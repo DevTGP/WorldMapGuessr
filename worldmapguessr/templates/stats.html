@@ -20,6 +20,19 @@
     <button class="btn" id="refresh" type="button">Aktualisieren</button>
   </header>
 
+  <section class="totals" aria-label="Summen (gefiltert)">
+    <div class="total"><span>Spawns</span><b id="t-spawned">–</b></div>
+    <div class="total"><span>Eingesetzt</span><b id="t-correct">–</b></div>
+    <div class="total"><span>Fehlplatziert</span><b id="t-incorrect">–</b></div>
+    <div class="total accent"><span>Eingesetzt / Spawns</span><b id="t-place-rate">–</b><i class="bar"><i id="t-place-bar"></i></i></div>
+    <div class="total"><span>Trefferquote</span><b id="t-hit-rate">–</b><small>richtig / Versuche</small></div>
+  </section>
+  <p class="how">
+    <b>Gezählt wird:</b> Spawn = ein Item kommt aus dem Vorrat ins Inventar (in einer Lobby nur, wenn der Server es
+    einem Spieler austeilt – an Mitspieler gesendete Items zählen nicht) · Eingesetzt = richtig eingesetzt ·
+    Fehlplatziert = falsch eingesetzt (kostet ein Leben).
+  </p>
+
   <div class="toolbar">
     <div class="segmented" role="radiogroup" aria-label="Art">
       <button type="button" role="radio" data-kind="" aria-checked="true">Alle</button>
@@ -39,15 +52,17 @@
           <th data-key="name" scope="col">Name</th>
           <th data-key="kind" scope="col">Art</th>
           <th data-key="code" scope="col">Code</th>
-          <th data-key="spawned" scope="col" class="num">Gespawnt</th>
-          <th data-key="correct" scope="col" class="num">Richtig</th>
-          <th data-key="incorrect" scope="col" class="num">Falsch</th>
-          <th data-key="rate" scope="col" class="num">Trefferquote</th>
+          <th data-key="spawned" scope="col" class="num">Spawns</th>
+          <th data-key="correct" scope="col" class="num">Eingesetzt</th>
+          <th data-key="incorrect" scope="col" class="num">Fehlplatziert</th>
+          <th data-key="placeRate" scope="col" class="num" title="Eingesetzt / Spawns">Eingesetzt / Spawns</th>
+          <th data-key="rate" scope="col" class="num" title="Eingesetzt / (Eingesetzt + Fehlplatziert)">Trefferquote</th>
           <th data-key="updated" scope="col">Zuletzt</th>
           <th data-key="uid" scope="col">UID</th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
+      <tfoot id="foot"></tfoot>
     </table>
     <p class="empty" id="empty" hidden>Keine Items für diesen Filter.</p>
   </div>

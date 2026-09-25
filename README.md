@@ -88,8 +88,8 @@ Hinweise:
 
 ## Item-Statistik
 
-Jedes Spielteil ist auf dem Server als Item mit fester UID registriert. Der Browser meldet Ereignisse
-über die API, der Server zählt – in MongoDB oder im Fallback in `instance/items.json`.
+Jedes Item ist auf dem Server mit fester UID registriert. Gezählt wird in MongoDB oder im Fallback in
+`instance/items.json`.
 
 | Methode | Pfad | Zweck |
 |---|---|---|
@@ -97,12 +97,24 @@ Jedes Spielteil ist auf dem Server als Item mit fester UID registriert. Der Brow
 | GET | `/api/items/<uid>` | ein Item |
 | POST | `/api/items/<uid>/events` | Body `{"event": "spawned" \| "correct" \| "incorrect"}` |
 
-Ereignisse: `spawned` = ins Inventar gelegt, `correct` / `incorrect` = Einsetzversuch.
+Was wann zählt:
+
+| Zähler | Einzelspiel (meldet der Browser über die API) | Lobby (zählt allein der Server) |
+|---|---|---|
+| `spawned` (Spawns) | Item kommt aus dem Vorrat ins Inventar (Start, Nachschub) | Server teilt ein Item aus dem Vorrat einem Spieler aus (Start, Nachschub, Nachlegen). **Nicht:** an Mitspieler gesendete Items, Neuladen/Wiederverbinden, zweiter Tab. Ein Item, das nach Verlassen zurück in den Vorrat ging und neu ausgeteilt wird, zählt erneut. |
+| `correct` (Eingesetzt) | richtiger Einsetzversuch | vom Server angenommener richtiger Versuch |
+| `incorrect` (Fehlplatziert) | falscher Versuch (kostet ein Leben) | vom Server angenommener falscher Versuch (nicht nach Rundenende oder mit fremden Items) |
+
+In der Lobby meldet der Browser nichts (`lobbies/round.py` sammelt die Ereignisse, `item_events.py` schreibt sie).
+Hinweis: Bis zu dieser Version haben in Lobbys die Browser gezählt – ältere Zahlen können dort Spawns doppelt enthalten
+(Neuladen, gesendete Items).
 
 **Statistik-Seite:** <http://127.0.0.1:5000/stats> (oder das Balken-Symbol oben rechts im Spiel). Tabelle aller Items,
 sortierbar per Klick auf den Spaltenkopf (zweiter Klick kehrt die Richtung um), Filter Kontinente/Staaten, Suche nach
-Name, Code oder UID, Trefferquote je Item. Darunter die Rohdaten als JSON (gefiltert und sortiert wie die Tabelle);
-ein Klick auf eine UID kopiert sie.
+Name, Code oder UID. Oben Kacheln mit den Summen (Spawns, Eingesetzt, Fehlplatziert) und den Quoten
+**Eingesetzt / Spawns** und **Trefferquote** (eingesetzt / Versuche) – jeweils für den aktuellen Filter; dieselben
+Summen stehen als letzte Tabellenzeile. Je Item gibt es beide Quoten als Spalte. Darunter die Rohdaten als JSON
+(gefiltert und sortiert wie die Tabelle); ein Klick auf eine UID kopiert sie.
 Ist der Server nicht erreichbar, läuft das Spiel ohne Tracking weiter (Warnung in der Konsole).
 
 ## Struktur
@@ -124,6 +136,7 @@ worldmapguessr/
   lobbies/store.py            Lobbys im Speicher, Beitritt, Passwort, Host-Aktionen, Verfall
   lobbies/hub.py              Live-Verbindungen, Online-Status, Host-Wechsel, Broadcast (mit eigenem Inventar)
   lobbies/round.py            Mehrspieler-Runde: Vorrat, Inventare, gemeinsame Leben, Nachschub
+  item_events.py              Item-Statistik aus Lobby-Runden in den Item-Store schreiben
   lobbies/catalog.py          Item-Katalog je Gruppe aus world.topo.json
   lobbies/ws.py               WebSocket-Endpunkt
   lobbies/api.py              HTTP-API /api/lobbies

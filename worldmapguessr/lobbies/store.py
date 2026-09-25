@@ -33,10 +33,12 @@ def _hash_token(token: str) -> str:
 
 
 class LobbyStore:
-    def __init__(self, persistence, ttl: int = LOBBY_TTL, clock=time.time, catalog=None):
+    def __init__(self, persistence, ttl: int = LOBBY_TTL, clock=time.time, catalog=None, on_stat=None):
         """persistence: JsonLobbyPersistence/MongoLobbyPersistence oder ein Dateipfad (→ JSON).
-        catalog: {kind: [Feature-Key]} – alle Teile, aus denen eine Runde gebaut wird."""
+        catalog: {Gruppe: [Feature-Key]} – alle Items, aus denen eine Runde gebaut wird.
+        on_stat(key, event): Item-Statistik der Lobby-Runden (spawned/correct/incorrect), vom Server gezählt."""
         self.catalog = catalog or {}
+        self.on_stat = on_stat
         if isinstance(persistence, (str, os.PathLike)):
             persistence = JsonLobbyPersistence(persistence)
         self.persistence = persistence
@@ -240,6 +242,10 @@ class LobbyStore:
         with self.lock:
             lobby = self._lobbies.get(normalize(code))
             if lobby:
+                # Statistik-Ereignisse der Runde weiterreichen (werden nicht mit der Lobby gespeichert)
+                for key, event in rounds.take_stats(lobby["round"]):
+                    if self.on_stat:
+                        self.on_stat(key, event)
                 lobby["lastActive"] = self.clock()
                 self.persistence.save(lobby)
 

@@ -1,5 +1,9 @@
 // Spielablauf: Runde nach Konfiguration (Leben, Startteile, Nachschub, Auswahl der Teile),
-// Einsetzen, Zurücklegen, Rundenende und Item-Tracking über den Server.
+// Einsetzen, Zurücklegen, Rundenende und Item-Statistik.
+//
+// Statistik: Im Einzelspiel meldet der Browser spawned (Item aus dem Vorrat ins Inventar) und
+// correct/incorrect (Einsetzversuch). In einer Lobby zählt allein der Server – der Browser meldet nichts,
+// sonst würden Neuladen, zweite Tabs oder gesendete Items doppelt zählen.
 //
 // Einzelspiel: Vorrat, Leben und Nachschub werden hier im Browser verwaltet (newRound).
 // Lobby: der Server ist maßgeblich (game/remote.js ruft resetRound/addPieces/… auf);
@@ -113,11 +117,11 @@ export class Game {
     };
   }
 
-  /** Teile ins Inventar legen (und als "spawned" zählen – außer von Mitspielern gesendete) */
-  addPieces(pieces, { notSpawned = new Set() } = {}) {
+  /** Items ins Inventar legen; im Einzelspiel als "spawned" zählen (Lobby: zählt der Server) */
+  addPieces(pieces) {
     for (const p of pieces) {
       this.pieces.set(p.id, p);
-      if (!notSpawned.has(p.id)) this.tracker.record(p.kind, p.code, "spawned");
+      if (!this.remote) this.tracker.record(p.kind, p.code, "spawned");
     }
     this.inventory.add(pieces);
   }
@@ -195,7 +199,7 @@ export class Game {
     const piece = this.held.piece;
     const fits = this.held.fits();
     this.busy = true;
-    this.tracker.record(piece.kind, piece.code, fits ? "correct" : "incorrect");
+    if (!this.remote) this.tracker.record(piece.kind, piece.code, fits ? "correct" : "incorrect");
     if (this.remote) return this._tryPlaceRemote(piece, fits);
     if (fits) {
       await this.held.snap();

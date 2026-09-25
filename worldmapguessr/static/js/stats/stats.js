@@ -2,7 +2,7 @@
 
 import { fetchItems } from "../api/items-api.js";
 import { sortItems, NUMERIC_KEYS } from "./sort.js";
-import { renderRows, renderSummary, renderJson } from "./render.js";
+import { renderRows, renderSummary, renderTotals, renderFoot, renderJson } from "./render.js";
 
 const $ = (id) => document.getElementById(id);
 const state = { items: [], kind: "", query: "", key: "name", dir: 1 };
@@ -19,6 +19,8 @@ function render() {
   const items = visibleItems();
   renderRows($("rows"), items);
   renderSummary($("summary"), items);
+  renderTotals(items);
+  renderFoot($("foot"), items);
   renderJson($("json"), items);
   $("empty").hidden = items.length > 0;
   document.querySelectorAll("th[data-key]").forEach((th) => {

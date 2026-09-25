@@ -6,11 +6,17 @@ export function hitRate(item) {
   return attempts ? item.correct / attempts : null;
 }
 
+/** Einsetzquote 0…1 (eingesetzt / spawns) oder null, wenn das Item nie gespawnt ist */
+export function placeRate(item) {
+  return item.spawned ? item.correct / item.spawned : null;
+}
+
 const collator = new Intl.Collator("de", { sensitivity: "base", numeric: true });
 
 /** Wert, nach dem eine Spalte sortiert wird */
 function value(item, key) {
   if (key === "rate") return hitRate(item);
+  if (key === "placeRate") return placeRate(item);
   return item[key];
 }
 
@@ -34,4 +40,4 @@ export function sortItems(items, key, dir) {
 }
 
 /** Standard-Richtung beim ersten Klick: Zahlen absteigend, Text aufsteigend */
-export const NUMERIC_KEYS = new Set(["spawned", "correct", "incorrect", "rate", "updated"]);
+export const NUMERIC_KEYS = new Set(["spawned", "correct", "incorrect", "placeRate", "rate", "updated"]);

@@ -19,12 +19,18 @@ Rundenzustand (JSON-serialisierbar, wird mit der Lobby gespeichert):
  pool: [key], hands: {playerId: [key]}, placed: [key], placedBy: {key: playerId},
  order: [playerId], cursor, dealt: {playerId: n}, sinceRefill, events, last: {seq, type: placed|miss|refill|gift, player, key?, count?, to?}}
 `events` zählt Ereignisse hoch; `last.seq` erlaubt dem Client, jedes Ereignis genau einmal anzuzeigen.
+
+Item-Statistik (spawned/correct/incorrect) zählt in der Lobby allein der Server: jedes Austeilen aus
+dem Vorrat an einen Spieler = spawned, jeder angenommene Einsetzversuch = correct bzw. incorrect.
+Senden zwischen Spielern und Zurücklegen in den Vorrat zählen nicht. Die Ereignisse sammeln sich in
+rnd[STATS] und werden vom LobbyStore mit take_stats() abgeholt (nicht gespeichert).
 """
 from __future__ import annotations
 
 import random
 
 RUNNING, WON, LOST = "running", "won", "lost"
+STATS = "_stats"  # vorübergehende Liste [(key, event)] für die Item-Statistik
 
 
 class RoundError(Exception):
@@ -80,10 +86,21 @@ def deal(rnd: dict, online: list[str], count: int) -> int:
         rnd["cursor"] = (rnd["cursor"] + 1) % len(order)
         if pid not in online:
             continue
-        rnd["hands"].setdefault(pid, []).append(rnd["pool"].pop(0))
+        key = rnd["pool"].pop(0)
+        rnd["hands"].setdefault(pid, []).append(key)
         rnd["dealt"][pid] = rnd["dealt"].get(pid, 0) + 1
+        _count(rnd, key, "spawned")
         given += 1
     return given
+
+
+def _count(rnd: dict, key: str, event: str) -> None:
+    rnd.setdefault(STATS, []).append((key, event))
+
+
+def take_stats(rnd: dict | None) -> list[tuple[str, str]]:
+    """Gesammelte Statistik-Ereignisse abholen (und aus der Runde entfernen)."""
+    return rnd.pop(STATS, []) if rnd else []
 
 
 def _event(rnd: dict, **event) -> None:
@@ -110,6 +127,7 @@ def place(rnd: dict, pid: str, key: str, correct: bool, online: list[str]) -> di
     if key not in hand:
         raise RoundError("not_in_hand", "Dieses Item liegt nicht in deinem Inventar.")
 
+    _count(rnd, key, "correct" if correct else "incorrect")
     if not correct:
         rnd["lives"] = max(0, rnd["lives"] - 1)
         _event(rnd, type="miss", player=pid, key=key)

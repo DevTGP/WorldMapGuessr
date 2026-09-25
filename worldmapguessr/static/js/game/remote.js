@@ -89,7 +89,7 @@ export class RemoteRound {
     const added = hand.filter((key) => !g.inventory.pieces.has(key)).map((key) => g.pieceFor(key)).filter(Boolean);
     const ev = round.last;
     const gift = ev?.type === "gift" && ev.to === this.client.me?.id && ev.seq > this.seq ? ev.key : null;
-    if (added.length) g.addPieces(added, { notSpawned: new Set(gift ? [gift] : []) });
+    if (added.length) g.addPieces(added);
 
     g.lives.set(round.lives);
     g.setProgress(round.placed.length, round.total);

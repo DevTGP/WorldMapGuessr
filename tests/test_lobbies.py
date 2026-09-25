@@ -243,6 +243,41 @@ def test_give_item_to_online_player_and_host_can_disable(store):
     assert e.value.code == "send_disabled"
 
 
+# ---------- Item-Statistik (zählt in Lobbys nur der Server) ----------
+def test_stats_counted_by_server_only_for_deals_and_accepted_placements(tmp_path):
+    events = []
+    store = LobbyStore(tmp_path / "l.json", catalog=CATALOG, on_stat=lambda k, e: events.append((k, e)))
+    hub, code, h, g = two_players(store)
+    spawned = [k for k, e in events if e == "spawned"]
+    assert len(spawned) == 6 and set(spawned) == set(hand_of(h)) | set(hand_of(g))
+    events.clear()
+    # Senden an Mitspieler, Wiederverbinden, abgelehnter Versuch: nichts zählt
+    hub.handle(code, h, {"type": "give", "key": hand_of(h)[0], "to": g.player_id})
+    connect(hub, code, playerId=g.player_id, token=g.ws.sent[0]["player"]["token"])
+    with pytest.raises(LobbyError):
+        hub.handle(code, h, {"type": "place", "key": hand_of(g)[0], "correct": True})
+    assert events == []
+    # falsch → incorrect, richtig → correct; 2. Treffer der Lobby → Nachschub 4 → 4× spawned
+    wrong, right1, right2 = hand_of(h)[0], hand_of(h)[1], hand_of(g)[0]
+    hub.handle(code, h, {"type": "place", "key": wrong, "correct": False})
+    hub.handle(code, h, {"type": "place", "key": right1, "correct": True})
+    hub.handle(code, g, {"type": "place", "key": right2, "correct": True})
+    assert events[:3] == [(wrong, "incorrect"), (right1, "correct"), (right2, "correct")]
+    assert [e for _, e in events[3:]] == ["spawned"] * 4
+    # nichts davon landet in der gespeicherten Lobby
+    assert "_stats" not in store.get(code)["round"]
+
+
+def test_item_event_recorder_counts_in_item_store(app):
+    store = app.extensions["item_store"]
+    recorder = app.extensions["lobby_store"].on_stat
+    recorder("country:USA", "spawned")
+    recorder("country:USA", "correct")
+    recorder("country:NOPE", "spawned")          # unbekannt: wird ignoriert, kein Fehler
+    usa = next(i for i in store.list("country") if i["code"] == "USA")
+    assert (usa["spawned"], usa["correct"], usa["incorrect"]) == (1, 1, 0)
+
+
 # ---------- HTTP ----------
 def test_http_create_info_and_page(client):
     r = client.post("/api/lobbies", json={"name": "Manu", "maxPlayers": 4, "password": "pw"})
