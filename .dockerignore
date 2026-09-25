@@ -12,6 +12,6 @@ build/
 tests/
 requirements-dev.txt
 Dockerfile
-compose.yaml
+docker-compose.yml
 .dockerignore
 README.md

@@ -1,0 +1,16 @@
+services:
+  worldmapguessr-web:
+    build: .
+    container_name: worldmapguessr-web
+    restart: unless-stopped
+    ports:
+      - "5002:5000"
+    volumes:
+      - ./instance:/app/instance
+    networks:
+      local-web:
+        ipv4_address: 172.20.0.12
+
+networks:
+  local-web:
+    external: true
