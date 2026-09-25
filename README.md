@@ -33,9 +33,22 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
 - **Host-Wechsel:** Ist der Host länger als 10 s getrennt, übernimmt der am längsten anwesende Spieler.
 - **Verlassen (alle):** „Lobby verlassen“ im Lobby-Bereich des Menüs → Bestätigung → zurück zum Einzelspiel. Der Spieler wird aus der Lobby entfernt, seine gespeicherte Identität gelöscht; über den Link kann er später als neuer Spieler wieder beitreten. Verlässt der Host, geht die Rolle sofort an den am längsten anwesenden Online-Spieler. Verlässt der letzte Spieler, wird die Lobby gelöscht.
 - **Beenden (nur Host):** „Lobby beenden“ → Bestätigung → die Lobby wird für alle gelöscht. Alle anderen sehen „Lobby beendet“ mit dem Weg zum Einzelspiel; der Link funktioniert danach nicht mehr.
-- **Runde starten:** Der Host startet für alle. Alle bekommen dieselbe Konfiguration und denselben Zufalls-Seed, also dieselbe Reihenfolge der Teile. Wie die Spieler sich gegenseitig beeinflussen, ist noch nicht umgesetzt – jeder spielt vorerst für sich.
+- **Runde starten:** Der Host startet für alle („Neue Runde für alle“ im Menü oder im Rundenende-Dialog). Ablauf siehe *Mehrspieler-Runde*.
 - **Speicherung:** MongoDB-Collection `lobbies` bzw. Fallback `instance/lobbies.json` (Passwörter nur als Hash, Spieler-Tokens als SHA-256). Lobbys ohne Aktivität verfallen nach 24 Stunden.
-- **Technik:** WebSocket `/ws/lobby/<code>` über `flask-sock`. Protokoll (JSON): Client → `join`, `settings`, `start`, `rename`, `leave`, `close`, `ping`; Server → `welcome`, `state`, `error`, `left`, `closed`, `pong`. HTTP: `POST /api/lobbies`, `GET /api/lobbies/<code>`.
+- **Technik:** WebSocket `/ws/lobby/<code>` über `flask-sock`. Protokoll (JSON): Client → `join`, `settings`, `start`, `place {key, correct}`, `rename`, `leave`, `close`, `ping`; Server → `welcome`, `state {lobby, hand}`, `error`, `left`, `closed`, `pong`. HTTP: `POST /api/lobbies`, `GET /api/lobbies/<code>`.
+
+## Mehrspieler-Runde
+
+Der Server führt die Runde (`lobbies/round.py`); der Browser prüft nur, ob ein Teil passt, und meldet das Ergebnis.
+
+- **Jedes Teil nur einmal:** Ein gemeinsamer, gemischter Vorrat. Jedes Teil liegt entweder im Vorrat, im Inventar genau eines Spielers oder ist eingesetzt. Fremde Inventare sieht niemand (nur deren Größe); Teile anderer Spieler kann man nicht einsetzen.
+- **Eingesetzte Teile synchron:** Jeder richtig eingesetzte Umriss erscheint sofort bei allen auf der Karte (mit Helligkeitsstufe und Grenze), dazu eine kurze Meldung „Name hat Frankreich eingesetzt“. Fortschritt `eingesetzt / gesamt` gilt für die Lobby.
+- **Gemeinsame Leben:** Jeder Fehlwurf kostet der ganzen Lobby ein Leben. Bei 0 endet die Runde für alle.
+- **Start und Nachschub:** Jeder Online-Spieler bekommt `Startteile`. Nach je `Nachschub alle` Treffern der *ganzen Lobby* bekommt jeder Online-Spieler `Nachschub` neue Teile (reihum verteilt, solange der Vorrat reicht). Hat niemand mehr ein Teil, der Vorrat aber schon, wird sofort nachgelegt.
+- **Später beitreten:** Wer in eine laufende Runde kommt, bekommt `Startteile` aus dem Vorrat und sieht alle bisher eingesetzten Teile.
+- **Verlassen / Verbindung weg:** Wer die Lobby verlässt, gibt seine Teile sofort zurück in den Vorrat. Bei einem Verbindungsabbruch bleiben sie 60 s reserviert (Neu laden behält das Inventar), danach gehen sie ebenfalls zurück.
+- **Rundenende:** Gewonnen (alles eingesetzt) oder verloren (keine Leben) – der Dialog erscheint bei allen. Nur der Host sieht „Neue Runde für alle“. Eine Rangliste gibt es noch nicht.
+- Der Rundenzustand wird mit der Lobby gespeichert und übersteht einen Server-Neustart.
 
 ## Speicher
 
@@ -105,7 +118,9 @@ worldmapguessr/
   lobbies/codes.py            Lobby-Codes, URL-Konverter
   lobbies/settings.py         Lobbyeinstellungen prüfen (Grenzen, Arten, Namen)
   lobbies/store.py            Lobbys im Speicher, Beitritt, Passwort, Host-Aktionen, Verfall
-  lobbies/hub.py              Live-Verbindungen, Online-Status, Host-Wechsel, Broadcast
+  lobbies/hub.py              Live-Verbindungen, Online-Status, Host-Wechsel, Broadcast (mit eigenem Inventar)
+  lobbies/round.py            Mehrspieler-Runde: Vorrat, Inventare, gemeinsame Leben, Nachschub
+  lobbies/catalog.py          Teile-Katalog aus world.topo.json
   lobbies/ws.py               WebSocket-Endpunkt
   lobbies/api.py              HTTP-API /api/lobbies
   item_store.py               Items als JSON-Datei (Fallback)
@@ -134,6 +149,7 @@ worldmapguessr/
   static/js/stats/sort.js     Sortierung, Trefferquote
   static/js/stats/render.js   Tabelle, Zusammenfassung, JSON-Ansicht
   static/js/game/game.js      Spielablauf nach Konfiguration (Wellen, Einsetzen, Leben, Tracking)
+  static/js/game/remote.js    Lobby-Runde: Server-Zustand auf Karte, Inventar, Leben abbilden
   static/js/menu/menu.js      Menü vor der Runde (Einzelspiel und Lobby)
   static/js/lobby/client.js   WebSocket-Client mit automatischem Wiederverbinden
   static/js/lobby/lobby-menu.js  Lobby-Bereich im Menü (Link, Spieler, Einstellungen, Rechte)
@@ -150,7 +166,7 @@ worldmapguessr/
   static/js/game/lives.js     Lebensanzeige
   static/js/game/toast.js     Kurzmeldungen
   static/data/world.topo.json 7 Kontinente + 45 Staaten in einer Topologie (generiert)
-tests/                        pytest: Item-Store, API, Lobbys – jeweils mit JSON und MongoDB (mongomock)
+tests/                        pytest: Item-Store, API, Lobbys, Mehrspieler-Runde – jeweils mit JSON und MongoDB (mongomock)
 build/                        Erzeugung der Kartendaten (siehe unten)
 .run/                         PyCharm-Startkonfigurationen (Server, Tests)
 ```

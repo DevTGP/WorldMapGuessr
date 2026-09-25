@@ -41,6 +41,13 @@ export class Lives {
     return this.value;
   }
 
+  /** Auf einen Wert setzen (Lobby: Server zählt die gemeinsamen Leben); Verluste werden animiert */
+  set(value) {
+    value = Math.max(0, Math.min(this.max, value));
+    if (value > this.value) this.reset(this.max);
+    while (this.value > value) this.lose();
+  }
+
   _label() {
     if (this.compact) this.countEl.textContent = `${this.value} / ${this.max}`;
     this.container.setAttribute("aria-label", `Leben: ${this.value} von ${this.max}`);

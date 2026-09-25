@@ -1,6 +1,9 @@
 // Spielablauf: Runde nach Konfiguration (Leben, Startteile, Nachschub, Auswahl der Teile),
 // Einsetzen, Zurücklegen, Rundenende und Item-Tracking über den Server.
-// Die Teile einer Runde werden zufällig gemischt.
+//
+// Einzelspiel: Vorrat, Leben und Nachschub werden hier im Browser verwaltet (newRound).
+// Lobby: der Server ist maßgeblich (game/remote.js ruft resetRound/addPieces/… auf);
+// der Browser prüft nur, ob ein Teil passt, und meldet das Ergebnis.
 
 import { sample, seededRandom } from "./random.js";
 import { HeldPiece } from "./held-piece.js";
@@ -25,6 +28,7 @@ export class Game {
     this.inventory = new Inventory(document.getElementById("slots"), (id) => this._onSlot(id));
     this.lives = new Lives(document.getElementById("lives"));
     this.config = null;       // Konfiguration der laufenden Runde
+    this.remote = null;       // Lobby-Runde (RemoteRound) oder null im Einzelspiel
     this.toast = createToast(document.getElementById("toast"));
     this.progressEl = document.getElementById("progress");
     this.dialog = document.getElementById("round-dialog");
@@ -59,46 +63,94 @@ export class Game {
    */
   async newRound(config, { seed } = {}) {
     await this.ready; // UIDs vom Server, damit schon das erste "spawned" gezählt wird
-    this.config = config;
-    this.held.cancel();
-    this._endHolding();
-    this.busy = false;
-    this.over = false;
-    this.map.resetPlaced();
-    this.inventory.clear();
-    this.lives.reset(config.lives);
-
+    this.resetRound(config);
     const features = poolFor(config, this.map.features);
     const random = Number.isInteger(seed) ? seededRandom(seed) : Math.random;
-    this.pool = sample(features, features.length, random).map((f) => ({
+    this.pool = sample(features, features.length, random).map((f) => this._piece(f));
+    this.total = this.pool.length;
+    this.sinceRefill = 0;
+    this._deal(config.startItems);
+  }
+
+  /** Alles für eine neue Runde zurücksetzen (Einzelspiel und Lobby) */
+  resetRound(config, lives = config.lives) {
+    this.config = config;
+    this.cancelHeld();
+    this.busy = false;
+    this.over = false;
+    this.dialog.close();
+    this.map.resetPlaced();
+    this.inventory.clear();
+    this.lives.reset(lives);
+    this.pool = [];
+    this.pieces = new Map();
+    this.correct = 0;
+    this.total = 0;
+    this._updateProgress();
+  }
+
+  /** Spielteil zu einem Feature-Key ("country:DEU") oder null */
+  pieceFor(key) {
+    const f = this.map.byKey.get(key);
+    return f ? this._piece(f) : null;
+  }
+
+  _piece(f) {
+    return {
       id: f.key,               // eindeutig über alle Ebenen, z. B. "country:DEU"
       kind: f.kind,
       code: f.id,
       name: f.properties.name,
       feature: f,
       geom: f.geom,
-    }));
-    this.total = this.pool.length;
-    this.pieces = new Map();
-    this.correct = 0;
-    this.sinceRefill = 0;
-    this._deal(config.startItems);
+    };
+  }
+
+  /** Teile ins Inventar legen (und als "spawned" zählen) */
+  addPieces(pieces) {
+    for (const p of pieces) {
+      this.pieces.set(p.id, p);
+      this.tracker.record(p.kind, p.code, "spawned");
+    }
+    this.inventory.add(pieces);
+  }
+
+  /** Teil ohne Animation aus dem Inventar nehmen (Lobby: Server hat es zurück in den Vorrat gelegt) */
+  removePiece(id) {
+    if (this.held.piece?.id === id) this.cancelHeld();
+    this.inventory.remove(id);
+  }
+
+  /** Gehaltenes Teil sofort fallen lassen (zurück in seinen Slot) */
+  cancelHeld() {
+    const id = this.held.active ? this.held.piece.id : null;
+    this.held.cancel();
+    if (id && this.inventory.state(id) === "held") this.inventory.setState(id, "ready");
+    this._endHolding();
+  }
+
+  setProgress(correct, total) {
+    this.correct = correct;
+    this.total = total;
+    this._updateProgress();
   }
 
   /** n Teile aus dem Vorrat ins Inventar legen */
   _deal(n) {
     const wave = this.pool.splice(0, n);
-    for (const p of wave) {
-      this.pieces.set(p.id, p);
-      this.tracker.record(p.kind, p.code, "spawned");
-    }
-    this.inventory.add(wave);
+    this.addPieces(wave);
     this._updateProgress();
     return wave.length;
   }
 
   _updateProgress() {
     this.progressEl.textContent = `${this.correct} / ${this.total}`;
+  }
+
+  /** Animation vorbei: Eingaben wieder frei, zurückgestellten Lobby-Zustand anwenden */
+  _idle() {
+    this.busy = false;
+    this.remote?.flush();
   }
 
   _onSlot(id) {
@@ -120,9 +172,11 @@ export class Game {
 
   async _tryPlace() {
     const piece = this.held.piece;
+    const fits = this.held.fits();
     this.busy = true;
-    if (this.held.fits()) {
-      this.tracker.record(piece.kind, piece.code, "correct");
+    this.tracker.record(piece.kind, piece.code, fits ? "correct" : "incorrect");
+    if (this.remote) return this._tryPlaceRemote(piece, fits);
+    if (fits) {
       await this.held.snap();
       this.map.setPlaced(piece.id, true);
       this.inventory.setState(piece.id, "placed");
@@ -143,7 +197,6 @@ export class Game {
       return;
     }
 
-    this.tracker.record(piece.kind, piece.code, "incorrect");
     const left = this.lives.lose();
     this.toast(left > 0 ? `Daneben – noch ${left} Leben` : "Daneben", "bad");
     await this._flyBack(piece);
@@ -151,12 +204,28 @@ export class Game {
     if (left === 0) this._finish(false);
   }
 
+  /** Lobby: Ergebnis an den Server; Leben, Nachschub und Rundenende kommen mit dem nächsten Zustand */
+  async _tryPlaceRemote(piece, fits) {
+    this.remote.send(piece.id, fits);
+    if (fits) {
+      await this.held.snap();
+      this.map.setPlaced(piece.id, true);
+      this.inventory.setState(piece.id, "placed");
+      this._endHolding();
+      this.toast(`${piece.name} sitzt`, "good");
+    } else {
+      this.toast("Daneben", "bad");
+      await this._flyBack(piece);
+    }
+    this._idle();
+  }
+
   /** Zurücklegen ohne Strafe */
   async _putBack() {
     if (this.busy) return;
     this.busy = true;
     await this._flyBack(this.held.piece);
-    this.busy = false;
+    this._idle();
   }
 
   async _flyBack(piece) {
@@ -174,6 +243,7 @@ export class Game {
 
   _finish(won) {
     this.over = true;
+    this.cancelHeld();
     document.getElementById("dlg-title").textContent = won ? "Runde geschafft" : "Keine Leben mehr";
     document.getElementById("dlg-text").textContent = won
       ? `Alle ${this.total} Umrisse sitzen – mit ${this.lives.value} von ${this.lives.max} Leben übrig.`

@@ -3,8 +3,9 @@
 import { createMap } from "./map/map.js";
 import { bindMapControls } from "./map/controls.js";
 import { Game } from "./game/game.js";
+import { RemoteRound } from "./game/remote.js";
 import { Menu } from "./menu/menu.js";
-import { fromWire, toWire } from "./menu/config.js";
+import { toWire } from "./menu/config.js";
 import { LobbyClient } from "./lobby/client.js";
 import { LobbyMenu } from "./lobby/lobby-menu.js";
 import { identity } from "./lobby/identity.js";
@@ -25,9 +26,11 @@ createMap({ canvas: document.getElementById("map"), dataUrl: WMG.dataUrl ?? "dat
 
     const roundDialog = document.getElementById("round-dialog");
     document.getElementById("new-round").addEventListener("click", () => menu.open({ canCancel: game.running }));
+    // Einzelspiel: gleiche Einstellungen, neu gemischt. Lobby: startLobby ersetzt das.
+    game.again = () => game.newRound(game.config);
     document.getElementById("dlg-again").addEventListener("click", () => {
       roundDialog.close();
-      game.newRound(game.config); // gleiche Einstellungen, neu gemischt
+      game.again();
     });
     document.getElementById("dlg-menu").addEventListener("click", () => {
       roundDialog.close();
@@ -72,19 +75,17 @@ async function startLobby(code, { game, menu }) {
   const info = await infoRes.json();
 
   const client = new LobbyClient(code);
-  let playingRound = 0; // Nummer der Lobby-Runde, die hier läuft
-  const joinRound = (round) => {
-    playingRound = round.number;
-    if (menu.isOpen) menu.dialog.close();
-    document.getElementById("round-dialog").close();
-    game.newRound(fromWire(round.config), { seed: round.seed });
-  };
+  // Gemeinsame Runde: Server verteilt die Teile (jedes nur einmal), Einsetzen wird für alle synchronisiert
+  const remote = new RemoteRound(game, client);
   new LobbyMenu(menu, client, {
-    onJoinRound: () => joinRound(client.state.round),
-    isPlaying: () => playingRound > 0 && game.running,
+    onJoinRound: () => menu.dialog.close(),
+    isPlaying: () => remote.number > 0 && game.running,
   });
   document.getElementById("new-round").textContent = "Lobby";
   document.getElementById("dlg-menu").textContent = "Lobby";
+  const again = document.getElementById("dlg-again");
+  again.textContent = "Neue Runde für alle";
+  game.again = () => client.startRound();
 
   const hud = document.getElementById("lobby-badge");
   hud.hidden = false;
@@ -95,7 +96,9 @@ async function startLobby(code, { game, menu }) {
     hud.querySelector("b").textContent = code;
     hud.querySelector("span").textContent = `${online} ${online === 1 ? "Spieler" : "Spieler"}`;
     // Neue Runde vom Host (oder laufende Runde beim ersten Beitritt) → mitspielen
-    if (state.round && state.round.number > playingRound) joinRound(state.round);
+    if (state.round && state.round.number !== remote.number && menu.isOpen) menu.dialog.close();
+    remote.apply(state, client.hand);
+    again.hidden = !client.isHost; // neue Runde startet nur der Host
     menu.setCloseable(game.running);
   });
   // Verlassen: zurück zum Einzelspiel. Beendet (vom Host): Hinweis für alle.

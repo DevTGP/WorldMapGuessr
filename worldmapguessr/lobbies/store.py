@@ -10,6 +10,7 @@ import time
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from . import round as rounds
 from .codes import new_code, normalize
 from .persistence import JsonLobbyPersistence
 from .settings import DEFAULT_CONFIG, clean_config, clean_max_players, clean_name
@@ -31,8 +32,10 @@ def _hash_token(token: str) -> str:
 
 
 class LobbyStore:
-    def __init__(self, persistence, ttl: int = LOBBY_TTL, clock=time.time):
-        """persistence: JsonLobbyPersistence/MongoLobbyPersistence oder ein Dateipfad (→ JSON)."""
+    def __init__(self, persistence, ttl: int = LOBBY_TTL, clock=time.time, catalog=None):
+        """persistence: JsonLobbyPersistence/MongoLobbyPersistence oder ein Dateipfad (→ JSON).
+        catalog: {kind: [Feature-Key]} – alle Teile, aus denen eine Runde gebaut wird."""
+        self.catalog = catalog or {}
         if isinstance(persistence, (str, os.PathLike)):
             persistence = JsonLobbyPersistence(persistence)
         self.persistence = persistence
@@ -127,19 +130,54 @@ class LobbyStore:
             self.touch(code)
             return lobby
 
-    def start_round(self, code, player_id) -> dict:
+    # ---------- Runde ----------
+    def start_round(self, code, player_id, online=()) -> dict:
+        """Host startet eine neue Runde für alle (gemeinsamer Vorrat, gemeinsame Leben)."""
         with self.lock:
             lobby = self._require(code)
             self._require_host(lobby, player_id)
             number = (lobby["round"] or {}).get("number", 0) + 1
-            lobby["round"] = {
-                "number": number,
-                "seed": secrets.randbits(31),
-                "startedAt": self.clock(),
-                "config": dict(lobby["settings"]["config"]),
-            }
+            players = [p for p in online if p in lobby["players"]] or [player_id]
+            lobby["round"] = rounds.new_round(
+                number, lobby["settings"]["config"], self.catalog, players,
+                seed=secrets.randbits(31), now=self.clock(),
+            )
             self.touch(code)
             return lobby
+
+    def round_join(self, code, player_id) -> int:
+        """Spieler ist (wieder) da: Startteile, falls er in der laufenden Runde noch nichts hat."""
+        with self.lock:
+            lobby = self._require(code)
+            if not lobby["round"]:
+                return 0
+            n = rounds.join(lobby["round"], player_id)
+            if n:
+                self.touch(code)
+            return n
+
+    def place(self, code, player_id, key, correct, online=()) -> dict:
+        with self.lock:
+            lobby = self._require(code)
+            if not lobby["round"]:
+                raise LobbyError("no_round", "Es läuft keine Runde.")
+            try:
+                result = rounds.place(lobby["round"], player_id, str(key), bool(correct), list(online))
+            except rounds.RoundError as err:
+                raise LobbyError(err.code, err.message) from None
+            self.touch(code)
+            return result
+
+    def return_hand(self, code, player_id, online=()) -> int:
+        """Teile eines Spielers zurück in den Vorrat (Verlassen, lange getrennt)."""
+        with self.lock:
+            lobby = self.get(code)
+            if not lobby or not lobby["round"]:
+                return 0
+            n = rounds.return_hand(lobby["round"], player_id, [p for p in online if p != player_id])
+            if n:
+                self.touch(code)
+            return n
 
     def remove_player(self, code, player_id, online=()) -> dict | None:
         """Spieler verlässt die Lobby endgültig. War er Host, übernimmt der am längsten anwesende

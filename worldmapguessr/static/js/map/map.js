@@ -252,10 +252,13 @@ export class WorldMap {
   }
 
   // ---------- Spielzustand ----------
-  setPlaced(key, placed) {
-    this.renderer.setPlaced(key, placed);
+  setPlaced(key, placed, animate = true) {
+    this.renderer.setPlaced(key, placed, animate);
     this.requestRender();
   }
+
+  isPlaced(key) { return this.renderer.placed.has(key); }
+  get placedKeys() { return [...this.renderer.placed.keys()]; }
 
   resetPlaced() {
     this.renderer.placed.clear();

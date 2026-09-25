@@ -65,15 +65,23 @@ export class Inventory {
       done.className = "done";
       done.innerHTML = `${CHECK}${p.name}`;
       el.append(done);
-      const t = setTimeout(() => { this.timers.delete(t); this._remove(id); }, REMOVE_AFTER_MS);
+      const t = setTimeout(() => {
+        this.timers.delete(t);
+        if (this.state(id) === "placed") this._remove(id);
+      }, REMOVE_AFTER_MS);
       this.timers.add(t);
     }
   }
 
+  /** Slot entfernen (mit kurzer Ausblende-Animation) */
+  remove(id) { this._remove(id); }
+
   _remove(id) {
     const el = this.slot(id);
-    if (!el) return;
     this.pieces.delete(id);
+    if (!el) return;
+    el.dataset.state = "removed";
+    el.removeAttribute("data-id"); // gleicher Key kann sofort neu ins Inventar kommen
     el.classList.add("leaving");
     el.addEventListener("transitionend", () => el.remove(), { once: true });
     setTimeout(() => el.remove(), 400); // Fallback ohne Transition

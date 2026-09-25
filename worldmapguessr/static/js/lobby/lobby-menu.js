@@ -58,13 +58,12 @@ export class LobbyMenu {
     };
     menu.primaryAction = () => {
       if (client.isHost) client.startRound();
-      else if (client.state?.round) onJoinRound();
+      else if (isPlaying()) onJoinRound();
     };
     menu.primaryLabel = (pool) => {
       if (!client.connected) return { text: "Verbinde …", disabled: true };
-      if (client.isHost) return pool ? `Runde für alle starten · ${pool} Teile` : "Runde für alle starten";
-      if (client.state?.round && !isPlaying()) return "Laufender Runde beitreten";
-      if (client.state?.round) return { text: "Runde läuft", disabled: true };
+      if (client.isHost) return pool ? `Neue Runde für alle · ${pool} Teile` : "Neue Runde für alle";
+      if (isPlaying()) return "Zurück zur Runde";
       return { text: "Warten auf den Host …", disabled: true };
     };
 

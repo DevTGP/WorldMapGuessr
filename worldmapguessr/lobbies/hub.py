@@ -1,14 +1,19 @@
-"""Live-Verbindungen der Lobbys: wer ist online, Host-Übergabe, Broadcast des Lobby-Zustands."""
+"""Live-Verbindungen der Lobbys: wer ist online, Host-Übergabe, gemeinsame Runde, Broadcast.
+
+Jeder Spieler bekommt denselben Lobby-Zustand (inkl. öffentlicher Rundenansicht: eingesetzte Teile,
+Leben, Vorratsgröße) plus sein eigenes Inventar (`hand`). Fremde Inventare sieht niemand."""
 from __future__ import annotations
 
 import json
 import threading
 import time
 
+from . import round as rounds
 from .settings import clean_name
 from .store import LobbyError, LobbyStore
 
 HOST_GRACE = 10.0         # s: so lange darf der Host weg sein (z. B. Seite neu laden), bevor die Rolle wechselt
+HAND_GRACE = 60.0         # s: so lange behält ein getrennter Spieler sein Inventar, danach zurück in den Vorrat
 EXPIRE_INTERVAL = 600.0   # s: Abstand der Aufräumläufe für verfallene Lobbys
 
 
@@ -30,9 +35,11 @@ class Connection:
 
 
 class LobbyHub:
-    def __init__(self, store: LobbyStore, host_grace: float = HOST_GRACE, clock=time.monotonic):
+    def __init__(self, store: LobbyStore, host_grace: float = HOST_GRACE, clock=time.monotonic,
+                 hand_grace: float = HAND_GRACE):
         self.store = store
         self.host_grace = host_grace
+        self.hand_grace = hand_grace
         self.clock = clock
         self.lock = threading.RLock()
         self.online: dict[str, dict[str, list[Connection]]] = {}  # code → player_id → Verbindungen
@@ -66,6 +73,7 @@ class LobbyHub:
             online.setdefault(player["id"], []).append(conn)
             self.offline_since.pop((code, player["id"]), None)
             self._fix_host(code)
+            self.store.round_join(code, player["id"])  # Nachzügler bekommt Startteile
             self.store.touch(code)
 
         welcome = {"type": "welcome", "player": {"id": player["id"], "name": player["name"]}}
@@ -86,7 +94,9 @@ class LobbyHub:
                 self.offline_since[(code, conn.player_id)] = self.clock()
                 lobby = self.store.get(code)
                 if lobby and lobby["host"] == conn.player_id:
-                    threading.Timer(self.host_grace + 0.1, self._host_check, args=(code,)).start()
+                    self._later(self.host_grace + 0.1, self._host_check, code)
+                if lobby and lobby["round"] and lobby["round"]["hands"].get(conn.player_id):
+                    self._later(self.hand_grace + 0.1, self._hand_check, code, conn.player_id)
             if not players:
                 self.online.pop(code, None)
         self.broadcast(code)
@@ -107,7 +117,10 @@ class LobbyHub:
         if kind == "settings":
             self.store.update_settings(code, pid, msg.get("settings") or {})
         elif kind == "start":
-            self.store.start_round(code, pid)
+            self.store.start_round(code, pid, online=self._online_ids(code))
+        elif kind == "place":
+            self.store.place(code, pid, msg.get("key"), msg.get("correct") is True,
+                             online=self._online_ids(code))
         elif kind == "rename":
             self.store.rename(code, pid, msg.get("name"))
         else:
@@ -119,6 +132,7 @@ class LobbyHub:
         with self.lock:
             conns = self.online.get(code, {}).pop(player_id, [])
             self.offline_since.pop((code, player_id), None)
+            self.store.return_hand(code, player_id, online=self._online_ids(code))
             lobby = self.store.remove_player(code, player_id, online=self.online.get(code, {}).keys())
             if lobby is None:
                 self.online.pop(code, None)
@@ -157,20 +171,46 @@ class LobbyHub:
             "host": lobby["host"],
             "players": players,
             "settings": {"config": s["config"], "maxPlayers": s["maxPlayers"], "private": bool(s["passwordHash"])},
-            "round": lobby["round"],
+            "round": rounds.public_view(lobby["round"]),
         }
 
     def broadcast(self, code: str):
-        state = self.state(code)
-        if state is None:
-            return
+        """Zustand an alle; jeder bekommt zusätzlich nur sein eigenes Inventar."""
         with self.lock:
-            conns = [c for cs in self.online.get(state["code"], {}).values() for c in cs]
-        for c in conns:
-            c.send({"type": "state", "lobby": state})
+            state = self.state(code)
+            if state is None:
+                return
+            rnd = self.store.get(code)["round"]
+            hands = rnd["hands"] if rnd else {}
+            targets = [
+                (c, list(hands.get(pid, [])))
+                for pid, cs in self.online.get(state["code"], {}).items() for c in cs
+            ]
+        for c, hand in targets:
+            c.send({"type": "state", "lobby": state, "hand": hand})
+
+    def _online_ids(self, code: str) -> list[str]:
+        return list(self.online.get(code, {}))
 
     def online_count(self, code: str) -> int:
         return len(self.online.get(code, {}))
+
+    # ---------- Getrennte Spieler ----------
+    def _hand_check(self, code: str, player_id: str):
+        """Nach hand_grace immer noch getrennt → Inventar zurück in den Vorrat."""
+        with self.lock:
+            since = self.offline_since.get((code, player_id))
+            if since is None or self.clock() - since < self.hand_grace:
+                return
+            n = self.store.return_hand(code, player_id, online=self._online_ids(code))
+        if n:
+            self.broadcast(code)
+
+    @staticmethod
+    def _later(delay: float, fn, *args):
+        t = threading.Timer(delay, fn, args=args)
+        t.daemon = True
+        t.start()
 
     # ---------- Host ----------
     def _host_check(self, code: str):

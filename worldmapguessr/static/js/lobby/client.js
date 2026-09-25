@@ -1,4 +1,4 @@
-// WebSocket-Verbindung zu einer Lobby: beitreten, Zustand empfangen, Einstellungen/Start senden.
+// WebSocket-Verbindung zu einer Lobby: beitreten, Zustand empfangen, Einstellungen/Start/Einsetzen senden.
 // Baut die Verbindung bei Abbruch selbst wieder auf (mit Wiederbeitritt über ID + Token).
 
 import { identity } from "./identity.js";
@@ -13,6 +13,7 @@ export class LobbyClient extends EventTarget {
     this.code = code;
     this.me = null;          // {id, name}
     this.state = null;       // letzter Lobby-Zustand vom Server
+    this.hand = [];          // eigenes Inventar in der Lobby-Runde (Feature-Keys)
     this.ws = null;
     this.retry = 0;
     this.closedForGood = false;
@@ -31,6 +32,8 @@ export class LobbyClient extends EventTarget {
 
   sendSettings(settings) { this._send({ type: "settings", settings }); }
   startRound() { this._send({ type: "start" }); }
+  /** Einsetzversuch eines Teils aus dem eigenen Inventar (correct: passt es?) */
+  place(key, correct) { this._send({ type: "place", key, correct }); }
   /** Lobby endgültig verlassen (alle Tabs dieses Spielers) */
   leave() { this._send({ type: "leave" }); }
   /** Nur Host: Lobby für alle beenden */
@@ -74,6 +77,7 @@ export class LobbyClient extends EventTarget {
         break;
       case "state":
         this.state = msg.lobby;
+        this.hand = msg.hand ?? [];
         this._emit("state", msg.lobby);
         break;
       case "left":

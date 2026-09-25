@@ -26,11 +26,14 @@ class Clock:
         return self.t
 
 
+CATALOG = {"continent": [f"continent:{i}" for i in range(3)], "country": [f"country:{i}" for i in range(20)]}
+
+
 @pytest.fixture(params=["json", "mongodb"])
 def store(request, tmp_path):
     if request.param == "mongodb":
-        return LobbyStore(MongoLobbyPersistence(mongomock.MongoClient().db["lobbies"]))
-    return LobbyStore(tmp_path / "lobbies.json")
+        return LobbyStore(MongoLobbyPersistence(mongomock.MongoClient().db["lobbies"]), catalog=CATALOG)
+    return LobbyStore(tmp_path / "lobbies.json", catalog=CATALOG)
 
 
 def connect(hub, code, **msg):
@@ -130,6 +133,75 @@ def test_hub_rejects_guest_settings_and_start(store):
     g = connect(hub, code, name="Gast")
     with pytest.raises(LobbyError):
         hub.handle(code, g, {"type": "start"})
+
+
+# ---------- Gemeinsame Runde ----------
+def hand_of(conn):
+    return [m for m in conn.ws.sent if m["type"] == "state"][-1]["hand"]
+
+
+def round_of(conn):
+    return [m for m in conn.ws.sent if m["type"] == "state"][-1]["lobby"]["round"]
+
+
+def two_players(store, **config):
+    hub = LobbyHub(store, clock=Clock())
+    lobby, host = store.create(player_name="Host", config={"startItems": 3, "refillEvery": 2,
+                                                          "refillCount": 2, "lives": 2, **config})
+    code = lobby["code"]
+    h = connect(hub, code, playerId=host["id"], token=host["token"])
+    g = connect(hub, code, name="Gast")
+    hub.handle(code, h, {"type": "start"})
+    return hub, code, h, g
+
+
+def test_round_items_exclusive_and_placements_synced(store):
+    hub, code, h, g = two_players(store)
+    hh, gh = hand_of(h), hand_of(g)
+    assert len(hh) == len(gh) == 3 and not set(hh) & set(gh)
+    assert "pool" not in round_of(g) and round_of(g)["poolCount"] == 23 - 6
+    # Gast kann kein Teil des Hosts einsetzen
+    with pytest.raises(LobbyError) as e:
+        hub.handle(code, g, {"type": "place", "key": hh[0], "correct": True})
+    assert e.value.code == "not_in_hand"
+    hub.handle(code, h, {"type": "place", "key": hh[0], "correct": True})
+    r = round_of(g)
+    assert r["placed"] == [hh[0]] and r["placedBy"][hh[0]] == h.player_id
+    assert r["last"]["type"] == "placed" and hh[0] not in hand_of(h)
+    # zweiter Treffer der Lobby → jeder bekommt 2 neue
+    hub.handle(code, g, {"type": "place", "key": gh[0], "correct": True})
+    assert len(hand_of(h)) == 4 and len(hand_of(g)) == 4
+
+
+def test_shared_lives_end_round_for_everyone(store):
+    hub, code, h, g = two_players(store)
+    hub.handle(code, h, {"type": "place", "key": hand_of(h)[0], "correct": False})
+    assert round_of(g)["lives"] == 1
+    hub.handle(code, g, {"type": "place", "key": hand_of(g)[0], "correct": "yes"})  # nur True zählt
+    assert round_of(h)["status"] == "lost" and round_of(h)["lives"] == 0
+
+
+def test_late_joiner_gets_items_and_leaver_returns_them(store):
+    hub, code, h, g = two_players(store)
+    late = connect(hub, code, name="Spät")
+    assert len(hand_of(late)) == 3
+    hub.handle(code, late, {"type": "leave"})
+    r = round_of(h)
+    assert late.player_id is None and r["poolCount"] == 23 - 6 and late.ws.sent[-1]["type"] == "left"
+
+
+def test_disconnected_player_keeps_hand_during_grace(store):
+    hub, code, h, g = two_players(store)
+    gid, items = g.player_id, hand_of(g)
+    hub.leave(code, g)
+    hub._hand_check(code, gid)                     # noch in der Karenzzeit
+    assert round_of(h)["handCounts"][gid] == 3
+    g2 = connect(hub, code, playerId=gid, token=g.ws.sent[0]["player"]["token"])
+    assert hand_of(g2) == items                    # Wiederverbinden: gleiches Inventar
+    hub.leave(code, g2)
+    hub.clock.t += hub.hand_grace + 1
+    hub._hand_check(code, gid)
+    assert gid not in round_of(h)["handCounts"] and round_of(h)["poolCount"] == 23 - 3
 
 
 # ---------- HTTP ----------

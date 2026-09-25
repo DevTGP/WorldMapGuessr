@@ -55,7 +55,7 @@
 
 /* Ein- und Ausblenden beim Nachschub bzw. nach dem Einsetzen */
 .slot.entering { opacity: 0; transform: translateY(12px); }
-.slot.leaving { opacity: 0; transform: scale(0.9); }
+.slot.leaving { opacity: 0; transform: scale(0.9); pointer-events: none; }
 .slot { transition: background 0.15s ease, border-color 0.15s ease, opacity 0.3s ease, transform 0.3s ease; }
 
 /* Teil ist gerade in der Hand: Slot zeigt nur noch die Aussparung */
@@ -183,7 +183,7 @@ body.is-holding #map { cursor: crosshair; }
 .round-dialog::backdrop { background: rgba(10, 20, 30, 0.25); }
 .round-dialog h2 { margin: 0 0 6px; font-size: 18px; text-wrap: balance; }
 .round-dialog p { margin: 0 0 16px; color: var(--ink-soft); }
-.round-dialog .actions { display: flex; justify-content: flex-end; }
+.round-dialog .actions { display: flex; justify-content: flex-end; gap: 8px; }
 
 @media (max-width: 480px) {
   .slot { height: 76px; }

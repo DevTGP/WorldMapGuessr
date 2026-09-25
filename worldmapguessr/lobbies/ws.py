@@ -2,8 +2,11 @@
 
 Protokoll (JSON):
   Client → Server  join {playerId?, token?, name, password?} · settings {settings} · start · rename {name}
+                   · place {key, correct} (Einsetzversuch eines Teils aus dem eigenen Inventar)
                    · leave (Lobby verlassen) · close (nur Host: Lobby beenden) · ping
-  Server → Client  welcome {player} · state {lobby} · error {code, message} · left · closed {message} · pong
+  Server → Client  welcome {player} · state {lobby, hand} · error {code, message} · left · closed {message}
+                   · pong
+  lobby.round: öffentliche Rundenansicht (round.public_view), hand: eigenes Inventar (Feature-Keys)
 """
 import json
 
@@ -29,9 +32,7 @@ def register(sock):
                 hub.join(code, conn, json.loads(raw))
             except LobbyError as err:
                 conn.send({"type": "error", "code": err.code, "message": err.message, "fatal": True})
-                # Der Client schließt selbst; bis dahin warten (sauberer als ein Abbruch vom Server)
-                while ws.receive(timeout=5) is not None:
-                    pass
+                _wait_for_close(ws)
                 return
             code = hub.store.get(code)["code"]
             while True:
@@ -41,6 +42,7 @@ def register(sock):
                 try:
                     hub.handle(code, conn, json.loads(raw))
                     if conn.player_id is None:  # verlassen oder Lobby beendet
+                        _wait_for_close(ws)
                         break
                 except LobbyError as err:
                     conn.send({"type": "error", "code": err.code, "message": err.message})
@@ -51,3 +53,12 @@ def register(sock):
         finally:
             if conn.player_id:
                 hub.leave(code.upper(), conn)
+
+
+def _wait_for_close(ws):
+    """Der Client schließt selbst; bis dahin warten (sauberer als ein Abbruch vom Server)."""
+    try:
+        while ws.receive(timeout=5) is not None:
+            pass
+    except ConnectionClosed:
+        pass
