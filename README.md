@@ -19,7 +19,7 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
 - Staatsgrenzen sind auf der Karte unsichtbar, sichtbar sind nur Küsten und Kontinentgrenzen. Ein richtig eingesetzter Staat erscheint aufgehellt mit seinem Umriss (Kleinststaaten zusätzlich mit einem Ring, solange sie zu klein zum Erkennen sind).
 - Ein gehaltener Kleinststaat (Vatikan, Monaco, San Marino …) bekommt einen gestrichelten Ring, damit man ihn sieht.
 - Klick auf ein Item im Inventar nimmt es auf; er folgt dem Mauszeiger in der aktuellen Ansicht (gleiche Drehung, gleicher Zoom).
-- Klick auf die Karte setzt ihn ein. Liegt er innerhalb einer kleinen Toleranz richtig, rastet er ein und die Fläche wird eine Stufe heller.
+- Klick auf die Karte setzt es ein. Richtig ist jeder Klick in die Fläche des Items (z. B. irgendwo in Südamerika) oder höchstens 6 Bildschirmpixel neben ihrem Rand (Touch: 12 px) – unabhängig vom Zoom immer gleich viele Pixel, hineingezoomt also geografisch genauer. Winzige Items (Vatikan, Monaco …) zählen zusätzlich, wenn der Klick nahe an ihrem Mittelpunkt liegt. Dann rastet das Item ein und die Fläche wird eine Stufe heller.
 - Helligkeitsstufen: Das Land startet fast schwarz. Jedes eingesetzte Item hellt seine Fläche um eine Stufe auf (additiv, Reihenfolge egal). Sind alle Ebenen an einer Stelle eingesetzt – derzeit Kontinent und Staat –, ist sie fast weiß. Kommen später Ebenen hinzu (Bundesländer, Regionen), werden die Stufen automatisch feiner.
 - Daneben: Das Item fliegt zurück ins Inventar, ein Leben weniger. Bei 0 Leben endet die Runde.
 - Nachschub: Nach der eingestellten Zahl richtiger Treffer kommen neue Items ins Inventar, bis der Vorrat leer ist.

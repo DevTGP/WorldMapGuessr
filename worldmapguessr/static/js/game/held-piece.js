@@ -4,7 +4,12 @@
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const dur = (ms) => (reduceMotion ? 0 : ms);
 
-/** Einrast-Toleranz in Bildschirmpixeln: klein, wächst mäßig mit der Teilgröße */
+/** Klick in die Fläche des Items zählt – oder höchstens so viele Bildschirmpixel daneben
+ *  (unabhängig vom Zoom immer gleich viele Pixel; Touch etwas großzügiger) */
+const EDGE_TOLERANCE_PX = matchMedia("(pointer: coarse)").matches ? 12 : 6;
+/** Prüfpunkte je Ring um den Klick (zwei Ringe: halbe und volle Toleranz) */
+const EDGE_SAMPLES = 12;
+/** Kleinststaaten (kleiner als die Toleranz): Nähe zum Anker genügt; wächst mäßig mit der Größe */
 const MIN_TOLERANCE_PX = 6;
 /** Unter dieser Bildschirmgröße bekommt das gehaltene Teil einen Ring, damit man es sieht */
 const TINY_PX = 14;
@@ -44,11 +49,41 @@ export class HeldPiece {
     return Math.sqrt(this.piece.geom.area) * this.map.projection.scale();
   }
 
-  /** Abstand Mauszeiger ↔ echte Position des Ankers innerhalb der Toleranz? */
+  /**
+   * Richtig eingesetzt, wenn der Klick in der Fläche des Items liegt (z. B. irgendwo in Südamerika)
+   * oder höchstens EDGE_TOLERANCE_PX Bildschirmpixel neben ihrem Rand. Für winzige Items zählt
+   * zusätzlich die Nähe zu ihrem Anker, damit sie trotz weniger Pixel treffbar bleiben.
+   */
   fits() {
+    const [px, py] = this.pointer;
+    const parts = this._nearParts(px, py);
+    if (parts.length) {
+      if (this._inside(px, py, parts)) return true;
+      for (const r of [EDGE_TOLERANCE_PX / 2, EDGE_TOLERANCE_PX]) {
+        for (let i = 0; i < EDGE_SAMPLES; i++) {
+          const a = (2 * Math.PI * (i + (r < EDGE_TOLERANCE_PX ? 0.5 : 0))) / EDGE_SAMPLES;
+          if (this._inside(px + r * Math.cos(a), py + r * Math.sin(a), parts)) return true;
+        }
+      }
+    }
     const [tx, ty] = this.map.toScreen(this.piece.geom.anchor);
     const tolerance = Math.max(MIN_TOLERANCE_PX, TOLERANCE_FACTOR * this._sizePx());
-    return Math.hypot(tx - this.pointer[0], ty - this.pointer[1]) <= tolerance;
+    return Math.hypot(tx - px, ty - py) <= tolerance;
+  }
+
+  /** Einzelteile des Items, die überhaupt in Reichweite des Klicks liegen (spart Rechenzeit bei Russland & Co.) */
+  _nearParts(x, y) {
+    const parts = this.piece.feature.parts;
+    const center = this.map.invert(x, y);
+    if (!center) return parts;
+    const margin = (3 * EDGE_TOLERANCE_PX) / this.map.projection.scale(); // Bogenmaß, großzügig wegen Verzerrung
+    return parts.filter((p) => p.center === null || d3.geoDistance(center, p.center) - p.radius < margin);
+  }
+
+  /** Liegt der Bildschirmpunkt (auf der Weltkugel) in einem der Einzelteile? */
+  _inside(x, y, parts = this.piece.feature.parts) {
+    const lonLat = this.map.invert(x, y);
+    return lonLat !== null && parts.some((p) => p.geometry.type === "Polygon" && d3.geoContains(p.geometry, lonLat));
   }
 
   /** Auf die exakte Position einrasten lassen */
