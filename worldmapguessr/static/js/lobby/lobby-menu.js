@@ -4,6 +4,7 @@
 
 import { createStepper } from "../menu/stepper.js";
 import { fromWire, toWire } from "../menu/config.js";
+import { confirmDialog } from "./confirm.js";
 
 const SEND_DELAY_MS = 250;
 const CROWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></svg>';
@@ -43,6 +44,10 @@ export class LobbyMenu {
       this.pwInput.value = "";
     });
     document.getElementById("lobby-password-clear").addEventListener("click", () => client.sendSettings({ password: "" }));
+
+    // Verlassen (alle) und Beenden (nur Host)
+    document.getElementById("lobby-leave").addEventListener("click", () => this._leave());
+    document.getElementById("lobby-close").addEventListener("click", () => this._close());
 
     // Spielkonfiguration: Host-Änderungen gebündelt senden
     menu.onConfigEdited = (config) => {
@@ -84,6 +89,7 @@ export class LobbyMenu {
     document.getElementById("lobby-privacy").textContent = state.settings.private
       ? "Privat – Beitritt nur mit Passwort" : "Offen – Beitritt mit dem Link";
     document.getElementById("lobby-password-clear").hidden = !state.settings.private;
+    document.getElementById("lobby-close").hidden = !host;
 
     this._renderPlayers(state);
     this.menu._update();
@@ -101,6 +107,32 @@ export class LobbyMenu {
       li.title = p.host ? (p.online ? "Host" : "Host – gerade nicht verbunden") : "Spieler";
       return li;
     }));
+  }
+
+  async _leave() {
+    const state = this.client.state;
+    let text = "Du kannst später über den Link wieder beitreten – als neuer Spieler.";
+    if (this.client.isHost) {
+      const next = state?.players.find((p) => p.online && p.id !== this.client.me?.id);
+      text = next
+        ? `Du bist Host. Die Rolle geht an ${next.name}. ` + text
+        : "Du bist der letzte Spieler – die Lobby wird damit gelöscht.";
+    }
+    const ok = await confirmDialog({ title: "Lobby verlassen?", text, confirm: "Verlassen" });
+    if (ok) this.client.leave();
+  }
+
+  async _close() {
+    const others = (this.client.state?.players ?? []).filter((p) => p.online && p.id !== this.client.me?.id).length;
+    const ok = await confirmDialog({
+      title: "Lobby beenden?",
+      text: others
+        ? `Die Lobby wird für alle gelöscht – ${others} ${others === 1 ? "Spieler wird" : "Spieler werden"} hinausgeworfen. Der Link funktioniert danach nicht mehr.`
+        : "Die Lobby wird gelöscht. Der Link funktioniert danach nicht mehr.",
+      confirm: "Lobby beenden",
+      danger: true,
+    });
+    if (ok) this.client.close();
   }
 
   async _copy(button, text) {

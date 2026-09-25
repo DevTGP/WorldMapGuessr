@@ -80,6 +80,13 @@
 
 .foot-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 
+/* Verlassen / Beenden */
+.lobby-exit { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+.btn-danger { border-color: var(--bad); color: var(--bad); background: transparent; }
+.btn-danger:hover { background: var(--bad); color: #fff; }
+.btn-primary.btn-danger { background: var(--bad); border-color: var(--bad); color: #fff; }
+.btn-primary.btn-danger:hover { filter: brightness(1.08); }
+
 /* ---------- Beitrittsdialog ---------- */
 .join-dialog {
   border: 1px solid var(--panel-line);

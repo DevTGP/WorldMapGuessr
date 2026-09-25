@@ -85,6 +85,10 @@
             <button type="button" class="btn" id="lobby-copy">Link kopieren</button>
           </div>
           <ul class="players" id="lobby-players" aria-label="Spieler"></ul>
+          <div class="lobby-exit">
+            <button type="button" class="btn" id="lobby-leave">Lobby verlassen</button>
+            <button type="button" class="btn btn-danger" id="lobby-close" hidden>Lobby beenden</button>
+          </div>
           <div class="fields" id="lobby-fields">
             <div class="field password host-only">
               <label for="lobby-password">Passwort<small id="lobby-privacy"></small></label>
@@ -159,6 +163,15 @@
       <button type="submit" class="btn btn-primary" id="join-submit">Beitreten</button>
     </div>
   </form>
+</dialog>
+
+<dialog class="join-dialog" id="confirm-dialog">
+  <h2></h2>
+  <p></p>
+  <div class="actions">
+    <button type="button" class="btn" id="confirm-cancel">Abbrechen</button>
+    <button type="button" class="btn btn-primary" id="confirm-ok"></button>
+  </div>
 </dialog>
 
 <dialog class="join-dialog" id="lobby-gone">

@@ -153,3 +153,43 @@ def test_fresh_host_keeps_role_during_grace(store):
     clock.t += 6
     connect(hub, code, name="Zweiter")          # nächster Beitritt prüft erneut
     assert store.get(code)["host"] != host["id"]
+
+
+# ---------- Verlassen / Beenden ----------
+def test_leave_transfers_host_and_removes_player(store):
+    hub = LobbyHub(store)
+    lobby, host = store.create(player_name="Host")
+    code = lobby["code"]
+    h = connect(hub, code, playerId=host["id"], token=host["token"])
+    g = connect(hub, code, name="Gast")
+    gid = g.ws.sent[0]["player"]["id"]
+    hub.handle(code, h, {"type": "leave"})
+    assert h.ws.sent[-1] == {"type": "left"} and h.player_id is None
+    lob = store.get(code)
+    assert host["id"] not in lob["players"] and lob["host"] == gid     # sofortiger Host-Wechsel
+    assert g.ws.sent[-1]["lobby"]["host"] == gid
+    # alter Token gilt nicht mehr → Wiederkommen = neuer Spieler
+    again = connect(hub, code, playerId=host["id"], token=host["token"], name="Host")
+    assert again.ws.sent[0]["player"]["id"] != host["id"]
+
+
+def test_last_player_leaving_deletes_lobby(store):
+    hub = LobbyHub(store)
+    lobby, host = store.create(player_name="Host")
+    h = connect(hub, lobby["code"], playerId=host["id"], token=host["token"])
+    hub.handle(lobby["code"], h, {"type": "leave"})
+    assert store.get(lobby["code"]) is None
+
+
+def test_close_only_host_and_notifies_everyone(store):
+    hub = LobbyHub(store)
+    lobby, host = store.create(player_name="Host")
+    code = lobby["code"]
+    h = connect(hub, code, playerId=host["id"], token=host["token"])
+    g = connect(hub, code, name="Gast")
+    with pytest.raises(LobbyError):
+        hub.handle(code, g, {"type": "close"})
+    hub.handle(code, h, {"type": "close"})
+    assert store.get(code) is None
+    assert g.ws.sent[-1]["type"] == "closed" and h.ws.sent[-1]["type"] == "closed"
+    assert hub.online_count(code) == 0

@@ -31,9 +31,11 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
 - **Wiedererkennung:** Spieler-ID und Token liegen im Browser (localStorage). Neu laden oder später zurückkommen führt ohne erneuten Beitritt in dieselbe Rolle – auch als Host.
 - **Einstellungen (nur Host):** Spielkonfiguration wie im Einzelspiel, max. Spielerzahl (Standard 8), Passwort (setzen/entfernen). Gäste sehen alles live, aber gesperrt.
 - **Host-Wechsel:** Ist der Host länger als 10 s getrennt, übernimmt der am längsten anwesende Spieler.
+- **Verlassen (alle):** „Lobby verlassen“ im Lobby-Bereich des Menüs → Bestätigung → zurück zum Einzelspiel. Der Spieler wird aus der Lobby entfernt, seine gespeicherte Identität gelöscht; über den Link kann er später als neuer Spieler wieder beitreten. Verlässt der Host, geht die Rolle sofort an den am längsten anwesenden Online-Spieler. Verlässt der letzte Spieler, wird die Lobby gelöscht.
+- **Beenden (nur Host):** „Lobby beenden“ → Bestätigung → die Lobby wird für alle gelöscht. Alle anderen sehen „Lobby beendet“ mit dem Weg zum Einzelspiel; der Link funktioniert danach nicht mehr.
 - **Runde starten:** Der Host startet für alle. Alle bekommen dieselbe Konfiguration und denselben Zufalls-Seed, also dieselbe Reihenfolge der Teile. Wie die Spieler sich gegenseitig beeinflussen, ist noch nicht umgesetzt – jeder spielt vorerst für sich.
 - **Speicherung:** `instance/lobbies.json` (Passwörter nur als Hash, Spieler-Tokens als SHA-256). Lobbys ohne Aktivität verfallen nach 24 Stunden.
-- **Technik:** WebSocket `/ws/lobby/<code>` über `flask-sock`. Protokoll (JSON): Client → `join`, `settings`, `start`, `rename`, `ping`; Server → `welcome`, `state`, `error`, `pong`. HTTP: `POST /api/lobbies`, `GET /api/lobbies/<code>`.
+- **Technik:** WebSocket `/ws/lobby/<code>` über `flask-sock`. Protokoll (JSON): Client → `join`, `settings`, `start`, `rename`, `leave`, `close`, `ping`; Server → `welcome`, `state`, `error`, `left`, `closed`, `pong`. HTTP: `POST /api/lobbies`, `GET /api/lobbies/<code>`.
 
 ## Item-Statistik
 
@@ -96,7 +98,8 @@ worldmapguessr/
   static/js/lobby/client.js   WebSocket-Client mit automatischem Wiederverbinden
   static/js/lobby/lobby-menu.js  Lobby-Bereich im Menü (Link, Spieler, Einstellungen, Rechte)
   static/js/lobby/identity.js Spieler-ID/Token und Name im Browser
-  static/js/lobby/join-dialog.js  Name/Passwort-Dialog
+  static/js/lobby/join-dialog.js  Name/Passwort-Dialog, Hinweis „Lobby nicht verfügbar/beendet“
+  static/js/lobby/confirm.js  Bestätigungsdialog (Verlassen, Beenden)
   static/js/menu/config.js    Standardwerte, Grenzen, Teile-Pool einer Konfiguration
   static/js/menu/stepper.js   Zahlen-Stepper
   static/js/menu/item-picker.js  Einzelauswahl der Teile

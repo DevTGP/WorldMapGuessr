@@ -1,8 +1,9 @@
 """WebSocket-Endpunkt einer Lobby: /ws/lobby/<code>
 
 Protokoll (JSON):
-  Client → Server  join {playerId?, token?, name, password?} · settings {settings} · start · rename {name} · ping
-  Server → Client  welcome {player} · state {lobby} · error {code, message} · pong
+  Client → Server  join {playerId?, token?, name, password?} · settings {settings} · start · rename {name}
+                   · leave (Lobby verlassen) · close (nur Host: Lobby beenden) · ping
+  Server → Client  welcome {player} · state {lobby} · error {code, message} · left · closed {message} · pong
 """
 import json
 
@@ -39,6 +40,8 @@ def register(sock):
                     break
                 try:
                     hub.handle(code, conn, json.loads(raw))
+                    if conn.player_id is None:  # verlassen oder Lobby beendet
+                        break
                 except LobbyError as err:
                     conn.send({"type": "error", "code": err.code, "message": err.message})
                 except (ValueError, TypeError):

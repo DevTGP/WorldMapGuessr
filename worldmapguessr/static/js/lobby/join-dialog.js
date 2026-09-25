@@ -48,8 +48,10 @@ export function askPlayer({ title, text = "", submit, askPassword = false, name 
 }
 
 /** Unheilbarer Fehler (Lobby weg) – mit Weg zurück zum Einzelspiel */
-export function showLobbyGone(message) {
+export function showLobbyGone(message, title = "Lobby nicht verfügbar") {
   const dialog = document.getElementById("lobby-gone");
+  document.querySelectorAll("dialog[open]").forEach((d) => d !== dialog && d.close());
+  dialog.querySelector("h2").textContent = title;
   dialog.querySelector("p").textContent = message;
   dialog.addEventListener("cancel", (e) => e.preventDefault());
   dialog.showModal();

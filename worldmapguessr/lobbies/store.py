@@ -139,6 +139,31 @@ class LobbyStore:
             self.touch(code)
             return lobby
 
+    def remove_player(self, code, player_id, online=()) -> dict | None:
+        """Spieler verlässt die Lobby endgültig. War er Host, übernimmt der am längsten anwesende
+        Online-Spieler (sonst der am längsten anwesende überhaupt). Ohne Spieler wird die Lobby
+        gelöscht – dann Rückgabe None."""
+        with self.lock:
+            lobby = self._require(code)
+            lobby["players"].pop(player_id, None)
+            if not lobby["players"]:
+                del self._lobbies[lobby["code"]]
+                self._save()
+                return None
+            if lobby["host"] == player_id:
+                candidates = [p for p in lobby["players"] if p in online] or list(lobby["players"])
+                lobby["host"] = min(candidates, key=lambda p: lobby["players"][p]["joined"])
+            self.touch(code)
+            return lobby
+
+    def close(self, code, player_id):
+        """Host beendet die Lobby für alle."""
+        with self.lock:
+            lobby = self._require(code)
+            self._require_host(lobby, player_id)
+            del self._lobbies[lobby["code"]]
+            self._save()
+
     def set_host(self, code, player_id):
         with self.lock:
             lobby = self._require(code)

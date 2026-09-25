@@ -31,6 +31,10 @@ export class LobbyClient extends EventTarget {
 
   sendSettings(settings) { this._send({ type: "settings", settings }); }
   startRound() { this._send({ type: "start" }); }
+  /** Lobby endgültig verlassen (alle Tabs dieses Spielers) */
+  leave() { this._send({ type: "leave" }); }
+  /** Nur Host: Lobby für alle beenden */
+  close() { this._send({ type: "close" }); }
 
   _open() {
     const proto = location.protocol === "https:" ? "wss" : "ws";
@@ -71,6 +75,14 @@ export class LobbyClient extends EventTarget {
       case "state":
         this.state = msg.lobby;
         this._emit("state", msg.lobby);
+        break;
+      case "left":
+      case "closed":
+        // Verbindung endet hier; gespeicherte Identität ist wertlos geworden
+        this.closedForGood = true;
+        identity.clear(this.code);
+        this.ws.close();
+        this._emit(msg.type, msg);
         break;
       case "error":
         if (msg.fatal) {

@@ -98,6 +98,12 @@ async function startLobby(code, { game, menu }) {
     if (state.round && state.round.number > playingRound) joinRound(state.round);
     menu.setCloseable(game.running);
   });
+  // Verlassen: zurück zum Einzelspiel. Beendet (vom Host): Hinweis für alle.
+  client.addEventListener("left", () => { location.href = "/"; });
+  client.addEventListener("closed", ({ detail }) => {
+    if (client.isHost) location.href = "/";
+    else showLobbyGone(detail.message, "Lobby beendet");
+  });
   client.addEventListener("connection", ({ detail }) => {
     hud.classList.toggle("offline", !detail.connected);
     hud.title = detail.connected ? "Lobby öffnen" : "Verbindung getrennt – verbinde neu …";

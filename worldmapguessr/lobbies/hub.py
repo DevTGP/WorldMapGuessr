@@ -98,6 +98,12 @@ class LobbyHub:
         if kind == "ping":
             conn.send({"type": "pong"})
             return
+        if kind == "leave":
+            self._leave_for_good(code, pid)
+            return
+        if kind == "close":
+            self._close(code, pid)
+            return
         if kind == "settings":
             self.store.update_settings(code, pid, msg.get("settings") or {})
         elif kind == "start":
@@ -107,6 +113,32 @@ class LobbyHub:
         else:
             raise LobbyError("protocol", f"Unbekannte Nachricht: {kind}")
         self.broadcast(code)
+
+    def _leave_for_good(self, code: str, player_id: str):
+        """Spieler verlässt die Lobby (alle seine Tabs). Er muss danach neu beitreten."""
+        with self.lock:
+            conns = self.online.get(code, {}).pop(player_id, [])
+            self.offline_since.pop((code, player_id), None)
+            lobby = self.store.remove_player(code, player_id, online=self.online.get(code, {}).keys())
+            if lobby is None:
+                self.online.pop(code, None)
+        for c in conns:
+            c.player_id = None  # kein erneutes leave() beim Schließen
+            c.send({"type": "left"})
+        if lobby is not None:
+            self.broadcast(code)
+
+    def _close(self, code: str, player_id: str):
+        """Host beendet die Lobby: alle bekommen "closed", die Lobby wird gelöscht."""
+        with self.lock:
+            self.store.close(code, player_id)
+            players = self.online.pop(code, {})
+            for key in [k for k in self.offline_since if k[0] == code]:
+                del self.offline_since[key]
+        for conns in players.values():
+            for c in conns:
+                c.player_id = None
+                c.send({"type": "closed", "message": "Der Host hat die Lobby beendet."})
 
     # ---------- Zustand ----------
     def state(self, code: str) -> dict | None:
