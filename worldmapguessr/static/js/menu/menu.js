@@ -6,11 +6,10 @@
 import { iconPath } from "../map/icon.js";
 import { createStepper } from "./stepper.js";
 import { ItemPicker } from "./item-picker.js";
-import { KIND_LABELS, LIMITS, cloneConfig, defaultConfig, poolFor } from "./config.js";
+import { GROUPS, LIMITS, cloneConfig, defaultConfig, poolFor } from "./config.js";
 
 const KIND_ICON_W = 44;
 const KIND_ICON_H = 30;
-const KIND_PREVIEW = { continent: ["AF", "SA", "OC"], country: ["ITA", "DEU", "NOR"] };
 
 export class Menu {
   /**
@@ -44,10 +43,10 @@ export class Menu {
     /** Läuft eine Runde? (Kennzeichnung „gilt ab der nächsten Runde“); im Lobby-Modus ersetzt */
     this.roundRunning = () => this.canCancel;
 
-    this.groups = [
-      { kind: "continent", features: map.layers.continents },
-      { kind: "country", features: map.layers.countries },
-    ];
+    // Item-Gruppen (Kontinente, Staaten Europas, Staaten Nordamerikas …); "kind" = Gruppen-ID
+    this.groups = GROUPS
+      .map((g) => ({ kind: g.id, title: g.title, preview: g.preview, features: map.features.filter((f) => f.group === g.id) }))
+      .filter((g) => g.features.length);
     this.config = defaultConfig(this.groups.map((g) => g.kind));
 
     this._buildKinds();
@@ -114,13 +113,12 @@ export class Menu {
   _buildKinds() {
     const wrap = document.getElementById("kind-cards");
     this.kindButtons = new Map();
-    for (const { kind, features } of this.groups) {
-      const label = KIND_LABELS[kind]?.title ?? kind;
+    for (const { kind, title: label, preview: previewIds, features } of this.groups) {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "kind-card";
       btn.setAttribute("role", "checkbox");
-      const preview = (KIND_PREVIEW[kind] ?? [])
+      const preview = (previewIds ?? [])
         .map((id) => features.find((f) => f.id === id))
         .filter(Boolean)
         .map((f) => `<svg viewBox="0 0 ${KIND_ICON_W} ${KIND_ICON_H}"><path d="${iconPath(f, KIND_ICON_W, KIND_ICON_H, 2)}"/></svg>`)

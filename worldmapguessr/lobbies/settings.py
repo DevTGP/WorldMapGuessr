@@ -6,7 +6,10 @@ LIMITS = {
     "refillCount": (1, 20),
     "refillEvery": (1, 20),
 }
-KINDS = ("continent", "country")
+# Item-Gruppen (Menü-Karten); Items behalten ihre Art im Key ("country:USA")
+KINDS = ("continent", "country-eu", "country-na")
+# Ältere Lobbys: "country" meinte die Staaten Europas
+LEGACY_KINDS = {"country": ("country-eu",)}
 MAX_PLAYERS = (1, 50)
 DEFAULT_ALLOW_SEND = True  # Items an Mitspieler senden
 
@@ -30,7 +33,10 @@ def _int(value, lo, hi, default):
 def clean_config(raw) -> dict:
     raw = raw if isinstance(raw, dict) else {}
     cfg = {k: _int(raw.get(k), lo, hi, DEFAULT_CONFIG[k]) for k, (lo, hi) in LIMITS.items()}
-    kinds = [k for k in KINDS if k in (raw.get("kinds") or [])]
+    wanted = set()
+    for k in raw.get("kinds") or []:
+        wanted.update(LEGACY_KINDS.get(k, (k,)) if isinstance(k, str) else ())
+    kinds = [k for k in KINDS if k in wanted]
     cfg["kinds"] = kinds or list(KINDS)
     excluded = raw.get("excluded") or []
     cfg["excluded"] = sorted({str(x)[:40] for x in excluded if isinstance(x, str)})[:500]

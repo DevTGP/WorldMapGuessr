@@ -27,6 +27,8 @@ export async function createMap({ canvas, dataUrl }) {
   const layer = (object, kind) => topojson.feature(topo, topo.objects[object]).features.map((f) => {
     f.kind = kind;
     f.key = `${kind}:${f.id}`;
+    // Item-Gruppe im Menü: Kontinente, Staaten Europas, Staaten Nordamerikas …
+    f.group = kind === "country" ? `country-${(f.properties.region ?? "EU").toLowerCase()}` : kind;
     f.geom = featureGeometry(f); // Anker, Fläche, Mittel-Länge
     f.parts = splitParts(f.geometry); // für das Überspringen unsichtbarer Teile beim Zeichnen
     return f;

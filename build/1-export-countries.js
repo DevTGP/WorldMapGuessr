@@ -1,5 +1,6 @@
 // Schritt 1: Länder (Natural Earth 1:10m via world-atlas) als GeoJSON exportieren –
-// mit Kontinent-Zuordnung und, für europäische Staaten, ISO-Code und deutschem Namen.
+// mit Kontinent-Zuordnung und, für spielbare Staaten (Europa, Nordamerika), ISO-Code,
+// deutschem Namen und Region.
 const fs = require("fs");
 const topo = require("world-atlas/countries-10m.json");
 const wc = require("world-countries");
@@ -39,21 +40,27 @@ function continentOf(f) {
   return REGION[c.region];
 }
 
-function europeanCountry(f) {
-  if (f.properties.name === "Kosovo") return KOSOVO;
+/** Spielbarer Staat? → {code, name, region} oder null */
+function countryItem(f) {
+  if (f.properties.name === "Kosovo") return { ...KOSOVO, region: "EU" };
   const c = byNum[f.id];
-  if (!c || c.region !== "Europe" || c.independent !== true || EXCLUDED_EUROPE.has(c.cca3)) return null;
-  return { code: c.cca3, name: c.translations.deu.common };
+  if (!c || c.independent !== true) return null;
+  const item = { code: c.cca3, name: c.translations.deu.common };
+  // "Klassisch Europa": unabhängige Staaten der Region Europa ohne Zypern (+ Kosovo) – 45 Staaten
+  if (c.region === "Europe" && !EXCLUDED_EUROPE.has(c.cca3)) return { ...item, region: "EU" };
+  // Nordamerika: Nord-, Mittelamerika und Karibik – 23 Staaten
+  if (c.region === "Americas" && c.subregion !== "South America") return { ...item, region: "NA" };
+  return null;
 }
 
 const fc = feature(topo, topo.objects.countries);
-let n = 0;
+const count = { EU: 0, NA: 0 };
 for (const f of fc.features) {
   if (f.properties.name === "Vatican") f.geometry = { type: "Polygon", coordinates: VATICAN_OUTLINE };
   f.properties.continent = continentOf(f);
-  const eu = europeanCountry(f);
-  if (eu) { f.properties.country = eu; n++; }
+  const item = countryItem(f);
+  if (item) { f.properties.country = item; count[item.region]++; }
 }
 fs.mkdirSync("tmp", { recursive: true });
 fs.writeFileSync("tmp/countries.geojson", JSON.stringify(fc));
-console.log("Länder:", fc.features.length, "davon europäische Staaten:", n);
+console.log("Länder:", fc.features.length, "spielbare Staaten:", count);

@@ -8,11 +8,13 @@ export const LIMITS = {
   refillEvery: { min: 1, max: 20 },
 };
 
-/** Anzeigenamen der Item-Arten (Ebenen der Karte) */
-export const KIND_LABELS = {
-  continent: { title: "Kontinente", singular: "Kontinent" },
-  country: { title: "Staaten Europas", singular: "Staat" },
-};
+/** Item-Gruppen im Menü (je eine Karte zum An-/Abwählen); config.kinds enthält Gruppen-IDs */
+export const GROUPS = [
+  { id: "continent", title: "Kontinente", preview: ["AF", "SA", "OC"] },
+  { id: "country-eu", title: "Staaten Europas", preview: ["ITA", "DEU", "NOR"] },
+  { id: "country-na", title: "Staaten Nordamerikas", preview: ["USA", "MEX", "CUB"] },
+];
+export const GROUP_LABELS = Object.fromEntries(GROUPS.map((g) => [g.id, g]));
 
 export function defaultConfig(kinds) {
   return {
@@ -33,7 +35,7 @@ export const clamp = (v, { min, max }) => Math.max(min, Math.min(max, Math.round
 
 /** Alle Features, die mit dieser Konfiguration ins Spiel kommen */
 export function poolFor(config, features) {
-  return features.filter((f) => config.kinds.has(f.kind) && !config.excluded.has(f.key));
+  return features.filter((f) => config.kinds.has(f.group) && !config.excluded.has(f.key));
 }
 
 /** Für Server/Netz: Sets → Arrays */

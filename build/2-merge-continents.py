@@ -1,5 +1,7 @@
-"""Schritt 2: Länder je Kontinent vereinigen (GEOS) und europäische Staaten als eigene Ebene ausgeben.
-Russland wird für die Kontinente am Ural / Ural-Fluss geteilt, als Staat bleibt es ganz.
+"""Schritt 2: Länder je Kontinent vereinigen (GEOS) und spielbare Staaten (Europa, Nordamerika)
+als eigene Ebene ausgeben. Russland wird für die Kontinente am Ural / Ural-Fluss geteilt, als Staat
+bleibt es ganz. Überseegebiete europäischer Staaten (Französisch-Guayana, Guadeloupe, Réunion,
+Karibische Niederlande …) zählen zum Kontinent, auf dem sie liegen – nicht zu Europa.
 
 Die Kontinente sollen später beliebig um die Längsachse gedreht werden können. Deshalb dürfen
 sie an der Datumsgrenze (±180°) keine künstlichen Schnittkanten haben: Kontinente, die über
@@ -31,6 +33,16 @@ EUROPE_BOX = box(-32, 27, 62, 83)
 MIN_ISLAND_DEG2 = 0.003          # ~30 km² am Äquator
 # Staaten: nur Landesteile in Europa (ohne Französisch-Guayana, Réunion, Karibische Niederlande …)
 COUNTRY_BOX = box(-32, 27, 45, 83)
+
+
+def overseas_continent(pt):
+    """Kontinent eines Landesteils außerhalb Europas nach seiner Lage."""
+    lon, lat = pt.x, pt.y
+    if lon < -100 or lon > 100:
+        return "OC"                          # Pazifik
+    if lon < -25:
+        return "SA" if lat < 10 else "NA"    # Französisch-Guayana | Karibik, St. Pierre
+    return "AF"                              # Réunion, Mayotte …
 
 
 def polys(g):
@@ -77,6 +89,11 @@ for f in fc["features"]:
         ru = to_shifted(f["geometry"])
         groups["EU"].append(ru.intersection(EURO_RUSSIA))
         groups["AS"].append(ru.difference(EURO_RUSSIA))
+    elif c == "EU":
+        for p in polys(shape(f["geometry"]).buffer(0)):
+            pt = p.representative_point()
+            home = "EU" if COUNTRY_BOX.contains(pt) else overseas_continent(pt)
+            groups[home].append(to_shifted(p) if home in SHIFTED else p)
     elif c in SHIFTED:
         groups[c].append(to_shifted(f["geometry"]))
     else:
@@ -99,21 +116,29 @@ for code, parts in groups.items():
 
 json.dump({"type": "FeatureCollection", "features": out}, open("tmp/continents.geojson", "w"))
 
-# ---------- Europäische Staaten ----------
+# ---------- Spielbare Staaten (Europa, Nordamerika) ----------
+# Über die Datumsgrenze reichende Staaten: im Rahmen 0…360° ohne Naht (Tschukotka, Aleuten)
+SHIFTED_COUNTRIES = {"RUS", "USA"}
 countries = []
 for f in fc["features"]:
     info = f["properties"].get("country")
     if not info:
         continue
-    if info["code"] == "RUS":
-        # ganzes Russland; über die Datumsgrenze hinweg ohne Naht
+    code = info["code"]
+    if code in SHIFTED_COUNTRIES:
         g = to_shifted(f["geometry"])
         ps = [orient(p, sign=-1.0) for p in polys(g) if p.area >= MIN_ISLAND_DEG2 or EUROPE_BOX.contains(p.representative_point())]
         geom = unshift_coords(mapping(MultiPolygon(ps)))
-    else:
+    elif info["region"] == "EU":
         g = shape(f["geometry"]).buffer(0)
         ps = [orient(p, sign=-1.0) for p in polys(g) if COUNTRY_BOX.contains(p.representative_point())]
         geom = mapping(MultiPolygon(ps))
-    countries.append({"type": "Feature", "id": info["code"], "properties": {"name": info["name"]}, "geometry": geom})
-print("Staaten:", len(countries))
-json.dump({"type": "FeatureCollection", "features": countries}, open("tmp/countries-europe.geojson", "w"))
+    else:
+        # wie beim Kontinent: Kleinstinseln (< ~30 km²) weglassen, damit beide Ebenen deckungsgleich sind
+        g = shape(f["geometry"]).buffer(0)
+        ps = [orient(p, sign=-1.0) for p in polys(g) if p.area >= MIN_ISLAND_DEG2]
+        geom = mapping(MultiPolygon(ps))
+    countries.append({"type": "Feature", "id": code,
+                      "properties": {"name": info["name"], "region": info["region"]}, "geometry": geom})
+print("Staaten:", len(countries), {r: sum(c["properties"]["region"] == r for c in countries) for r in ("EU", "NA")})
+json.dump({"type": "FeatureCollection", "features": countries}, open("tmp/countries-items.geojson", "w"))

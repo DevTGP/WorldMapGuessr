@@ -1,6 +1,7 @@
-"""Teile-Katalog für Lobby-Runden: {kind: ["kind:id", …]} aus der TopoJSON-Karte.
+"""Item-Katalog für Lobby-Runden: {Gruppe: ["kind:id", …]} aus der TopoJSON-Karte.
 
-Die Schlüssel entsprechen den Feature-Keys im Browser (static/js/map/map.js: `${kind}:${id}`)."""
+Die Keys entsprechen den Feature-Keys im Browser (static/js/map/map.js: `${kind}:${id}`), die Gruppen
+den Karten im Menü: "continent", "country-eu", "country-na" (Staaten nach properties.region)."""
 from __future__ import annotations
 
 import json
@@ -9,10 +10,18 @@ import os
 LAYERS = {"continents": "continent", "countries": "country"}
 
 
+def group_of(kind: str, geometry: dict) -> str:
+    if kind == "country":
+        return f"country-{(geometry.get('properties') or {}).get('region', 'EU').lower()}"
+    return kind
+
+
 def load_catalog(topojson_path: str | os.PathLike) -> dict[str, list[str]]:
     with open(topojson_path, encoding="utf-8") as fh:
         objects = json.load(fh)["objects"]
-    return {
-        kind: [f"{kind}:{g['id']}" for g in objects.get(obj, {}).get("geometries", []) if g.get("id")]
-        for obj, kind in LAYERS.items()
-    }
+    catalog: dict[str, list[str]] = {}
+    for obj, kind in LAYERS.items():
+        for g in objects.get(obj, {}).get("geometries", []):
+            if g.get("id"):
+                catalog.setdefault(group_of(kind, g), []).append(f"{kind}:{g['id']}")
+    return catalog

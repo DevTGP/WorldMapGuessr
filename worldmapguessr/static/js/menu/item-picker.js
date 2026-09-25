@@ -2,7 +2,7 @@
 // "Alle"/"Keine" je Gruppe und Suche. Abgewählte Teile werden ausgeschlossen.
 
 import { iconPath } from "../map/icon.js";
-import { KIND_LABELS } from "./config.js";
+import { GROUP_LABELS } from "./config.js";
 
 const ICON_W = 34;
 const ICON_H = 24;
@@ -25,7 +25,7 @@ export class ItemPicker {
 
   _build(groups) {
     for (const { kind, features } of groups) {
-      const label = KIND_LABELS[kind]?.title ?? kind;
+      const label = GROUP_LABELS[kind]?.title ?? kind;
       const section = document.createElement("section");
       section.className = "picker-group";
       section.dataset.kind = kind;

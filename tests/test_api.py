@@ -4,14 +4,22 @@ def test_continents_are_seeded(client):
     assert all(i["spawned"] == i["correct"] == i["incorrect"] == 0 for i in items)
 
 
-def test_european_countries_are_seeded(client):
+def test_countries_are_seeded(client):
     items = client.get("/api/items?kind=country").get_json()["items"]
     codes = {i["code"] for i in items}
-    assert len(items) == 45
+    assert len(items) == 45 + 23                                   # Europa + Nordamerika
     assert {"DEU", "FRA", "RUS", "XKX", "VAT", "MCO", "SMR"} <= codes
-    assert "CYP" not in codes and "TUR" not in codes
+    assert {"USA", "CAN", "MEX", "CUB", "PAN", "KNA", "TTO"} <= codes
+    assert "CYP" not in codes and "TUR" not in codes and "GRL" not in codes
     names = {i["code"]: i["name"] for i in items}
-    assert names["DEU"] == "Deutschland"
+    assert names["DEU"] == "Deutschland" and names["USA"] == "Vereinigte Staaten"
+
+
+def test_catalog_groups_countries_by_region(app):
+    catalog = app.extensions["lobby_store"].catalog
+    assert len(catalog["continent"]) == 7
+    assert len(catalog["country-eu"]) == 45 and "country:DEU" in catalog["country-eu"]
+    assert len(catalog["country-na"]) == 23 and "country:USA" in catalog["country-na"]
 
 
 def test_record_event(client):

@@ -26,7 +26,7 @@ class Clock:
         return self.t
 
 
-CATALOG = {"continent": [f"continent:{i}" for i in range(3)], "country": [f"country:{i}" for i in range(20)]}
+CATALOG = {"continent": [f"continent:{i}" for i in range(3)], "country-eu": [f"country:{i}" for i in range(20)]}
 
 
 @pytest.fixture(params=["json", "mongodb"])
@@ -44,11 +44,11 @@ def connect(hub, code, **msg):
 
 # ---------- Store ----------
 def test_create_short_unique_code_and_persist(tmp_path, store):
-    lobby, host = store.create(player_name="Manu", config={"lives": 99, "kinds": ["country", "x"]})
+    lobby, host = store.create(player_name="Manu", config={"lives": 99, "kinds": ["country-na", "x"]})
     assert re.fullmatch(PATTERN, lobby["code"])
     assert lobby["host"] == host["id"] and host["token"]
     assert lobby["settings"]["config"]["lives"] == 30          # auf Grenze geklemmt
-    assert lobby["settings"]["config"]["kinds"] == ["country"]  # unbekannte Art verworfen
+    assert lobby["settings"]["config"]["kinds"] == ["country-na"]  # unbekannte Gruppe verworfen
     again = LobbyStore(store.persistence)                       # neu geladen (gleiches Backend)
     assert again.get(lobby["code"].lower())["host"] == host["id"]
 
@@ -72,6 +72,15 @@ def test_only_host_changes_settings(store):
         store.update_settings(lobby["code"], guest["id"], {"maxPlayers": 3})
     store.update_settings(lobby["code"], host["id"], {"maxPlayers": 3, "password": "x"})
     assert store.public_info(lobby["code"]) == {"code": lobby["code"], "private": True, "maxPlayers": 3}
+
+
+def test_legacy_kind_country_means_europe(tmp_path):
+    store = LobbyStore(tmp_path / "l.json")
+    lobby, _ = store.create(player_name="A")
+    lobby["settings"]["config"]["kinds"] = ["continent", "country"]  # so gespeichert vor den Item-Gruppen
+    store.persistence.save(lobby)
+    again = LobbyStore(store.persistence)
+    assert again.get(lobby["code"])["settings"]["config"]["kinds"] == ["continent", "country-eu"]
 
 
 def test_expiry(tmp_path):

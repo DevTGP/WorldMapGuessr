@@ -9,7 +9,7 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
 - Die Karte lässt sich wie ein Globus um die Längsachse drehen: seitlich ziehen oder die Pfeile oben (bzw. `←`/`→`), die in 45°-Schritten (π/4) auf 0°, 45°, 90° … weiterdrehen. Was in der Mitte liegt, ist am wenigsten verzerrt.
 - Bei 100 % ist die Y-Achse fest (Ziehen dreht nur). Erst nach dem Hineinzoomen lässt sich die Karte auch senkrecht verschieben.
 - Vor jeder Runde öffnet sich das Menü (auch über „Neue Runde“ oben rechts und nach Rundenende über „Einstellungen“):
-  - **Item-Arten:** an-/abwählen (7 Kontinente, 45 Staaten Europas – klassisches Europa inkl. Russland und Kosovo, ohne Türkei, Zypern und Kaukasus).
+  - **Item-Arten:** drei Karten zum An-/Abwählen – 7 Kontinente, 45 Staaten Europas (klassisches Europa inkl. Russland und Kosovo, ohne Türkei, Zypern und Kaukasus), 23 Staaten Nordamerikas (USA, Kanada, Mexiko, 7 Staaten Mittelamerikas, 13 Karibikstaaten; ohne abhängige Gebiete wie Grönland oder Puerto Rico).
   - **Einzelne Items:** ausschließen (Suche, „Alle“/„Keine“ je Gruppe).
   - **Regeln:** Leben (Standard 10), Start-Items (Standard 5), Nachschub: neue Items (Standard 4) nach je … Treffern (Standard 3).
   - Die Einstellungen gelten nur für die gestartete Runde und werden nicht gespeichert; solange die Seite offen ist, merkt sich das Menü die letzte Auswahl. „Nochmal“ im Rundenende-Dialog startet mit denselben Einstellungen neu gemischt.
@@ -124,7 +124,7 @@ worldmapguessr/
   lobbies/store.py            Lobbys im Speicher, Beitritt, Passwort, Host-Aktionen, Verfall
   lobbies/hub.py              Live-Verbindungen, Online-Status, Host-Wechsel, Broadcast (mit eigenem Inventar)
   lobbies/round.py            Mehrspieler-Runde: Vorrat, Inventare, gemeinsame Leben, Nachschub
-  lobbies/catalog.py          Teile-Katalog aus world.topo.json
+  lobbies/catalog.py          Item-Katalog je Gruppe aus world.topo.json
   lobbies/ws.py               WebSocket-Endpunkt
   lobbies/api.py              HTTP-API /api/lobbies
   item_store.py               Items als JSON-Datei (Fallback)
@@ -217,8 +217,10 @@ npm run build
 ## Datenentscheidungen
 
 - Quelle: Natural Earth 1:10m (`world-atlas`, dort auf ~400 m quantisiert), Regionen und deutsche Namen aus `world-countries`.
-- Detailgrad: in Europa (-32…62° O, 27…83° N) volle 1:10m-Auflösung, außerhalb auf etwa 1:50m vereinfacht; Kleinstinseln außerhalb Europas entfallen. Beim Zeichnen filtert eine Detailstufe je nach Zoom (bis 4000 %).
-- Staaten nur mit ihren europäischen Landesteilen (ohne Französisch-Guayana, Réunion, Karibische Niederlande …); Russland ganz.
+- Detailgrad: Europa (-32…62° O, 27…83° N) volle 1:10m-Auflösung, Nordamerika inkl. Grönland, Mittelamerika und Karibik (-180…-10° O, 5…84° N) praktisch volle 1:10m-Auflösung, übrige Welt etwa 1:50m; Kleinstinseln (< ~30 km²) außerhalb Europas entfallen. Beim Zeichnen filtert eine Detailstufe je nach Zoom (bis 4000 %). Einstellbar in `build/3-topologize.js` (`REGIONS`).
+- Europäische Staaten nur mit ihren europäischen Landesteilen; Russland ganz. Überseegebiete (Französisch-Guayana, Guadeloupe, Martinique, Réunion, Karibische Niederlande …) gehören zum Kontinent, auf dem sie liegen – nicht mehr zu Europa.
+- Staaten Nordamerikas mit allen Landesteilen: USA inkl. Alaska, Aleuten (über die Datumsgrenze ohne Naht) und Hawaii.
+- Item-Gruppen: Staaten tragen im TopoJSON `properties.region` (`EU`/`NA`); daraus entstehen die Gruppen `continent`, `country-eu`, `country-na` (Menü-Karten, `config.kinds`). Item-Keys bleiben `country:USA` usw., die Statistik ist davon unberührt. Ältere Lobbys mit `kinds: ["country"]` werden beim Laden zu `country-eu`.
 - Vatikan: in den Quelldaten zu einer Linie zusammengefallen, daher ein vereinfachter, von Hand nachgezogener Umriss.
 - Projektion: Natural Earth 1.
 - Europa/Asien: Ural-Kamm → Ural-Fluss → Kaspisches Meer → Kaukasus; Türkei, Georgien, Armenien, Aserbaidschan, Kasachstan = Asien.

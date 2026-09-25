@@ -44,6 +44,8 @@ class LobbyStore:
         self.clock = clock
         self.lock = threading.RLock()
         self._lobbies: dict[str, dict] = persistence.load_all()
+        for lobby in self._lobbies.values():  # ältere Lobbys: Konfiguration ins aktuelle Format (Item-Gruppen)
+            lobby["settings"]["config"] = clean_config(lobby["settings"]["config"])
         self.expire()
 
     # ---------- Lesen ----------
