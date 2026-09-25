@@ -7,7 +7,7 @@ LIMITS = {
     "refillEvery": (1, 20),
 }
 # Item-Gruppen (Menü-Karten); Items behalten ihre Art im Key ("country:USA")
-KINDS = ("continent", "country-eu", "country-na", "country-sa")
+KINDS = ("continent", "country-eu", "country-na", "country-sa", "country-af")
 # Ältere Lobbys: "country" meinte die Staaten Europas
 LEGACY_KINDS = {"country": ("country-eu",)}
 MAX_PLAYERS = (1, 50)

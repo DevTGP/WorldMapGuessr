@@ -1,5 +1,5 @@
 """Schritt 2: Länder je Kontinent vereinigen (GEOS) und spielbare Staaten (Europa, Nordamerika)
-als eigene Ebene ausgeben (Europa, Nord- und Südamerika). Russland wird für die Kontinente am Ural / Ural-Fluss geteilt, als Staat
+als eigene Ebene ausgeben (Europa, Nord-/Südamerika, Afrika). Russland wird für die Kontinente am Ural / Ural-Fluss geteilt, als Staat
 bleibt es ganz. Überseegebiete europäischer Staaten (Französisch-Guayana, Guadeloupe, Réunion,
 Karibische Niederlande …) zählen zum Kontinent, auf dem sie liegen – nicht zu Europa.
 
@@ -116,15 +116,32 @@ for code, parts in groups.items():
 
 json.dump({"type": "FeatureCollection", "features": out}, open("tmp/continents.geojson", "w"))
 
-# ---------- Spielbare Staaten (Europa, Nord- und Südamerika) ----------
+# ---------- Spielbare Staaten (Europa, Nord-/Südamerika, Afrika) ----------
 # Über die Datumsgrenze reichende Staaten: im Rahmen 0…360° ohne Naht (Tschukotka, Aleuten)
 SHIFTED_COUNTRIES = {"RUS", "USA"}
-countries = []
+
+# Mehrere Quell-Features mit demselben Staat (Somalia + Somaliland) zu einem vereinigen
+items = {}
 for f in fc["features"]:
     info = f["properties"].get("country")
     if not info:
         continue
-    code = info["code"]
+    if info["code"] in items:
+        prev = items[info["code"]]
+        prev["geometry"] = mapping(unary_union([shape(prev["geometry"]).buffer(0), shape(f["geometry"]).buffer(0)]))
+        print("vereinigt:", info["code"], "+", f["properties"]["name"])
+    else:
+        items[info["code"]] = {"properties": f["properties"], "geometry": f["geometry"]}
+
+# Marokko: in den Quelldaten (world-atlas 1:10m) samt dem von Marokko kontrollierten Teil der Westsahara.
+# Als Item gilt Marokko wie bei den Vereinten Nationen ohne Westsahara: Grenze 27°40′ N.
+CUT_TO = {"MAR": box(-20, 27 + 40 / 60, 0, 40)}
+for code, area in CUT_TO.items():
+    items[code]["geometry"] = mapping(shape(items[code]["geometry"]).buffer(0).intersection(area))
+
+countries = []
+for code, f in items.items():
+    info = f["properties"]["country"]
     if code in SHIFTED_COUNTRIES:
         g = to_shifted(f["geometry"])
         ps = [orient(p, sign=-1.0) for p in polys(g) if p.area >= MIN_ISLAND_DEG2 or EUROPE_BOX.contains(p.representative_point())]
@@ -140,5 +157,5 @@ for f in fc["features"]:
         geom = mapping(MultiPolygon(ps))
     countries.append({"type": "Feature", "id": code,
                       "properties": {"name": info["name"], "region": info["region"]}, "geometry": geom})
-print("Staaten:", len(countries), {r: sum(c["properties"]["region"] == r for c in countries) for r in ("EU", "NA", "SA")})
+print("Staaten:", len(countries), {r: sum(c["properties"]["region"] == r for c in countries) for r in ("EU", "NA", "SA", "AF")})
 json.dump({"type": "FeatureCollection", "features": countries}, open("tmp/countries-items.geojson", "w"))

@@ -1,5 +1,5 @@
 // Schritt 1: Länder (Natural Earth 1:10m via world-atlas) als GeoJSON exportieren –
-// mit Kontinent-Zuordnung und, für spielbare Staaten (Europa, Nord- und Südamerika), ISO-Code,
+// mit Kontinent-Zuordnung und, für spielbare Staaten (Europa, Nord-/Südamerika, Afrika), ISO-Code,
 // deutschem Namen und Region.
 const fs = require("fs");
 const topo = require("world-atlas/countries-10m.json");
@@ -40,23 +40,33 @@ function continentOf(f) {
   return REGION[c.region];
 }
 
+// Deutsche Namen, wo world-countries veraltet oder mehrdeutig ist
+const NAME_OVERRIDE = {
+  SWZ: "Eswatini", COD: "Demokratische Republik Kongo", COG: "Republik Kongo", CIV: "Elfenbeinküste",
+  CAF: "Zentralafrikanische Republik",
+};
+
 /** Spielbarer Staat? → {code, name, region} oder null */
 function countryItem(f) {
   if (f.properties.name === "Kosovo") return { ...KOSOVO, region: "EU" };
+  // Somaliland (international nicht anerkannt) gehört zum Item Somalia – Schritt 2 vereinigt beide Flächen
+  if (f.properties.name === "Somaliland") return { code: "SOM", name: "Somalia", region: "AF" };
   const c = byNum[f.id];
   if (!c || c.independent !== true) return null;
-  const item = { code: c.cca3, name: c.translations.deu.common };
+  const item = { code: c.cca3, name: NAME_OVERRIDE[c.cca3] ?? c.translations.deu.common };
   // "Klassisch Europa": unabhängige Staaten der Region Europa ohne Zypern (+ Kosovo) – 45 Staaten
   if (c.region === "Europe" && !EXCLUDED_EUROPE.has(c.cca3)) return { ...item, region: "EU" };
   // Nordamerika: Nord-, Mittelamerika und Karibik – 23 Staaten
   if (c.region === "Americas" && c.subregion !== "South America") return { ...item, region: "NA" };
   // Südamerika – 12 Staaten (ohne Französisch-Guayana und Falklandinseln)
   if (c.region === "Americas" && c.subregion === "South America") return { ...item, region: "SA" };
+  // Afrika – 54 Staaten (ohne Westsahara, Réunion, Mayotte, St. Helena …)
+  if (c.region === "Africa") return { ...item, region: "AF" };
   return null;
 }
 
 const fc = feature(topo, topo.objects.countries);
-const count = { EU: 0, NA: 0, SA: 0 };
+const count = { EU: 0, NA: 0, SA: 0, AF: 0 };
 for (const f of fc.features) {
   if (f.properties.name === "Vatican") f.geometry = { type: "Polygon", coordinates: VATICAN_OUTLINE };
   f.properties.continent = continentOf(f);
