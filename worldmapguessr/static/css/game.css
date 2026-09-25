@@ -1,0 +1,196 @@
+/* WorldMapGuessr – Spiel-UI: Inventar, Leben, gehaltenes Teil, Dialog */
+
+/* ---------- Inventar ---------- */
+.hud-inventory {
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 8px;
+  gap: 8px;
+  align-items: stretch;
+}
+.hud-inventory .label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  text-align: center;
+  padding-inline: 2px;
+}
+.slots { display: flex; gap: 8px; min-width: 0; }
+
+.slot {
+  position: relative;
+  width: 148px;
+  height: 92px;
+  flex: 0 1 148px;
+  min-width: 96px;
+  padding: 0;
+  border: 1px dashed var(--panel-line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.slot:hover { background: var(--panel-line); border-color: var(--piece); }
+.slot:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.slot > svg {
+  position: absolute;
+  inset: 8px;
+  width: calc(100% - 16px);
+  height: calc(100% - 16px);
+}
+.slot[data-state="placed"] > svg { bottom: 26px; height: calc(100% - 34px); }
+.slot .shape {
+  fill: var(--piece-fill);
+  stroke: var(--piece);
+  stroke-width: 1.2px;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Ein- und Ausblenden beim Nachschub bzw. nach dem Einsetzen */
+.slot.entering { opacity: 0; transform: translateY(12px); }
+.slot.leaving { opacity: 0; transform: scale(0.9); }
+.slot { transition: background 0.15s ease, border-color 0.15s ease, opacity 0.3s ease, transform 0.3s ease; }
+
+/* Teil ist gerade in der Hand: Slot zeigt nur noch die Aussparung */
+.slot[data-state="held"] { border-style: solid; border-color: var(--piece); }
+.slot[data-state="held"] .shape { fill: none; stroke-dasharray: 3 3; opacity: 0.55; }
+.slot[data-state="flying"] .shape { visibility: hidden; }
+
+/* Richtig eingesetzt */
+.slot[data-state="placed"] { cursor: default; border-style: solid; }
+.slot[data-state="placed"]:hover { background: transparent; border-color: var(--panel-line); }
+.slot[data-state="placed"] .shape { fill: none; stroke: var(--ink-soft); opacity: 0.35; }
+.slot .done {
+  position: absolute;
+  inset: auto 6px 6px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--good);
+}
+.slot .done svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; }
+
+/* ---------- Leben & Runde ---------- */
+.hud-status {
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  right: 16px;
+  align-items: center;
+  gap: 12px;
+}
+.progress {
+  font: 500 13px/1 "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+.progress b { color: var(--ink); font-weight: 500; }
+.lives { display: flex; gap: 3px; }
+.lives svg { width: 20px; height: 20px; }
+.lives .heart { fill: var(--heart); stroke: var(--heart); stroke-width: 1.5; transition: fill 0.25s ease; }
+.lives .lost .heart { fill: transparent; stroke: var(--ink-soft); opacity: 0.6; }
+.lives .breaking { animation: heart-break 0.5s ease; }
+@keyframes heart-break {
+  0%, 100% { transform: translateX(0) scale(1); }
+  20% { transform: translateX(-3px) scale(1.15); }
+  40% { transform: translateX(3px) scale(1.1); }
+  60% { transform: translateX(-2px) scale(1); }
+  80% { transform: translateX(2px); }
+}
+.lives span { display: inline-block; transform-origin: 50% 60%; }
+
+.btn {
+  border: 1px solid var(--panel-line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: 600 13px/1 "Instrument Sans", system-ui, sans-serif;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.btn:hover { background: var(--panel-line); }
+.btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.btn-icon { display: grid; place-items: center; padding: 6px; color: var(--ink); text-decoration: none; }
+.btn-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.btn-primary { background: var(--piece); border-color: var(--piece); color: #fff; }
+.btn-primary:hover { background: var(--piece); filter: brightness(1.08); }
+
+/* ---------- Gehaltenes Teil ---------- */
+.held-layer {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 20;
+  overflow: visible;
+}
+.held-layer path {
+  fill: var(--piece-fill);
+  stroke: var(--piece);
+  stroke-width: 1.6px;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.held-layer .tiny-ring {
+  fill: none;
+  stroke: var(--piece);
+  stroke-width: 1.5px;
+  stroke-dasharray: 3 3;
+}
+body.is-holding #map { cursor: crosshair; }
+
+/* ---------- Rückmeldung ---------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(128px + env(safe-area-inset-bottom, 0px));
+  transform: translate(-50%, 8px);
+  padding: 7px 12px;
+  border-radius: 6px;
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 15;
+  white-space: nowrap;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.good { color: var(--good); }
+.toast.bad { color: var(--bad); }
+
+/* ---------- Rundendialog ---------- */
+.round-dialog {
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  padding: 20px 22px;
+  max-width: min(360px, calc(100% - 32px));
+  background: var(--panel);
+  color: var(--ink);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.round-dialog::backdrop { background: rgba(10, 20, 30, 0.25); }
+.round-dialog h2 { margin: 0 0 6px; font-size: 18px; text-wrap: balance; }
+.round-dialog p { margin: 0 0 16px; color: var(--ink-soft); }
+.round-dialog .actions { display: flex; justify-content: flex-end; }
+
+@media (max-width: 480px) {
+  .slot { height: 76px; }
+  .hud-inventory .label { display: none; }
+  .toast { bottom: calc(112px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lives .breaking { animation: none; }
+  .toast, .slot { transition: none; }
+}

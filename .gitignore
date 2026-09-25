@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.idea/
+!.run/
+build/node_modules/
+build/tmp/
+instance/
+.pytest_cache/
+.run

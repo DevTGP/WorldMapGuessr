@@ -1,0 +1,45 @@
+"""Lobbyeinstellungen prüfen und normalisieren (Server ist maßgeblich)."""
+
+LIMITS = {
+    "lives": (1, 30),
+    "startItems": (1, 60),
+    "refillCount": (1, 20),
+    "refillEvery": (1, 20),
+}
+KINDS = ("continent", "country")
+MAX_PLAYERS = (1, 50)
+
+DEFAULT_CONFIG = {
+    "lives": 10,
+    "startItems": 5,
+    "refillCount": 4,
+    "refillEvery": 3,
+    "kinds": list(KINDS),
+    "excluded": [],
+}
+
+
+def _int(value, lo, hi, default):
+    try:
+        return max(lo, min(hi, int(value)))
+    except (TypeError, ValueError):
+        return default
+
+
+def clean_config(raw) -> dict:
+    raw = raw if isinstance(raw, dict) else {}
+    cfg = {k: _int(raw.get(k), lo, hi, DEFAULT_CONFIG[k]) for k, (lo, hi) in LIMITS.items()}
+    kinds = [k for k in KINDS if k in (raw.get("kinds") or [])]
+    cfg["kinds"] = kinds or list(KINDS)
+    excluded = raw.get("excluded") or []
+    cfg["excluded"] = sorted({str(x)[:40] for x in excluded if isinstance(x, str)})[:500]
+    return cfg
+
+
+def clean_max_players(value) -> int:
+    return _int(value, *MAX_PLAYERS, 8)
+
+
+def clean_name(value, fallback="Spieler") -> str:
+    name = " ".join(str(value or "").split())[:24]
+    return name or fallback

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WorldMapGuessr · Statistik</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/stats.css') }}">
+</head>
+<body>
+<main class="page">
+  <header class="head">
+    <div>
+      <a class="back" href="{{ url_for('main.index') }}">← Zur Karte</a>
+      <h1>Statistik</h1>
+      <p class="summary" id="summary">Lade Daten …</p>
+    </div>
+    <button class="btn" id="refresh" type="button">Aktualisieren</button>
+  </header>
+
+  <div class="toolbar">
+    <div class="segmented" role="radiogroup" aria-label="Art">
+      <button type="button" role="radio" data-kind="" aria-checked="true">Alle</button>
+      <button type="button" role="radio" data-kind="continent" aria-checked="false">Kontinente</button>
+      <button type="button" role="radio" data-kind="country" aria-checked="false">Staaten</button>
+    </div>
+    <label class="search">
+      <span class="visually-hidden">Suchen</span>
+      <input id="search" type="search" placeholder="Name, Code oder UID suchen" autocomplete="off">
+    </label>
+  </div>
+
+  <div class="table-wrap">
+    <table id="table">
+      <thead>
+        <tr>
+          <th data-key="name" scope="col">Name</th>
+          <th data-key="kind" scope="col">Art</th>
+          <th data-key="code" scope="col">Code</th>
+          <th data-key="spawned" scope="col" class="num">Gespawnt</th>
+          <th data-key="correct" scope="col" class="num">Richtig</th>
+          <th data-key="incorrect" scope="col" class="num">Falsch</th>
+          <th data-key="rate" scope="col" class="num">Trefferquote</th>
+          <th data-key="updated" scope="col">Zuletzt</th>
+          <th data-key="uid" scope="col">UID</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p class="empty" id="empty" hidden>Keine Items für diesen Filter.</p>
+  </div>
+
+  <details class="raw">
+    <summary>Rohdaten (JSON, gefiltert und sortiert wie die Tabelle)</summary>
+    <p><a id="api-link" href="{{ request.script_root }}/api/items" target="_blank" rel="noopener">API direkt öffnen</a></p>
+    <pre id="json"></pre>
+  </details>
+</main>
+
+<script>
+  window.WMG = { apiBase: "{{ request.script_root }}/api" };
+</script>
+<script type="module" src="{{ url_for('static', filename='js/stats/stats.js') }}"></script>
+</body>
+</html>

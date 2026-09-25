@@ -1,0 +1,118 @@
+/* WorldMapGuessr – Lobby: HUD-Anzeige, Lobby-Bereich im Menü, Beitrittsdialog */
+
+/* ---------- HUD ---------- */
+.lobby-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--piece);
+  border-radius: 999px;
+  background: var(--piece-fill);
+  color: var(--ink);
+  font: 500 12.5px/1 "Instrument Sans", system-ui, sans-serif;
+  cursor: pointer;
+}
+.lobby-badge svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.lobby-badge b { font: 600 12.5px/1 "IBM Plex Mono", ui-monospace, monospace; letter-spacing: 0.06em; }
+.lobby-badge span { color: var(--ink-soft); }
+.lobby-badge.offline { border-color: var(--bad); background: transparent; }
+.lobby-badge.offline span::after { content: " · getrennt"; color: var(--bad); }
+.lobby-badge:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* ---------- Lobby-Bereich im Menü ---------- */
+.lobby-section h3 { display: flex; align-items: baseline; gap: 8px; }
+.lobby-count { font: 500 12px "IBM Plex Mono", ui-monospace, monospace; letter-spacing: 0; text-transform: none; }
+.invite { display: flex; gap: 8px; }
+.invite input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--panel-line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: 500 14px "IBM Plex Mono", ui-monospace, monospace;
+}
+.invite .btn { white-space: nowrap; }
+
+.players { list-style: none; margin: 12px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.player {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-line);
+  font-size: 13px;
+}
+.player svg { width: 14px; height: 14px; fill: var(--piece); }
+.player.host { border-color: var(--piece); }
+.player.offline { opacity: 0.5; border-style: dashed; }
+
+.lobby-section .fields { gap: 10px; }
+.field.password {
+  padding: 10px 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+}
+.field.password label { display: flex; flex-direction: column; font-weight: 600; font-size: 14px; margin-bottom: 8px; }
+.field.password small { font-weight: 400; font-size: 12px; color: var(--ink-soft); }
+.password-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.password-row input {
+  flex: 1 1 140px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--panel-line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+}
+.lobby-section.readonly .host-only .password-row { display: none; }
+.lobby-section.readonly .field.password label { margin-bottom: 0; }
+
+/* Gäste: Einstellungen sichtbar, aber gesperrt */
+.menu-card.readonly .game-settings .kind-card { cursor: default; }
+.menu-card.readonly .game-settings .kind-card:hover { border-color: var(--panel-line); }
+.menu-card.readonly .game-settings .kind-card[aria-checked="true"]:hover { border-color: var(--piece); }
+.guest-note { color: var(--ink); font-weight: 600; }
+
+.foot-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* ---------- Beitrittsdialog ---------- */
+.join-dialog {
+  border: 1px solid var(--panel-line);
+  border-radius: 12px;
+  padding: 22px;
+  width: min(380px, calc(100% - 32px));
+  box-sizing: border-box;
+  background: var(--panel);
+  color: var(--ink);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.join-dialog::backdrop { background: rgba(8, 14, 20, 0.45); }
+.join-dialog h2 { margin: 0 0 6px; font-size: 19px; }
+.join-dialog p { margin: 0 0 12px; color: var(--ink-soft); }
+.join-dialog p:empty { display: none; }
+.join-dialog .join-error { color: var(--bad); font-weight: 600; }
+.join-dialog label { display: block; margin: 10px 0 4px; font-weight: 600; font-size: 13px; }
+.join-dialog input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 10px;
+  border: 1px solid var(--panel-line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+}
+.join-dialog input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.join-dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.join-dialog a.btn { text-decoration: none; }
+
+@media (max-width: 520px) {
+  .foot-actions { flex-direction: column-reverse; }
+  .invite { flex-direction: column; }
+}

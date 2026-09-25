@@ -1,0 +1,125 @@
+/* WorldMapGuessr – Karte & HUD (Tokens in tokens.css) */
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--outside);
+  color: var(--ink);
+  font: 14px/1.4 "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  overflow: hidden;
+}
+#stage { position: fixed; inset: 0; }
+#map { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+#map.dragging { cursor: grabbing; }
+/* Kartenfarben werden per getComputedStyle in den Canvas-Renderer gelesen. */
+
+
+.hud {
+  position: fixed;
+  display: flex;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  border-radius: 8px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.hud-title {
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  left: 16px;
+  flex-direction: column;
+  gap: 2px;
+  max-width: min(340px, calc(100% - 32px));
+}
+.hud-title h1 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: 0.01em; }
+.hud-title p { margin: 0; color: var(--ink-soft); font-size: 12.5px; }
+
+.hud-controls {
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  flex-direction: column;
+  padding: 6px;
+  gap: 4px;
+}
+.hud-controls button {
+  width: 36px; height: 36px;
+  display: grid; place-items: center;
+  border: 0; border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: 500 18px/1 "IBM Plex Mono", ui-monospace, monospace;
+  cursor: pointer;
+}
+.hud-controls button:hover { background: var(--panel-line); }
+.hud-controls button[aria-pressed="true"] { background: var(--panel-line); }
+.hud-controls button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.hud-controls svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+.hud-controls hr { width: 100%; margin: 2px 0; border: 0; border-top: 1px solid var(--panel-line); }
+
+/* Dreh-Pfeile oben mittig */
+.hud-rotate {
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  align-items: center;
+  padding: 4px;
+  gap: 2px;
+}
+.hud-rotate button {
+  width: 36px; height: 36px;
+  display: grid; place-items: center;
+  border: 0; border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.hud-rotate button:hover { background: var(--panel-line); }
+.hud-rotate button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.hud-rotate svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hud-rotate .center {
+  min-width: 76px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.15;
+  font: 500 14px/1.15 "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.hud-rotate .center small {
+  font: 600 10px/1.2 "Instrument Sans", system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.hud-readout {
+  left: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  font: 12px/1.3 "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+  flex-direction: column;
+  gap: 3px;
+}
+.hud-readout b { color: var(--ink); font-weight: 500; }
+
+#loading {
+  position: fixed; inset: 0;
+  display: grid; place-items: center;
+  color: var(--ink-soft);
+  pointer-events: none;
+}
+@media (max-width: 900px) {
+  .hud-readout { display: none; }
+}
+/* Titel und Status belegen oben die Ecken: Pfeile darunter setzen */
+@media (max-width: 960px) {
+  .hud-rotate { top: calc(100px + env(safe-area-inset-top, 0px)); }
+}
+/* Schmale Fenster: Titel ausblenden, damit Status und Pfeile Platz haben */
+@media (max-width: 720px) {
+  .hud-title { display: none; }
+  .hud-rotate { top: calc(76px + env(safe-area-inset-top, 0px)); }
+}

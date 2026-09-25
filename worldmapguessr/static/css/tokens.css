@@ -1,0 +1,62 @@
+/* WorldMapGuessr – Design-Tokens (Farben für hell/dunkel), von allen Seiten genutzt */
+:root {
+  --sea: #9fc5e3;
+  --sea-shelf: #bcd8ee;
+  --land: #1f2326;       /* noch nichts eingesetzt: fast schwarz */
+  --coast: #7f868c;
+  --border: #5b6166;
+  --outside: #e4e9ed;
+  --ink: #1f2a33;
+  --ink-soft: #55636e;
+  --panel: rgba(255, 255, 255, 0.86);
+  --panel-line: rgba(31, 42, 51, 0.12);
+  --focus: #1f6fb2;
+  --land-top: #eceeef;   /* alle Ebenen eingesetzt: fast weiß */
+  --piece: #c0762a;
+  --piece-fill: rgba(192, 118, 42, 0.28);
+  --heart: #d2453b;
+  --good: #2f8a4c;
+  --bad: #c2372e;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --sea: #1b3b57;
+    --sea-shelf: #25506f;
+    --land: #16191c;
+    --coast: #a3a9ae;
+    --border: #5b6166;
+    --outside: #0e1720;
+    --ink: #e6ecf1;
+    --ink-soft: #9aa7b2;
+    --panel: rgba(17, 27, 37, 0.84);
+    --panel-line: rgba(230, 236, 241, 0.14);
+    --focus: #7cb8ec;
+    --land-top: #dde0e2;
+    --piece: #f0a557;
+    --piece-fill: rgba(240, 165, 87, 0.3);
+    --heart: #f06a5f;
+    --good: #6cc488;
+    --bad: #f07a70;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --border: #5b6166;
+  --sea: #1b3b57;
+  --sea-shelf: #25506f;
+  --land: #16191c;
+  --coast: #a3a9ae;
+  --outside: #0e1720;
+  --ink: #e6ecf1;
+  --ink-soft: #9aa7b2;
+  --panel: rgba(17, 27, 37, 0.84);
+  --panel-line: rgba(230, 236, 241, 0.14);
+  --focus: #7cb8ec;
+  --land-top: #dde0e2;
+  --piece: #f0a557;
+  --piece-fill: rgba(240, 165, 87, 0.3);
+  --heart: #f06a5f;
+  --good: #6cc488;
+  --bad: #f07a70;
+}

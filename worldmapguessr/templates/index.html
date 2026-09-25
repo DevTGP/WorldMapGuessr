@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WorldMapGuessr</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/game.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/menu.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/lobby.css') }}">
+</head>
+<body>
+
+<div id="stage">
+  <canvas id="map" role="img" aria-label="Drehbare Weltkarte mit Kontinentumrissen"></canvas>
+</div>
+<div id="loading">Karte wird geladen …</div>
+
+<header class="hud hud-title">
+  <h1>WorldMapGuessr</h1>
+  <p>Umriss anklicken, dann an der richtigen Stelle auf die Karte klicken · Karte seitlich ziehen oder Pfeile oben zum Drehen</p>
+</header>
+
+<nav class="hud hud-rotate" aria-label="Karte drehen">
+  <button id="rotate-west" type="button" title="45° nach Westen drehen (←)" aria-label="Karte 45 Grad nach Westen drehen">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+  </button>
+  <span class="center"><small>Mitte</small><b id="center">0°</b></span>
+  <button id="rotate-east" type="button" title="45° nach Osten drehen (→)" aria-label="Karte 45 Grad nach Osten drehen">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+  </button>
+</nav>
+
+<div class="hud hud-status">
+  <button class="lobby-badge" id="lobby-badge" type="button" title="Lobby öffnen" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c.8-3.4 3.2-5 6-5s5.2 1.6 6 5M16 5.5a3 3 0 010 5.6M18.5 14c1.4.7 2.2 2.2 2.5 4"/></svg>
+    <b></b><span></span>
+  </button>
+  <span class="progress" title="Richtig eingesetzt"><b id="progress">0 / 0</b></span>
+  <div class="lives" id="lives" role="img"></div>
+  <button class="btn" id="new-round" type="button">Neue Runde</button>
+  <a class="btn btn-icon" href="{{ url_for('main.stats') }}" title="Statistik" aria-label="Statistik">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-6"/></svg>
+  </a>
+</div>
+
+<section class="hud hud-inventory" aria-label="Inventar">
+  <span class="label" aria-hidden="true">Inventar</span>
+  <div class="slots" id="slots"></div>
+</section>
+
+<svg class="held-layer" id="held-layer" aria-hidden="true"></svg>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<dialog class="round-dialog" id="round-dialog">
+  <h2 id="dlg-title"></h2>
+  <p id="dlg-text"></p>
+  <div class="actions">
+    <button class="btn" id="dlg-menu" type="button">Einstellungen</button>
+    <button class="btn btn-primary" id="dlg-again" type="button" autofocus>Nochmal</button>
+  </div>
+</dialog>
+
+<dialog class="menu" id="menu" aria-labelledby="menu-title">
+  <form class="menu-card" id="menu-form" novalidate>
+    <header class="menu-head">
+      <div>
+        <p class="eyebrow">WorldMapGuessr</p>
+        <h2 id="menu-title">Neue Runde</h2>
+      </div>
+      <button type="button" class="menu-close" id="menu-close" aria-label="Zurück zur laufenden Runde" title="Zurück zur Runde (Esc)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </header>
+
+    <div class="menu-body">
+      <div class="menu-col">
+        <section class="menu-section lobby-section" id="lobby-section" aria-labelledby="sec-lobby" hidden>
+          <h3 id="sec-lobby">Lobby <span class="lobby-count" id="lobby-count"></span></h3>
+          <div class="invite">
+            <input id="lobby-link" type="text" readonly aria-label="Einladungslink">
+            <button type="button" class="btn" id="lobby-copy">Link kopieren</button>
+          </div>
+          <ul class="players" id="lobby-players" aria-label="Spieler"></ul>
+          <div class="fields" id="lobby-fields">
+            <div class="field password host-only">
+              <label for="lobby-password">Passwort<small id="lobby-privacy"></small></label>
+              <div class="password-row">
+                <input id="lobby-password" type="password" autocomplete="new-password" placeholder="Neues Passwort" maxlength="64">
+                <button type="button" class="btn" id="lobby-password-set">Setzen</button>
+                <button type="button" class="btn" id="lobby-password-clear">Entfernen</button>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section class="menu-section game-settings" aria-labelledby="sec-kinds">
+          <h3 id="sec-kinds">Spielteile</h3>
+          <div class="kind-cards" id="kind-cards"></div>
+        </section>
+        <section class="menu-section game-settings" aria-labelledby="sec-rules">
+          <h3 id="sec-rules">Regeln</h3>
+          <div class="fields" id="rule-fields"></div>
+        </section>
+      </div>
+
+      <section class="menu-section menu-col picker game-settings" aria-labelledby="sec-picker">
+        <div class="picker-head">
+          <h3 id="sec-picker">Auswahl</h3>
+          <input type="search" id="picker-search" placeholder="Teil suchen" autocomplete="off" aria-label="Teil suchen" data-always="1">
+        </div>
+        <p class="picker-hint">Abgewählte Teile kommen in dieser Runde nicht vor.</p>
+        <div class="picker-list" id="picker-list"></div>
+      </section>
+    </div>
+
+    <footer class="menu-foot">
+      <p id="menu-summary" aria-live="polite"></p>
+      <div class="foot-actions">
+        <button type="button" class="btn btn-lg" id="menu-create-lobby">Lobby erstellen</button>
+        <button type="submit" class="btn btn-primary btn-lg" id="menu-start">Runde starten</button>
+      </div>
+    </footer>
+  </form>
+</dialog>
+
+<div class="hud hud-readout" aria-live="off">
+  <span class="coord" id="coord">— · —</span>
+  <span>Zoom <b id="zoom">100 %</b></span>
+</div>
+
+<nav class="hud hud-controls" aria-label="Kartensteuerung">
+  <button id="zoom-in" type="button" title="Hineinzoomen (+)" aria-label="Hineinzoomen">+</button>
+  <button id="zoom-out" type="button" title="Herauszoomen (−)" aria-label="Herauszoomen">−</button>
+  <button id="zoom-reset" type="button" title="Ganze Welt (0)" aria-label="Ganze Welt anzeigen">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+  </button>
+  <hr>
+  <button id="grid" type="button" title="Gradnetz ein/aus (G)" aria-label="Gradnetz ein- oder ausblenden" aria-pressed="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c-3 3-3 14 0 17M12 3.5c3 3 3 14 0 17"/></svg>
+  </button>
+</nav>
+
+<dialog class="join-dialog" id="join-dialog">
+  <form>
+    <h2></h2>
+    <p class="join-text"></p>
+    <p class="join-error" role="alert" hidden></p>
+    <label for="join-name">Dein Name</label>
+    <input id="join-name" type="text" maxlength="24" autocomplete="nickname" required>
+    <div class="join-password" hidden>
+      <label for="join-password">Passwort</label>
+      <input id="join-password" type="password" maxlength="64" autocomplete="current-password">
+    </div>
+    <div class="actions">
+      <button type="button" class="btn" id="join-cancel">Abbrechen</button>
+      <button type="submit" class="btn btn-primary" id="join-submit">Beitreten</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="join-dialog" id="lobby-gone">
+  <h2>Lobby nicht verfügbar</h2>
+  <p></p>
+  <div class="actions"><a class="btn btn-primary" href="{{ url_for('main.index') }}">Zum Einzelspiel</a></div>
+</dialog>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson@3.0.2/dist/topojson.min.js"></script>
+<script>
+  window.WMG = {
+    dataUrl: "{{ url_for('static', filename='data/world.topo.json') }}",
+    apiBase: "{{ request.script_root }}/api",
+    lobbyCode: {{ (lobby_code or none) | tojson }},
+  };
+</script>
+<script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
