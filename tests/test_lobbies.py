@@ -1,10 +1,12 @@
 import json
 import re
 
+import mongomock
 import pytest
 
 from worldmapguessr.lobbies.codes import PATTERN
 from worldmapguessr.lobbies.hub import Connection, LobbyHub
+from worldmapguessr.lobbies.persistence import MongoLobbyPersistence
 from worldmapguessr.lobbies.store import LobbyError, LobbyStore
 
 
@@ -24,8 +26,10 @@ class Clock:
         return self.t
 
 
-@pytest.fixture()
-def store(tmp_path):
+@pytest.fixture(params=["json", "mongodb"])
+def store(request, tmp_path):
+    if request.param == "mongodb":
+        return LobbyStore(MongoLobbyPersistence(mongomock.MongoClient().db["lobbies"]))
     return LobbyStore(tmp_path / "lobbies.json")
 
 
@@ -42,7 +46,7 @@ def test_create_short_unique_code_and_persist(tmp_path, store):
     assert lobby["host"] == host["id"] and host["token"]
     assert lobby["settings"]["config"]["lives"] == 30          # auf Grenze geklemmt
     assert lobby["settings"]["config"]["kinds"] == ["country"]  # unbekannte Art verworfen
-    again = LobbyStore(tmp_path / "lobbies.json")               # neu geladen
+    again = LobbyStore(store.persistence)                       # neu geladen (gleiches Backend)
     assert again.get(lobby["code"].lower())["host"] == host["id"]
 
 

@@ -8,3 +8,5 @@ build/tmp/
 instance/
 .pytest_cache/
 .run
+
+.env

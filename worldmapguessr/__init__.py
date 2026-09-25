@@ -5,8 +5,9 @@ import os
 from flask import Flask
 from flask_sock import Sock
 
-from .item_store import ItemStore, seed_from_topojson
+from .item_store import seed_from_topojson
 from .lobbies import LobbyHub, LobbyStore
+from .storage import create_stores
 from .lobbies.codes import LobbyCodeConverter
 
 # Windows liest MIME-Typen aus der Registry; .js kommt dort teils als text/plain,
@@ -22,15 +23,21 @@ def create_app(test_config: dict | None = None) -> Flask:
         ITEM_STORE_PATH=os.path.join(app.instance_path, "items.json"),
         LOBBY_STORE_PATH=os.path.join(app.instance_path, "lobbies.json"),
         LOBBY_EXPIRY_THREAD=True,
+        # MongoDB: gesetzt → Daten in MongoDB, leer → JSON-Dateien (Fallback)
+        MONGODB_URI=os.environ.get("MONGODB_URI", ""),
+        MONGODB_DB=os.environ.get("MONGODB_DB", ""),
+        # Einmalige Übernahme alter Statistik in eine leere MongoDB; None → instance/items.json
+        ITEM_IMPORT_PATH=os.environ.get("WMG_ITEM_IMPORT") or None,
     )
     if test_config:
         app.config.update(test_config)
 
-    store = ItemStore(app.config["ITEM_STORE_PATH"])
+    store, lobby_persistence, storage = create_stores(app.config, app.instance_path)
     seed_from_topojson(store, os.path.join(app.static_folder, "data", "world.topo.json"))
     app.extensions["item_store"] = store
+    app.extensions["storage"] = storage
 
-    lobby_store = LobbyStore(app.config["LOBBY_STORE_PATH"])
+    lobby_store = LobbyStore(lobby_persistence)
     lobby_hub = LobbyHub(lobby_store)
     if app.config["LOBBY_EXPIRY_THREAD"]:
         lobby_hub.start_expiry()

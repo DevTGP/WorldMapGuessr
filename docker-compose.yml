@@ -5,6 +5,11 @@ services:
     restart: unless-stopped
     ports:
       - "5002:5000"
+    environment:
+      # Aus der Datei .env neben dieser Datei (auf dem Server, nicht im Git):
+      #   MONGODB_URI=mongodb://wmg:PASSWORT@mongo:27017/worldmapguessr?authSource=worldmapguessr
+      # Leer/fehlend → Fallback auf JSON-Dateien in ./instance
+      MONGODB_URI: ${MONGODB_URI:-}
     volumes:
       - ./instance:/app/instance
     networks:

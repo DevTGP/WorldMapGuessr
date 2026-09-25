@@ -1,3 +1,4 @@
 flask>=3.0
 flask-sock>=0.7
 gunicorn>=23
+pymongo>=4.6

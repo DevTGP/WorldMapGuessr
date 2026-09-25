@@ -10,6 +10,17 @@ def _store():
     return current_app.extensions["item_store"]
 
 
+@bp.get("/health")
+def health():
+    """Für Docker-Healthcheck und Portainer: läuft der Server, erreicht er die Datenbank?"""
+    storage = current_app.extensions["storage"]
+    if storage.backend == "mongodb":
+        from .storage.mongo import ping
+        if not ping(storage.db):
+            return jsonify(status="error", storage="mongodb", error="MongoDB nicht erreichbar"), 503
+    return jsonify(status="ok", storage=storage.backend)
+
+
 @bp.get("/items")
 def list_items():
     """Alle Items, optional gefiltert: /api/items?kind=continent"""

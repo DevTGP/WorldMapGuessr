@@ -1,18 +1,17 @@
-"""Lobbys als JSON-Datei (instance/lobbies.json). Verfällt nach LOBBY_TTL ohne Aktivität."""
+"""Lobbys: im Speicher gehalten, jede Änderung sofort persistiert (JSON-Datei oder MongoDB,
+siehe persistence.py). Verfällt nach LOBBY_TTL ohne Aktivität."""
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import secrets
-import tempfile
 import threading
 import time
-from pathlib import Path
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .codes import new_code, normalize
+from .persistence import JsonLobbyPersistence
 from .settings import DEFAULT_CONFIG, clean_config, clean_max_players, clean_name
 
 LOBBY_TTL = 24 * 3600  # Sekunden ohne Aktivität, danach wird die Lobby gelöscht
@@ -32,12 +31,15 @@ def _hash_token(token: str) -> str:
 
 
 class LobbyStore:
-    def __init__(self, path: str | os.PathLike, ttl: int = LOBBY_TTL, clock=time.time):
-        self.path = Path(path)
+    def __init__(self, persistence, ttl: int = LOBBY_TTL, clock=time.time):
+        """persistence: JsonLobbyPersistence/MongoLobbyPersistence oder ein Dateipfad (→ JSON)."""
+        if isinstance(persistence, (str, os.PathLike)):
+            persistence = JsonLobbyPersistence(persistence)
+        self.persistence = persistence
         self.ttl = ttl
         self.clock = clock
         self.lock = threading.RLock()
-        self._lobbies: dict[str, dict] = self._load()
+        self._lobbies: dict[str, dict] = persistence.load_all()
         self.expire()
 
     # ---------- Lesen ----------
@@ -76,7 +78,7 @@ class LobbyStore:
                 "round": None,
             }
             self._lobbies[code] = lobby
-            self._save()
+            self.persistence.save(lobby)
             return lobby, {"id": player["id"], "token": token, "name": player["name"]}
 
     def authenticate(self, code, player_id, token) -> dict | None:
@@ -148,7 +150,7 @@ class LobbyStore:
             lobby["players"].pop(player_id, None)
             if not lobby["players"]:
                 del self._lobbies[lobby["code"]]
-                self._save()
+                self.persistence.delete(lobby["code"])
                 return None
             if lobby["host"] == player_id:
                 candidates = [p for p in lobby["players"] if p in online] or list(lobby["players"])
@@ -162,7 +164,7 @@ class LobbyStore:
             lobby = self._require(code)
             self._require_host(lobby, player_id)
             del self._lobbies[lobby["code"]]
-            self._save()
+            self.persistence.delete(lobby["code"])
 
     def set_host(self, code, player_id):
         with self.lock:
@@ -177,7 +179,7 @@ class LobbyStore:
             lobby = self._lobbies.get(normalize(code))
             if lobby:
                 lobby["lastActive"] = self.clock()
-                self._save()
+                self.persistence.save(lobby)
 
     def expire(self) -> list[str]:
         """Lobbys ohne Aktivität seit ttl löschen."""
@@ -186,8 +188,7 @@ class LobbyStore:
             gone = [c for c, l in self._lobbies.items() if l["lastActive"] < limit]
             for c in gone:
                 del self._lobbies[c]
-            if gone:
-                self._save()
+                self.persistence.delete(c)
             return gone
 
     # ---------- intern ----------
@@ -212,20 +213,3 @@ class LobbyStore:
             "joined": now,
         }
         return player, token
-
-    def _load(self) -> dict:
-        if self.path.exists():
-            with self.path.open(encoding="utf-8") as f:
-                return json.load(f).get("lobbies", {})
-        return {}
-
-    def _save(self):
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=self.path.parent, prefix=".lobbies-", suffix=".json")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump({"version": 1, "lobbies": self._lobbies}, f, ensure_ascii=False, indent=2)
-            os.replace(tmp, self.path)
-        except BaseException:
-            Path(tmp).unlink(missing_ok=True)
-            raise

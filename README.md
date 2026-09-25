@@ -2,7 +2,7 @@
 
 Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltkarte korrekt einsetzen.
 
-**Stand:** Schritt 6: Lobbys (kurze Links, Einstellungen, Host, jederzeit beitreten). Das gemeinsame Spielen selbst folgt.
+**Stand:** Schritt 7: Daten in MongoDB (JSON-Dateien als Fallback).
 
 ## Spielablauf
 
@@ -34,13 +34,45 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
 - **Verlassen (alle):** „Lobby verlassen“ im Lobby-Bereich des Menüs → Bestätigung → zurück zum Einzelspiel. Der Spieler wird aus der Lobby entfernt, seine gespeicherte Identität gelöscht; über den Link kann er später als neuer Spieler wieder beitreten. Verlässt der Host, geht die Rolle sofort an den am längsten anwesenden Online-Spieler. Verlässt der letzte Spieler, wird die Lobby gelöscht.
 - **Beenden (nur Host):** „Lobby beenden“ → Bestätigung → die Lobby wird für alle gelöscht. Alle anderen sehen „Lobby beendet“ mit dem Weg zum Einzelspiel; der Link funktioniert danach nicht mehr.
 - **Runde starten:** Der Host startet für alle. Alle bekommen dieselbe Konfiguration und denselben Zufalls-Seed, also dieselbe Reihenfolge der Teile. Wie die Spieler sich gegenseitig beeinflussen, ist noch nicht umgesetzt – jeder spielt vorerst für sich.
-- **Speicherung:** `instance/lobbies.json` (Passwörter nur als Hash, Spieler-Tokens als SHA-256). Lobbys ohne Aktivität verfallen nach 24 Stunden.
+- **Speicherung:** MongoDB-Collection `lobbies` bzw. Fallback `instance/lobbies.json` (Passwörter nur als Hash, Spieler-Tokens als SHA-256). Lobbys ohne Aktivität verfallen nach 24 Stunden.
 - **Technik:** WebSocket `/ws/lobby/<code>` über `flask-sock`. Protokoll (JSON): Client → `join`, `settings`, `start`, `rename`, `leave`, `close`, `ping`; Server → `welcome`, `state`, `error`, `left`, `closed`, `pong`. HTTP: `POST /api/lobbies`, `GET /api/lobbies/<code>`.
+
+## Speicher
+
+| `MONGODB_URI` | Items | Lobbys |
+|---|---|---|
+| gesetzt | MongoDB, Collection `items` (Zähler atomar per `$inc`) | MongoDB, Collection `lobbies` (ein Dokument je Lobby) |
+| leer (Standard lokal) | `instance/items.json` | `instance/lobbies.json` |
+
+- Datenbankname: aus der URI (`…/worldmapguessr?…`), sonst `MONGODB_DB`, sonst `worldmapguessr`.
+- Beim Start prüft der Server die Verbindung (Timeout 5 s). Ist MongoDB nicht erreichbar, bricht der Start ab – im Container startet Docker ihn dank `restart: unless-stopped` neu.
+- `GET /api/health` → `{"status": "ok", "storage": "mongodb"}` bzw. 503, wenn MongoDB weg ist (nutzt auch der Docker-Healthcheck).
+- **Übernahme der alten Statistik:** Beim ersten Start mit *leerer* `items`-Collection übernimmt der Server `instance/items.json` (anderer Pfad: `WMG_ITEM_IMPORT`) mit UIDs und Zählern. Von Hand geht es auch: `python -m worldmapguessr.storage.migrate_items instance/items.json` (mit gesetztem `MONGODB_URI`, mehrfach ausführbar).
+- Lobbys laufen in einem einzigen Server-Prozess (WebSockets und Online-Status liegen im Speicher). MongoDB sorgt dafür, dass sie einen Neustart überstehen – mehrere Prozesse/Container parallel sind dafür nicht ausgelegt.
+- Lokal mit der Server-Datenbank testen: SSH-Tunnel `ssh -L 27017:127.0.0.1:27017 user@server` und in der PyCharm-Startkonfiguration `MONGODB_URI=mongodb://wmg:PASSWORT@localhost:27017/worldmapguessr?authSource=worldmapguessr` setzen (setzt voraus, dass der Mongo-Stack den Port an `127.0.0.1` bindet).
+
+## Deployment auf dem Server
+
+Push auf `master` → GitHub Action (`.github/workflows/deploy.yml`) → per SSH auf dem Server `git pull`,
+`docker compose build`, `docker compose up -d`. Der Container läuft im Netzwerk `local-web`, erreichbar auf Port 5002.
+
+**MongoDB einmalig anbinden:**
+1. Auf dem Server `/root/WorldMapGuessr/.env` anlegen (Vorlage: `.env.example`):
+   `MONGODB_URI=mongodb://wmg:PASSWORT@mongo:27017/worldmapguessr?authSource=worldmapguessr`
+   – `mongo` ist der Containername der Datenbank im Netzwerk `local-web`, `wmg`/`PASSWORT` der App-Benutzer aus dem Mongo-Stack.
+2. Pushen (oder auf dem Server `docker compose up -d --build`).
+3. Beim ersten Start mit leerer `items`-Collection übernimmt der Server `instance/items.json` (liegt über das Volume `./instance` im Container) mit allen UIDs und Zählern. Die Datei bleibt als Sicherung liegen.
+4. Prüfen: `http://SERVER:5002/api/health` → `{"status": "ok", "storage": "mongodb"}`. Steht dort `"json"`, fehlt die `.env` bzw. `MONGODB_URI`.
+
+Hinweise:
+- Gunicorn läuft mit genau einem Worker (siehe Dockerfile) – nötig, weil Lobbys und WebSockets im Speicher dieses Prozesses leben.
+- Ist MongoDB beim Start nicht erreichbar, bricht der Start nach 5 s ab; `restart: unless-stopped` startet den Container neu, bis die Datenbank da ist.
+- Hinter einem Reverse Proxy muss WebSocket-Support aktiv sein (`/ws/…`).
 
 ## Item-Statistik
 
 Jedes Spielteil ist auf dem Server als Item mit fester UID registriert. Der Browser meldet Ereignisse
-über die API, der Server zählt und schreibt `instance/items.json` (atomar, thread-sicher).
+über die API, der Server zählt – in MongoDB oder im Fallback in `instance/items.json`.
 
 | Methode | Pfad | Zweck |
 |---|---|---|
@@ -60,8 +92,11 @@ Ist der Server nicht erreichbar, läuft das Spiel ohne Tracking weiter (Warnung 
 
 ```
 run.py                        Startpunkt Entwicklungsserver
-requirements.txt              Laufzeit-Abhängigkeiten (Flask)
-requirements-dev.txt          + pytest
+requirements.txt              Laufzeit-Abhängigkeiten (Flask, flask-sock, gunicorn, pymongo)
+requirements-dev.txt          + pytest, mongomock
+Dockerfile, docker-compose.yml  Container für den Server (Netzwerk local-web, Port 5002)
+.env.example                  Vorlage für die .env auf dem Server (MONGODB_URI)
+.github/workflows/deploy.yml  Deployment per SSH bei Push auf master
 instance/items.json           Item-Statistik (wird beim Start angelegt, nicht versioniert)
 worldmapguessr/
   __init__.py                 App-Factory create_app(), registriert Kontinente als Items
@@ -69,11 +104,16 @@ worldmapguessr/
   api.py                      JSON-API /api/items
   lobbies/codes.py            Lobby-Codes, URL-Konverter
   lobbies/settings.py         Lobbyeinstellungen prüfen (Grenzen, Arten, Namen)
-  lobbies/store.py            Lobbys als JSON, Beitritt, Passwort, Host-Aktionen, Verfall
+  lobbies/store.py            Lobbys im Speicher, Beitritt, Passwort, Host-Aktionen, Verfall
   lobbies/hub.py              Live-Verbindungen, Online-Status, Host-Wechsel, Broadcast
   lobbies/ws.py               WebSocket-Endpunkt
   lobbies/api.py              HTTP-API /api/lobbies
-  item_store.py               JSON-Datei mit UIDs und Zählern
+  item_store.py               Items als JSON-Datei (Fallback)
+  storage/factory.py          Backend-Wahl: MongoDB oder JSON
+  storage/mongo.py            Verbindung, Ping
+  storage/mongo_items.py      Items in MongoDB, Übernahme aus items.json
+  storage/migrate_items.py    Übernahme von Hand (Kommandozeile)
+  lobbies/persistence.py      Lobbys schreiben: JSON-Datei oder MongoDB
   templates/index.html        Spielseite (Jinja-Template)
   templates/stats.html        Statistik-Seite
   static/css/tokens.css       Farb-Tokens hell/dunkel (von allen Seiten genutzt)
@@ -110,7 +150,7 @@ worldmapguessr/
   static/js/game/lives.js     Lebensanzeige
   static/js/game/toast.js     Kurzmeldungen
   static/data/world.topo.json 7 Kontinente + 45 Staaten in einer Topologie (generiert)
-tests/                        pytest: Item-Store, API, Lobbys
+tests/                        pytest: Item-Store, API, Lobbys – jeweils mit JSON und MongoDB (mongomock)
 build/                        Erzeugung der Kartendaten (siehe unten)
 .run/                         PyCharm-Startkonfigurationen (Server, Tests)
 ```
