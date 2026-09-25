@@ -1,5 +1,5 @@
 """Schritt 2: Länder je Kontinent vereinigen (GEOS) und spielbare Staaten (Europa, Nordamerika)
-als eigene Ebene ausgeben (Europa, Nord-/Südamerika, Afrika, Asien). Russland wird für die Kontinente am Ural / Ural-Fluss geteilt, als Staat
+als eigene Ebene ausgeben (alle Kontinente außer Antarktika). Russland wird für die Kontinente am Ural / Ural-Fluss geteilt, als Staat
 bleibt es ganz. Überseegebiete europäischer Staaten (Französisch-Guayana, Guadeloupe, Réunion,
 Karibische Niederlande …) zählen zum Kontinent, auf dem sie liegen – nicht zu Europa.
 
@@ -78,9 +78,11 @@ def drop_tiny_outside_europe(g, keep_all=False):
 
 fc = json.load(open("tmp/countries.geojson"))
 
-# Staaten, die nur aus Kleinstinseln bestehen (Malediven): nichts weglassen – sonst gäbe es sie nicht.
-# Gilt für Kontinent und Staat gleichermaßen, damit beide Ebenen deckungsgleich bleiben.
-# (je Staat betrachtet: Macao als Teil Chinas zählt nicht dazu)
+# Kleine Inselstaaten (größte Insel < ~600 km²: Malediven, Tuvalu, Kiribati, Grenada …): alle Inseln
+# behalten – sonst fehlten ganze Atolle oder der Staat gleich ganz. Gilt für Kontinent und Staat
+# gleichermaßen, damit beide Ebenen deckungsgleich bleiben. (Je Staat betrachtet: Macao als Teil
+# Chinas zählt nicht dazu.)
+SMALL_STATE_DEG2 = 0.05
 _largest = {}
 for f in fc["features"]:
     info = f["properties"].get("country")
@@ -88,8 +90,8 @@ for f in fc["features"]:
         biggest = max(p.area for p in polys(shape(f["geometry"]).buffer(0)))
         _largest[info["code"]] = max(_largest.get(info["code"], 0), biggest)
 TINY_ONLY = {f["properties"]["name"] for f in fc["features"]
-             if f["properties"].get("country") and _largest[f["properties"]["country"]["code"]] < MIN_ISLAND_DEG2}
-print("nur Kleinstinseln (alle behalten):", sorted(TINY_ONLY))
+             if f["properties"].get("country") and _largest[f["properties"]["country"]["code"]] < SMALL_STATE_DEG2}
+print("kleine Inselstaaten (alle Inseln behalten):", sorted(TINY_ONLY))
 groups = {k: [] for k in NAMES}
 antarctica = None
 for f in fc["features"]:
@@ -130,9 +132,11 @@ for code, parts in groups.items():
 
 json.dump({"type": "FeatureCollection", "features": out}, open("tmp/continents.geojson", "w"))
 
-# ---------- Spielbare Staaten (Europa, Nord-/Südamerika, Afrika) ----------
-# Über die Datumsgrenze reichende Staaten: im Rahmen 0…360° ohne Naht (Tschukotka, Aleuten)
+# ---------- Spielbare Staaten ----------
+# Über die Datumsgrenze reichende Staaten: im Rahmen 0…360° ohne Naht (Tschukotka, Aleuten, Fidschi,
+# Kiribati, Tuvalu, Neuseeland mit den Chatham-Inseln …) – für Ozeanien einfach alle Staaten
 SHIFTED_COUNTRIES = {"RUS", "USA"}
+SHIFTED_REGIONS = {"OC"}
 
 # Mehrere Quell-Features mit demselben Staat (Somalia + Somaliland) zu einem vereinigen
 items = {}
@@ -158,9 +162,10 @@ for code, area in CUT_TO.items():
 countries = []
 for code, f in items.items():
     info = f["properties"]["country"]
-    if code in SHIFTED_COUNTRIES:
+    if code in SHIFTED_COUNTRIES or info["region"] in SHIFTED_REGIONS:
         g = to_shifted(f["geometry"])
-        ps = [orient(p, sign=-1.0) for p in polys(g) if p.area >= MIN_ISLAND_DEG2 or EUROPE_BOX.contains(p.representative_point())]
+        ps = [orient(p, sign=-1.0) for p in polys(g)
+              if f.get("keep_all") or p.area >= MIN_ISLAND_DEG2 or EUROPE_BOX.contains(p.representative_point())]
         geom = unshift_coords(mapping(MultiPolygon(ps)))
     elif info["region"] == "EU":
         g = shape(f["geometry"]).buffer(0)
@@ -173,5 +178,5 @@ for code, f in items.items():
         geom = mapping(MultiPolygon(ps))
     countries.append({"type": "Feature", "id": code,
                       "properties": {"name": info["name"], "region": info["region"]}, "geometry": geom})
-print("Staaten:", len(countries), {r: sum(c["properties"]["region"] == r for c in countries) for r in ("EU", "NA", "SA", "AF", "AS")})
+print("Staaten:", len(countries), {r: sum(c["properties"]["region"] == r for c in countries) for r in ("EU", "NA", "SA", "AF", "AS", "OC")})
 json.dump({"type": "FeatureCollection", "features": countries}, open("tmp/countries-items.geojson", "w"))

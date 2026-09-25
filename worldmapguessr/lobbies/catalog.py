@@ -1,7 +1,7 @@
 """Item-Katalog für Lobby-Runden: {Gruppe: ["kind:id", …]} aus der TopoJSON-Karte.
 
 Die Keys entsprechen den Feature-Keys im Browser (static/js/map/map.js: `${kind}:${id}`), die Gruppen
-den Karten im Menü: "continent", "country-eu", "country-na", "country-sa", "country-af", "country-as" (Staaten nach properties.region)."""
+den Karten im Menü: "continent", "country-eu", "country-na", "country-sa", "country-af", "country-as", "country-oc" (Staaten nach properties.region)."""
 from __future__ import annotations
 
 import json
