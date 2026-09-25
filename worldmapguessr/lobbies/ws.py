@@ -3,6 +3,7 @@
 Protokoll (JSON):
   Client → Server  join {playerId?, token?, name, password?} · settings {settings} · start · rename {name}
                    · place {key, correct} (Einsetzversuch eines Teils aus dem eigenen Inventar)
+                   · give {key, to} (Teil an einen Online-Mitspieler senden, wenn settings.allowSend)
                    · leave (Lobby verlassen) · close (nur Host: Lobby beenden) · ping
   Server → Client  welcome {player} · state {lobby, hand} · error {code, message} · left · closed {message}
                    · pong

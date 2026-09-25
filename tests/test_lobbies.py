@@ -204,6 +204,30 @@ def test_disconnected_player_keeps_hand_during_grace(store):
     assert gid not in round_of(h)["handCounts"] and round_of(h)["poolCount"] == 23 - 3
 
 
+def test_give_item_to_online_player_and_host_can_disable(store):
+    hub, code, h, g = two_players(store)
+    key = hand_of(h)[0]
+    assert h.ws.sent[-1]["lobby"]["settings"]["allowSend"] is True   # Standard: an
+    hub.handle(code, h, {"type": "give", "key": key, "to": g.player_id})
+    assert key in hand_of(g) and key not in hand_of(h)
+    assert round_of(h)["handCounts"] == {h.player_id: 2, g.player_id: 4}
+    # an getrennte Spieler nicht
+    gid = g.player_id
+    hub.leave(code, g)
+    with pytest.raises(LobbyError) as e:
+        hub.handle(code, h, {"type": "give", "key": hand_of(h)[0], "to": gid})
+    assert e.value.code == "bad_target"
+    # Host schaltet aus → Senden abgelehnt; Gäste dürfen die Einstellung nicht ändern
+    g2 = connect(hub, code, name="Zweiter")
+    with pytest.raises(LobbyError):
+        hub.handle(code, g2, {"type": "settings", "settings": {"allowSend": True}})
+    hub.handle(code, h, {"type": "settings", "settings": {"allowSend": False}})
+    assert g2.ws.sent[-1]["lobby"]["settings"]["allowSend"] is False
+    with pytest.raises(LobbyError) as e:
+        hub.handle(code, h, {"type": "give", "key": hand_of(h)[0], "to": g2.player_id})
+    assert e.value.code == "send_disabled"
+
+
 # ---------- HTTP ----------
 def test_http_create_info_and_page(client):
     r = client.post("/api/lobbies", json={"name": "Manu", "maxPlayers": 4, "password": "pw"})

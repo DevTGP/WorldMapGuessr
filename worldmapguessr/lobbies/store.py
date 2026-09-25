@@ -13,7 +13,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from . import round as rounds
 from .codes import new_code, normalize
 from .persistence import JsonLobbyPersistence
-from .settings import DEFAULT_CONFIG, clean_config, clean_max_players, clean_name
+from .settings import (DEFAULT_ALLOW_SEND, DEFAULT_CONFIG, clean_bool, clean_config, clean_max_players,
+                       clean_name)
 
 LOBBY_TTL = 24 * 3600  # Sekunden ohne Aktivität, danach wird die Lobby gelöscht
 
@@ -76,6 +77,7 @@ class LobbyStore:
                     "config": clean_config(config if config is not None else DEFAULT_CONFIG),
                     "maxPlayers": clean_max_players(max_players),
                     "passwordHash": generate_password_hash(password) if password else "",
+                    "allowSend": DEFAULT_ALLOW_SEND,
                 },
                 "players": {player["id"]: player},
                 "round": None,
@@ -124,6 +126,8 @@ class LobbyStore:
                 s["config"] = clean_config(settings["config"])
             if "maxPlayers" in settings:
                 s["maxPlayers"] = clean_max_players(settings["maxPlayers"])
+            if "allowSend" in settings:
+                s["allowSend"] = clean_bool(settings["allowSend"], s.get("allowSend", DEFAULT_ALLOW_SEND))
             if "password" in settings:  # "" entfernt das Passwort
                 pw = str(settings["password"] or "")[:64]
                 s["passwordHash"] = generate_password_hash(pw) if pw else ""
@@ -167,6 +171,22 @@ class LobbyStore:
                 raise LobbyError(err.code, err.message) from None
             self.touch(code)
             return result
+
+    def give(self, code, player_id, to, key, online=()):
+        """Teil an einen Mitspieler senden (nur wenn der Host es erlaubt und der Empfänger online ist)."""
+        with self.lock:
+            lobby = self._require(code)
+            if not lobby["settings"].get("allowSend", DEFAULT_ALLOW_SEND):
+                raise LobbyError("send_disabled", "Senden ist in dieser Lobby ausgeschaltet.")
+            if not lobby["round"]:
+                raise LobbyError("no_round", "Es läuft keine Runde.")
+            if to not in online or to not in lobby["players"]:
+                raise LobbyError("bad_target", "Dieser Spieler ist gerade nicht da.")
+            try:
+                rounds.give(lobby["round"], player_id, str(to), str(key))
+            except rounds.RoundError as err:
+                raise LobbyError(err.code, err.message) from None
+            self.touch(code)
 
     def return_hand(self, code, player_id, online=()) -> int:
         """Teile eines Spielers zurück in den Vorrat (Verlassen, lange getrennt)."""

@@ -123,3 +123,115 @@
   .foot-actions { flex-direction: column-reverse; }
   .invite { flex-direction: column; }
 }
+
+/* ---------- Mitspieler-Spalte (Umrisse senden) ---------- */
+.hud-players {
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  flex-direction: column;
+  gap: 6px;
+  width: 176px;
+  max-height: calc(100% - 330px);
+  padding: 10px;
+  box-sizing: border-box;
+}
+.hud-players h2 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.hud-players ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; overflow: auto; min-height: 0; }
+.rail-player {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1.5px solid var(--panel-line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.rail-player:hover { background: var(--panel-line); }
+.rail-player:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.rail-player .avatar {
+  grid-row: 1 / 3;
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--piece-fill);
+  color: var(--ink);
+  font: 600 12px/1 "IBM Plex Mono", ui-monospace, monospace;
+}
+.rail-name { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-count { font: 12px "IBM Plex Mono", ui-monospace, monospace; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.rail-count b { font-weight: 500; color: var(--ink); }
+.rail-hint { margin: 0; font-size: 11.5px; color: var(--ink-soft); }
+
+/* Umriss in der Hand: Felder werden zu Zielen */
+body.is-holding .rail-player { border-style: dashed; border-color: var(--piece); }
+body.is-holding .rail-player:hover { background: var(--piece-fill); border-style: solid; }
+body.is-holding .rail-hint { color: var(--piece); }
+
+/* Lobby-Einstellung als Schalter */
+.field.toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.field.toggle span { display: flex; flex-direction: column; font-weight: 600; font-size: 14px; }
+.field.toggle small { font-weight: 400; font-size: 12px; color: var(--ink-soft); }
+.field.toggle input {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  position: relative;
+  width: 40px; height: 22px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--panel-line);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.field.toggle input::after {
+  content: "";
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease;
+}
+.field.toggle input:checked { background: var(--piece); }
+.field.toggle input:checked::after { transform: translateX(18px); }
+.field.toggle input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.field.toggle input:disabled { cursor: default; opacity: 0.6; }
+.lobby-section.readonly .field.toggle { cursor: default; }
+
+/* Schmal: nur Kürzel + Anzahl */
+@media (max-width: 720px) {
+  .hud-players { width: auto; top: calc(128px + env(safe-area-inset-top, 0px)); transform: none; max-height: calc(100% - 290px); padding: 6px; }
+  .hud-players h2, .rail-hint, .rail-name, .rail-count span { display: none; }
+  .rail-player { grid-template-columns: 32px; grid-template-rows: auto auto; justify-items: center; padding: 4px; row-gap: 2px; }
+  .rail-player .avatar { grid-row: auto; }
+  .rail-count { font-size: 10.5px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rail-player, .field.toggle input, .field.toggle input::after { transition: none; }
+}

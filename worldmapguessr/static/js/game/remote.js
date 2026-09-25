@@ -5,7 +5,7 @@
 import { fromWire } from "../menu/config.js";
 
 /** Fehler, nach denen der eigene (optimistische) Stand verworfen wird */
-const RESYNC_ERRORS = new Set(["not_in_hand", "round_over", "no_round"]);
+const RESYNC_ERRORS = new Set(["not_in_hand", "round_over", "no_round", "bad_target", "send_disabled"]);
 
 export class RemoteRound {
   /**
@@ -18,6 +18,7 @@ export class RemoteRound {
     this.number = 0;        // Nummer der dargestellten Lobby-Runde
     this.seq = 0;           // zuletzt angezeigtes Ereignis
     this.sent = new Set();  // von mir richtig eingesetzt, vom Server noch nicht bestätigt
+    this.gifting = new Set(); // von mir gesendet, vom Server noch nicht bestätigt
     this.finished = false;
     this.queued = null;     // {lobby, hand}, während einer Animation zurückgestellt
     game.remote = this;
@@ -25,6 +26,7 @@ export class RemoteRound {
     client.addEventListener("error", ({ detail: err }) => {
       if (!RESYNC_ERRORS.has(err.code)) return;
       this.sent.clear();
+      this.gifting.clear();
       if (client.state) this.apply(client.state, client.hand);
     });
   }
@@ -33,6 +35,12 @@ export class RemoteRound {
   send(key, correct) {
     if (correct) this.sent.add(key);
     this.client.place(key, correct);
+  }
+
+  /** Teil an einen Mitspieler senden */
+  give(key, to) {
+    this.gifting.add(key);
+    this.client.give(key, to);
   }
 
   /** Neuer Zustand vom Server; während Animationen zurückgestellt (Game ruft flush) */
@@ -55,6 +63,7 @@ export class RemoteRound {
       this.seq = round.last?.seq ?? 0;
       this.finished = false;
       this.sent.clear();
+      this.gifting.clear();
       g.resetRound(fromWire(round.config), round.livesMax);
     }
 
@@ -66,19 +75,25 @@ export class RemoteRound {
       if (!placed.has(key) && !this.sent.has(key)) g.map.setPlaced(key, false);
     }
 
-    // Eigenes Inventar
+    // Eigenes Inventar. Optimistisch eingesetzte/gesendete Teile, die der Server nicht bestätigt, kommen zurück.
     const inHand = new Set(hand);
+    for (const key of this.gifting) if (!inHand.has(key)) this.gifting.delete(key);
     for (const id of [...g.inventory.pieces.keys()]) {
       const state = g.inventory.state(id);
-      if (inHand.has(id) ? state === "placed" && !this.sent.has(id) : state !== "placed") g.removePiece(id);
+      const stale = inHand.has(id)
+        ? (state === "placed" && !this.sent.has(id)) || (state === "sent" && !this.gifting.has(id))
+        : state !== "placed";
+      if (stale) g.removePiece(id);
     }
     const added = hand.filter((key) => !g.inventory.pieces.has(key)).map((key) => g.pieceFor(key)).filter(Boolean);
-    if (added.length) g.addPieces(added);
+    const ev = round.last;
+    const gift = ev?.type === "gift" && ev.to === this.client.me?.id && ev.seq > this.seq ? ev.key : null;
+    if (added.length) g.addPieces(added, { notSpawned: new Set(gift ? [gift] : []) });
 
     g.lives.set(round.lives);
     g.setProgress(round.placed.length, round.total);
 
-    this._announce(lobby, round, fresh ? 0 : added.length);
+    this._announce(lobby, round, fresh ? 0 : added.filter((p) => p.id !== gift).length);
 
     if (round.status !== "running" && !this.finished) {
       this.finished = true;
@@ -98,6 +113,10 @@ export class RemoteRound {
     if (isNew && ev.type === "miss") {
       const who = ev.player === me ? "Daneben" : `${this._name(lobby, ev.player)} lag daneben`;
       return g.toast(round.lives > 0 ? `${who} – noch ${round.lives} Leben` : who, "bad");
+    }
+    if (isNew && ev.type === "gift" && ev.to === me) {
+      const piece = g.pieceFor(ev.key)?.name ?? "ein Teil";
+      return g.toast([`${this._name(lobby, ev.player)} hat dir ${piece} geschickt`, more].filter(Boolean).join(" · "), "good");
     }
     if (isNew && ev.type === "placed") {
       const piece = g.pieceFor(ev.key)?.name ?? "Ein Teil";

@@ -34,6 +34,8 @@ export class LobbyClient extends EventTarget {
   startRound() { this._send({ type: "start" }); }
   /** Einsetzversuch eines Teils aus dem eigenen Inventar (correct: passt es?) */
   place(key, correct) { this._send({ type: "place", key, correct }); }
+  /** Teil aus dem eigenen Inventar an einen Mitspieler senden */
+  give(key, to) { this._send({ type: "give", key, to }); }
   /** Lobby endgültig verlassen (alle Tabs dieses Spielers) */
   leave() { this._send({ type: "leave" }); }
   /** Nur Host: Lobby für alle beenden */

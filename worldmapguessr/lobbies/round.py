@@ -9,11 +9,12 @@
 - Hat kein Online-Spieler mehr ein Teil, der Vorrat aber noch welche, wird sofort nachgelegt
   (sonst käme die Runde nie weiter).
 - Verlässt ein Spieler die Lobby (oder ist lange getrennt), gehen seine Teile zurück in den Vorrat.
+- Teile können an Mitspieler gesendet werden (give) – sie wechseln nur das Inventar.
 
 Rundenzustand (JSON-serialisierbar, wird mit der Lobby gespeichert):
 {number, seed, startedAt, config, status: running|won|lost, lives, livesMax, total,
  pool: [key], hands: {playerId: [key]}, placed: [key], placedBy: {key: playerId},
- sinceRefill, events, last: {seq, type: placed|miss|refill, player, key?, count?}}
+ sinceRefill, events, last: {seq, type: placed|miss|refill|gift, player, key?, count?, to?}}
 `events` zählt Ereignisse hoch; `last.seq` erlaubt dem Client, jedes Ereignis genau einmal anzuzeigen.
 """
 from __future__ import annotations
@@ -109,6 +110,20 @@ def place(rnd: dict, pid: str, key: str, correct: bool, online: list[str]) -> di
         refill = deal(rnd, online, rnd["config"]["refillCount"])
     refill += _unstick(rnd, online)
     return {"refill": refill}
+
+
+def give(rnd: dict, pid: str, to: str, key: str) -> None:
+    """Teil aus dem eigenen Inventar an einen Mitspieler senden."""
+    if rnd["status"] != RUNNING:
+        raise RoundError("round_over", "Die Runde ist schon vorbei.")
+    if to == pid:
+        raise RoundError("bad_target", "An dich selbst kannst du nichts senden.")
+    hand = rnd["hands"].get(pid, [])
+    if key not in hand:
+        raise RoundError("not_in_hand", "Dieses Teil liegt nicht in deinem Inventar.")
+    hand.remove(key)
+    rnd["hands"].setdefault(to, []).append(key)
+    _event(rnd, type="gift", player=pid, to=to, key=key)
 
 
 def return_hand(rnd: dict, pid: str, online: list[str], rng: random.Random | None = None) -> int:

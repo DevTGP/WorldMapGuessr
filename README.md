@@ -29,13 +29,13 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
 - **Link:** so kurz wie möglich, `http://127.0.0.1:5000/K7Q2M` – 5 Zeichen aus `23456789ABCDEFGHJKMNPQRSTUVWXYZ` (ohne 0/O, 1/I/L), ≈ 28,6 Mio. Codes. Klein geschrieben wird weitergeleitet.
 - **Beitreten:** Link öffnen → Name (und ggf. Passwort). Jederzeit möglich, auch während einer Runde: Wer später kommt, steigt direkt in die laufende Runde ein.
 - **Wiedererkennung:** Spieler-ID und Token liegen im Browser (localStorage). Neu laden oder später zurückkommen führt ohne erneuten Beitritt in dieselbe Rolle – auch als Host.
-- **Einstellungen (nur Host):** Spielkonfiguration wie im Einzelspiel, max. Spielerzahl (Standard 8), Passwort (setzen/entfernen). Gäste sehen alles live, aber gesperrt.
+- **Einstellungen (nur Host):** Spielkonfiguration wie im Einzelspiel, max. Spielerzahl (Standard 8), Passwort (setzen/entfernen), „Items senden“ (Standard an, wirkt sofort). Gäste sehen alles live, aber gesperrt.
 - **Host-Wechsel:** Ist der Host länger als 10 s getrennt, übernimmt der am längsten anwesende Spieler.
 - **Verlassen (alle):** „Lobby verlassen“ im Lobby-Bereich des Menüs → Bestätigung → zurück zum Einzelspiel. Der Spieler wird aus der Lobby entfernt, seine gespeicherte Identität gelöscht; über den Link kann er später als neuer Spieler wieder beitreten. Verlässt der Host, geht die Rolle sofort an den am längsten anwesenden Online-Spieler. Verlässt der letzte Spieler, wird die Lobby gelöscht.
 - **Beenden (nur Host):** „Lobby beenden“ → Bestätigung → die Lobby wird für alle gelöscht. Alle anderen sehen „Lobby beendet“ mit dem Weg zum Einzelspiel; der Link funktioniert danach nicht mehr.
 - **Runde starten:** Der Host startet für alle („Neue Runde für alle“ im Menü oder im Rundenende-Dialog). Ablauf siehe *Mehrspieler-Runde*.
 - **Speicherung:** MongoDB-Collection `lobbies` bzw. Fallback `instance/lobbies.json` (Passwörter nur als Hash, Spieler-Tokens als SHA-256). Lobbys ohne Aktivität verfallen nach 24 Stunden.
-- **Technik:** WebSocket `/ws/lobby/<code>` über `flask-sock`. Protokoll (JSON): Client → `join`, `settings`, `start`, `place {key, correct}`, `rename`, `leave`, `close`, `ping`; Server → `welcome`, `state {lobby, hand}`, `error`, `left`, `closed`, `pong`. HTTP: `POST /api/lobbies`, `GET /api/lobbies/<code>`.
+- **Technik:** WebSocket `/ws/lobby/<code>` über `flask-sock`. Protokoll (JSON): Client → `join`, `settings`, `start`, `place {key, correct}`, `give {key, to}`, `rename`, `leave`, `close`, `ping`; Server → `welcome`, `state {lobby, hand}`, `error`, `left`, `closed`, `pong`. HTTP: `POST /api/lobbies`, `GET /api/lobbies/<code>`.
 
 ## Mehrspieler-Runde
 
@@ -47,6 +47,7 @@ Der Server führt die Runde (`lobbies/round.py`); der Browser prüft nur, ob ein
 - **Start und Nachschub:** Jeder Online-Spieler bekommt `Startteile`. Nach je `Nachschub alle` Treffern der *ganzen Lobby* bekommt jeder Online-Spieler `Nachschub` neue Teile (reihum verteilt, solange der Vorrat reicht). Hat niemand mehr ein Teil, der Vorrat aber schon, wird sofort nachgelegt.
 - **Später beitreten:** Wer in eine laufende Runde kommt, bekommt `Startteile` aus dem Vorrat und sieht alle bisher eingesetzten Teile.
 - **Verlassen / Verbindung weg:** Wer die Lobby verlässt, gibt seine Teile sofort zurück in den Vorrat. Bei einem Verbindungsabbruch bleiben sie 60 s reserviert (Neu laden behält das Inventar), danach gehen sie ebenfalls zurück.
+- **Items senden:** Links am Rand steht ein Feld je Online-Mitspieler (Name, Anzahl seiner Umrisse). Umriss aufnehmen, dann ein Feld anklicken → der Umriss fliegt hinüber und liegt danach im Inventar des Mitspielers, der eine Meldung bekommt. Keine Einschränkung (Anzahl, Abklingzeit); nur an verbundene Spieler. Ist „Items senden“ aus, verschwindet die Spalte und der Server lehnt Senden ab.
 - **Rundenende:** Gewonnen (alles eingesetzt) oder verloren (keine Leben) – der Dialog erscheint bei allen. Nur der Host sieht „Neue Runde für alle“. Eine Rangliste gibt es noch nicht.
 - Der Rundenzustand wird mit der Lobby gespeichert und übersteht einen Server-Neustart.
 
@@ -155,6 +156,7 @@ worldmapguessr/
   static/js/lobby/lobby-menu.js  Lobby-Bereich im Menü (Link, Spieler, Einstellungen, Rechte)
   static/js/lobby/identity.js Spieler-ID/Token und Name im Browser
   static/js/lobby/join-dialog.js  Name/Passwort-Dialog, Hinweis „Lobby nicht verfügbar/beendet“
+  static/js/lobby/players-rail.js  Mitspieler-Spalte links: Umrisse an Mitspieler senden
   static/js/lobby/confirm.js  Bestätigungsdialog (Verlassen, Beenden)
   static/js/menu/config.js    Standardwerte, Grenzen, Teile-Pool einer Konfiguration
   static/js/menu/stepper.js   Zahlen-Stepper

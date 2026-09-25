@@ -44,6 +44,8 @@ export class LobbyMenu {
       this.pwInput.value = "";
     });
     document.getElementById("lobby-password-clear").addEventListener("click", () => client.sendSettings({ password: "" }));
+    this.allowSend = document.getElementById("lobby-allow-send");
+    this.allowSend.addEventListener("change", () => client.sendSettings({ allowSend: this.allowSend.checked }));
 
     // Verlassen (alle) und Beenden (nur Host)
     document.getElementById("lobby-leave").addEventListener("click", () => this._leave());
@@ -89,6 +91,7 @@ export class LobbyMenu {
       ? "Privat – Beitritt nur mit Passwort" : "Offen – Beitritt mit dem Link";
     document.getElementById("lobby-password-clear").hidden = !state.settings.private;
     document.getElementById("lobby-close").hidden = !host;
+    this.allowSend.checked = state.settings.allowSend !== false;
 
     this._renderPlayers(state);
     this.menu._update();

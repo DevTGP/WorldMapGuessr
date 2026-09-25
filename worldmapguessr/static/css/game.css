@@ -61,7 +61,9 @@
 /* Teil ist gerade in der Hand: Slot zeigt nur noch die Aussparung */
 .slot[data-state="held"] { border-style: solid; border-color: var(--piece); }
 .slot[data-state="held"] .shape { fill: none; stroke-dasharray: 3 3; opacity: 0.55; }
-.slot[data-state="flying"] .shape { visibility: hidden; }
+.slot[data-state="flying"] .shape,
+.slot[data-state="sent"] .shape { visibility: hidden; }
+.slot[data-state="sent"] { pointer-events: none; }
 
 /* Richtig eingesetzt */
 .slot[data-state="placed"] { cursor: default; border-style: solid; }

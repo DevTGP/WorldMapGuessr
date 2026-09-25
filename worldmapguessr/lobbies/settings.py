@@ -8,6 +8,7 @@ LIMITS = {
 }
 KINDS = ("continent", "country")
 MAX_PLAYERS = (1, 50)
+DEFAULT_ALLOW_SEND = True  # Items an Mitspieler senden
 
 DEFAULT_CONFIG = {
     "lives": 10,
@@ -34,6 +35,10 @@ def clean_config(raw) -> dict:
     excluded = raw.get("excluded") or []
     cfg["excluded"] = sorted({str(x)[:40] for x in excluded if isinstance(x, str)})[:500]
     return cfg
+
+
+def clean_bool(value, default: bool) -> bool:
+    return value if isinstance(value, bool) else default
 
 
 def clean_max_players(value) -> int:

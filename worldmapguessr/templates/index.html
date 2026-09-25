@@ -52,6 +52,12 @@
   <div class="slots" id="slots"></div>
 </section>
 
+<nav class="hud hud-players" id="players-rail" aria-label="Mitspieler – Umrisse senden" hidden>
+  <h2>Mitspieler</h2>
+  <ul></ul>
+  <p class="rail-hint">Umriss aufnehmen, dann Mitspieler anklicken</p>
+</nav>
+
 <svg class="held-layer" id="held-layer" aria-hidden="true"></svg>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -98,6 +104,10 @@
                 <button type="button" class="btn" id="lobby-password-clear">Entfernen</button>
               </div>
             </div>
+            <label class="field toggle host-only" for="lobby-allow-send">
+              <span>Items senden<small>Spieler können Umrisse an Mitspieler schicken</small></span>
+              <input id="lobby-allow-send" type="checkbox" role="switch" checked>
+            </label>
           </div>
         </section>
         <section class="menu-section game-settings" aria-labelledby="sec-kinds">

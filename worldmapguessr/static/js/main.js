@@ -8,6 +8,7 @@ import { Menu } from "./menu/menu.js";
 import { toWire } from "./menu/config.js";
 import { LobbyClient } from "./lobby/client.js";
 import { LobbyMenu } from "./lobby/lobby-menu.js";
+import { PlayersRail } from "./lobby/players-rail.js";
 import { identity } from "./lobby/identity.js";
 import { askPlayer, showLobbyGone } from "./lobby/join-dialog.js";
 
@@ -77,6 +78,7 @@ async function startLobby(code, { game, menu }) {
   const client = new LobbyClient(code);
   // Gemeinsame Runde: Server verteilt die Teile (jedes nur einmal), Einsetzen wird für alle synchronisiert
   const remote = new RemoteRound(game, client);
+  const rail = new PlayersRail(document.getElementById("players-rail"), client, game);
   new LobbyMenu(menu, client, {
     onJoinRound: () => menu.dialog.close(),
     isPlaying: () => remote.number > 0 && game.running,
@@ -98,6 +100,7 @@ async function startLobby(code, { game, menu }) {
     // Neue Runde vom Host (oder laufende Runde beim ersten Beitritt) → mitspielen
     if (state.round && state.round.number !== remote.number && menu.isOpen) menu.dialog.close();
     remote.apply(state, client.hand);
+    rail.render(state);
     again.hidden = !client.isHost; // neue Runde startet nur der Host
     menu.setCloseable(game.running);
   });

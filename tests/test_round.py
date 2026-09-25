@@ -93,3 +93,16 @@ def test_public_view_hides_pool_and_hands():
     view = rounds.public_view(new())
     assert "pool" not in view and "hands" not in view and "seed" not in view
     assert view["poolCount"] == 10 and view["handCounts"] == {"a": 2, "b": 2}
+
+
+def test_give_moves_item_between_hands():
+    rnd = new()
+    key = rnd["hands"]["a"][0]
+    rounds.give(rnd, "a", "b", key)
+    assert key in rnd["hands"]["b"] and key not in rnd["hands"]["a"] and len(rnd["hands"]["b"]) == 3
+    assert rnd["last"]["type"] == "gift" and rnd["last"]["to"] == "b"
+    assert_unique(rnd)
+    for bad, code in [(("b", "b", key), "bad_target"), (("a", "b", key), "not_in_hand")]:
+        with pytest.raises(rounds.RoundError) as e:
+            rounds.give(rnd, *bad)
+        assert e.value.code == code

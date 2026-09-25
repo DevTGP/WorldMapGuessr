@@ -9,7 +9,7 @@ import threading
 import time
 
 from . import round as rounds
-from .settings import clean_name
+from .settings import DEFAULT_ALLOW_SEND, clean_name
 from .store import LobbyError, LobbyStore
 
 HOST_GRACE = 10.0         # s: so lange darf der Host weg sein (z. B. Seite neu laden), bevor die Rolle wechselt
@@ -118,6 +118,8 @@ class LobbyHub:
             self.store.update_settings(code, pid, msg.get("settings") or {})
         elif kind == "start":
             self.store.start_round(code, pid, online=self._online_ids(code))
+        elif kind == "give":
+            self.store.give(code, pid, msg.get("to"), msg.get("key"), online=self._online_ids(code))
         elif kind == "place":
             self.store.place(code, pid, msg.get("key"), msg.get("correct") is True,
                              online=self._online_ids(code))
@@ -170,7 +172,10 @@ class LobbyHub:
             "code": lobby["code"],
             "host": lobby["host"],
             "players": players,
-            "settings": {"config": s["config"], "maxPlayers": s["maxPlayers"], "private": bool(s["passwordHash"])},
+            "settings": {
+                "config": s["config"], "maxPlayers": s["maxPlayers"], "private": bool(s["passwordHash"]),
+                "allowSend": s.get("allowSend", DEFAULT_ALLOW_SEND),
+            },
             "round": rounds.public_view(lobby["round"]),
         }
 

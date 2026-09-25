@@ -3,7 +3,8 @@
 //
 // Einzelspiel: Vorrat, Leben und Nachschub werden hier im Browser verwaltet (newRound).
 // Lobby: der Server ist maßgeblich (game/remote.js ruft resetRound/addPieces/… auf);
-// der Browser prüft nur, ob ein Teil passt, und meldet das Ergebnis.
+// der Browser prüft nur, ob ein Teil passt, und meldet das Ergebnis. Gehaltene Teile können dort
+// auch an Mitspieler gesendet werden (giveHeld).
 
 import { sample, seededRandom } from "./random.js";
 import { HeldPiece } from "./held-piece.js";
@@ -106,11 +107,11 @@ export class Game {
     };
   }
 
-  /** Teile ins Inventar legen (und als "spawned" zählen) */
-  addPieces(pieces) {
+  /** Teile ins Inventar legen (und als "spawned" zählen – außer von Mitspielern gesendete) */
+  addPieces(pieces, { notSpawned = new Set() } = {}) {
     for (const p of pieces) {
       this.pieces.set(p.id, p);
-      this.tracker.record(p.kind, p.code, "spawned");
+      if (!notSpawned.has(p.id)) this.tracker.record(p.kind, p.code, "spawned");
     }
     this.inventory.add(pieces);
   }
@@ -156,7 +157,7 @@ export class Game {
   _onSlot(id) {
     if (this.busy || this.over) return;
     const state = this.inventory.state(id);
-    if (!state || state === "placed") return;
+    if (!state || state === "placed" || state === "sent") return;
     if (this.held.active) {
       const current = this.held.piece.id;
       if (current === id) return this._putBack();
@@ -217,6 +218,22 @@ export class Game {
       this.toast("Daneben", "bad");
       await this._flyBack(piece);
     }
+    this._idle();
+  }
+
+  /**
+   * Lobby: gehaltenes Teil an einen Mitspieler senden.
+   * @param {string} to  Spieler-ID  @param {string} name  @param {Element} targetEl  Ziel der Flug-Animation
+   */
+  async giveHeld(to, name, targetEl) {
+    if (!this.remote || !this.held.active || this.busy || this.over) return;
+    const piece = this.held.piece;
+    this.busy = true;
+    this.remote.give(piece.id, to);
+    this.inventory.setState(piece.id, "sent");
+    this._endHolding();
+    await this.held.sendTo(targetEl);
+    this.toast(`${piece.name} an ${name} gesendet`, "good");
     this._idle();
   }
 

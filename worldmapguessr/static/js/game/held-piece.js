@@ -57,8 +57,13 @@ export class HeldPiece {
     return this._flyTo(`translate(${r.left},${r.top}) scale(1)`, 160);
   }
 
+  /** In ein Mitspieler-Feld fliegen (Senden) */
+  sendTo(targetEl) {
+    return this.returnTo(targetEl, 380);
+  }
+
   /** Zurück in den Inventar-Slot fliegen */
-  returnTo(targetSvg) {
+  returnTo(targetSvg, ms = 450) {
     const r = targetSvg.getBoundingClientRect();
     this.ringEl.attr("hidden", true);
     const b = this.pathEl.node().getBBox();
@@ -67,7 +72,7 @@ export class HeldPiece {
     const s = Math.min(r.width / bw, r.height / bh, 400);
     const tx = r.left + (r.width - bw * s) / 2 - b.x * s;
     const ty = r.top + (r.height - bh * s) / 2 - b.y * s;
-    return this._flyTo(`translate(${tx},${ty}) scale(${s})`, 450);
+    return this._flyTo(`translate(${tx},${ty}) scale(${s})`, ms);
   }
 
   cancel() {
