@@ -1,0 +1,17 @@
+.git/
+.github/
+.gitignore
+.idea/
+.run/
+.venv/
+.pytest_cache/
+**/__pycache__/
+**/*.pyc
+instance/
+build/
+tests/
+requirements-dev.txt
+Dockerfile
+compose.yaml
+.dockerignore
+README.md
