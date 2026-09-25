@@ -1,5 +1,5 @@
 // Schritt 1: Länder (Natural Earth 1:10m via world-atlas) als GeoJSON exportieren –
-// mit Kontinent-Zuordnung und, für spielbare Staaten (Europa, Nord-/Südamerika, Afrika), ISO-Code,
+// mit Kontinent-Zuordnung und, für spielbare Staaten (Europa, Nord-/Südamerika, Afrika, Asien), ISO-Code,
 // deutschem Namen und Region.
 const fs = require("fs");
 const topo = require("world-atlas/countries-10m.json");
@@ -9,10 +9,11 @@ const { feature } = require("topojson-client");
 const byNum = Object.fromEntries(wc.map((c) => [c.ccn3, c]));
 
 // Kontinent-Sonderfälle (Features ohne ISO-Nummer oder mit abweichender Zuordnung)
-const OVERRIDE_ID = { "010": "AN", "239": "SA", "260": "AF", "074": "AF", "334": "OC", "643": "RU" };
+// Zypern liegt geografisch in Asien (samt Nordzypern, UN-Pufferzone und britischen Basen)
+const OVERRIDE_ID = { "010": "AN", "239": "SA", "260": "AF", "074": "AF", "334": "OC", "643": "RU", "196": "AS" };
 const OVERRIDE_NAME = {
-  Somaliland: "AF", Kosovo: "EU", "N. Cyprus": "EU", "Cyprus U.N. Buffer Zone": "EU",
-  Dhekelia: "EU", Akrotiri: "EU", "Indian Ocean Ter.": "OC", "Coral Sea Is.": "OC",
+  Somaliland: "AF", Kosovo: "EU", "N. Cyprus": "AS", "Cyprus U.N. Buffer Zone": "AS",
+  Dhekelia: "AS", Akrotiri: "AS", "Indian Ocean Ter.": "OC", "Coral Sea Is.": "OC",
   "Siachen Glacier": "AS", Baikonur: "AS", "Spratly Is.": "AS", "Scarborough Reef": "AS",
   "USNB Guantanamo Bay": "NA", "Clipperton I.": "NA", "Bajo Nuevo Bank": "NA", "Serranilla Bank": "NA",
 };
@@ -46,14 +47,30 @@ const NAME_OVERRIDE = {
   CAF: "Zentralafrikanische Republik",
 };
 
+// Quell-Features, die als Teil eines anderen Items zählen (Schritt 2 vereinigt die Flächen)
+const PART_OF = {
+  Somaliland: { code: "SOM", name: "Somalia", region: "AF" },          // international nicht anerkannt
+  "N. Cyprus": { code: "CYP", name: "Zypern", region: "AS" },
+  "Cyprus U.N. Buffer Zone": { code: "CYP", name: "Zypern", region: "AS" },
+  Dhekelia: { code: "CYP", name: "Zypern", region: "AS" },              // britische Basen auf Zypern
+  Akrotiri: { code: "CYP", name: "Zypern", region: "AS" },
+  Baikonur: { code: "KAZ", name: "Kasachstan", region: "AS" },          // an Russland verpachtet
+  "Hong Kong": { code: "CHN", name: "China", region: "AS" },            // Sonderverwaltungszonen Chinas
+  Macao: { code: "CHN", name: "China", region: "AS" },
+};
+// Nicht als unabhängig geführt, aber eigene Items (Entscheidung wie beim Kosovo)
+const EXTRA_ITEMS = { TWN: "AS", PSE: "AS" };
+
 /** Spielbarer Staat? → {code, name, region} oder null */
 function countryItem(f) {
   if (f.properties.name === "Kosovo") return { ...KOSOVO, region: "EU" };
-  // Somaliland (international nicht anerkannt) gehört zum Item Somalia – Schritt 2 vereinigt beide Flächen
-  if (f.properties.name === "Somaliland") return { code: "SOM", name: "Somalia", region: "AF" };
+  if (PART_OF[f.properties.name]) return PART_OF[f.properties.name];
   const c = byNum[f.id];
+  if (c && EXTRA_ITEMS[c.cca3]) return { code: c.cca3, name: c.translations.deu.common, region: EXTRA_ITEMS[c.cca3] };
   if (!c || c.independent !== true) return null;
   const item = { code: c.cca3, name: NAME_OVERRIDE[c.cca3] ?? c.translations.deu.common };
+  // Zypern: geografisch Asien
+  if (c.cca3 === "CYP") return { ...item, region: "AS" };
   // "Klassisch Europa": unabhängige Staaten der Region Europa ohne Zypern (+ Kosovo) – 45 Staaten
   if (c.region === "Europe" && !EXCLUDED_EUROPE.has(c.cca3)) return { ...item, region: "EU" };
   // Nordamerika: Nord-, Mittelamerika und Karibik – 23 Staaten
@@ -62,11 +79,13 @@ function countryItem(f) {
   if (c.region === "Americas" && c.subregion === "South America") return { ...item, region: "SA" };
   // Afrika – 54 Staaten (ohne Westsahara, Réunion, Mayotte, St. Helena …)
   if (c.region === "Africa") return { ...item, region: "AF" };
+  // Asien – 46 Staaten + Zypern, Taiwan, Palästina (Russland zählt als Ganzes zu Europa)
+  if (c.region === "Asia") return { ...item, region: "AS" };
   return null;
 }
 
 const fc = feature(topo, topo.objects.countries);
-const count = { EU: 0, NA: 0, SA: 0, AF: 0 };
+const count = { EU: 0, NA: 0, SA: 0, AF: 0, AS: 0 };
 for (const f of fc.features) {
   if (f.properties.name === "Vatican") f.geometry = { type: "Polygon", coordinates: VATICAN_OUTLINE };
   f.properties.continent = continentOf(f);

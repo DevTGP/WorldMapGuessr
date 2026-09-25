@@ -15,6 +15,7 @@ export const GROUPS = [
   { id: "country-na", title: "Staaten Nordamerikas", preview: ["USA", "MEX", "CUB"] },
   { id: "country-sa", title: "Staaten Südamerikas", preview: ["BRA", "ARG", "COL"] },
   { id: "country-af", title: "Staaten Afrikas", preview: ["EGY", "ZAF", "MDG"] },
+  { id: "country-as", title: "Staaten Asiens", preview: ["CHN", "IND", "JPN"] },
 ];
 export const GROUP_LABELS = Object.fromEntries(GROUPS.map((g) => [g.id, g]));
 

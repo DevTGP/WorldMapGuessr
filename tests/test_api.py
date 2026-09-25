@@ -7,12 +7,13 @@ def test_continents_are_seeded(client):
 def test_countries_are_seeded(client):
     items = client.get("/api/items?kind=country").get_json()["items"]
     codes = {i["code"] for i in items}
-    assert len(items) == 45 + 23 + 12 + 54                         # Europa + Nord-/Südamerika + Afrika
+    assert len(items) == 45 + 23 + 12 + 54 + 49                    # Europa, Nord-/Südamerika, Afrika, Asien
     assert {"DEU", "FRA", "RUS", "XKX", "VAT", "MCO", "SMR"} <= codes
     assert {"USA", "CAN", "MEX", "CUB", "PAN", "KNA", "TTO"} <= codes
     assert {"BRA", "ARG", "CHL", "GUY", "SUR", "URY"} <= codes
     assert {"EGY", "ZAF", "MDG", "SOM", "SSD", "SWZ", "CPV", "SYC", "MUS"} <= codes
-    assert not {"CYP", "TUR", "GRL", "GUF", "FLK", "ESH", "REU", "MYT"} & codes
+    assert {"CHN", "IND", "JPN", "TUR", "KAZ", "CYP", "TWN", "PSE", "MDV", "SGP", "TLS"} <= codes
+    assert not {"GRL", "GUF", "FLK", "ESH", "REU", "MYT", "HKG", "MAC"} & codes
     names = {i["code"]: i["name"] for i in items}
     assert names["DEU"] == "Deutschland" and names["USA"] == "Vereinigte Staaten"
     assert names["SWZ"] == "Eswatini" and names["COD"] == "Demokratische Republik Kongo"
@@ -25,6 +26,8 @@ def test_catalog_groups_countries_by_region(app):
     assert len(catalog["country-na"]) == 23 and "country:USA" in catalog["country-na"]
     assert len(catalog["country-sa"]) == 12 and "country:BRA" in catalog["country-sa"]
     assert len(catalog["country-af"]) == 54 and "country:SOM" in catalog["country-af"]
+    assert len(catalog["country-as"]) == 49 and "country:CYP" in catalog["country-as"]
+    assert "country:RUS" in catalog["country-eu"] and "country:CYP" not in catalog["country-eu"]
 
 
 def test_record_event(client):

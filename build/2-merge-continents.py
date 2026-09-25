@@ -1,5 +1,5 @@
 """Schritt 2: Länder je Kontinent vereinigen (GEOS) und spielbare Staaten (Europa, Nordamerika)
-als eigene Ebene ausgeben (Europa, Nord-/Südamerika, Afrika). Russland wird für die Kontinente am Ural / Ural-Fluss geteilt, als Staat
+als eigene Ebene ausgeben (Europa, Nord-/Südamerika, Afrika, Asien). Russland wird für die Kontinente am Ural / Ural-Fluss geteilt, als Staat
 bleibt es ganz. Überseegebiete europäischer Staaten (Französisch-Guayana, Guadeloupe, Réunion,
 Karibische Niederlande …) zählen zum Kontinent, auf dem sie liegen – nicht zu Europa.
 
@@ -71,12 +71,25 @@ def unshift_coords(geom):
             "coordinates": [[fix(r) for r in poly] for poly in geom["coordinates"]]}
 
 
-def drop_tiny_outside_europe(g):
-    keep = [p for p in polys(g) if p.area >= MIN_ISLAND_DEG2 or EUROPE_BOX.contains(p.representative_point())]
+def drop_tiny_outside_europe(g, keep_all=False):
+    keep = [p for p in polys(g) if keep_all or p.area >= MIN_ISLAND_DEG2 or EUROPE_BOX.contains(p.representative_point())]
     return MultiPolygon(keep) if keep else None
 
 
 fc = json.load(open("tmp/countries.geojson"))
+
+# Staaten, die nur aus Kleinstinseln bestehen (Malediven): nichts weglassen – sonst gäbe es sie nicht.
+# Gilt für Kontinent und Staat gleichermaßen, damit beide Ebenen deckungsgleich bleiben.
+# (je Staat betrachtet: Macao als Teil Chinas zählt nicht dazu)
+_largest = {}
+for f in fc["features"]:
+    info = f["properties"].get("country")
+    if info:
+        biggest = max(p.area for p in polys(shape(f["geometry"]).buffer(0)))
+        _largest[info["code"]] = max(_largest.get(info["code"], 0), biggest)
+TINY_ONLY = {f["properties"]["name"] for f in fc["features"]
+             if f["properties"].get("country") and _largest[f["properties"]["country"]["code"]] < MIN_ISLAND_DEG2}
+print("nur Kleinstinseln (alle behalten):", sorted(TINY_ONLY))
 groups = {k: [] for k in NAMES}
 antarctica = None
 for f in fc["features"]:
@@ -85,23 +98,24 @@ for f in fc["features"]:
         # umschließt den Südpol und hat keine Naht an ±180°: Original übernehmen
         antarctica = f["geometry"]
         continue
+    keep_all = f["properties"]["name"] in TINY_ONLY
     if c == "RU":
         ru = to_shifted(f["geometry"])
-        groups["EU"].append(ru.intersection(EURO_RUSSIA))
-        groups["AS"].append(ru.difference(EURO_RUSSIA))
+        groups["EU"].append((ru.intersection(EURO_RUSSIA), False))
+        groups["AS"].append((ru.difference(EURO_RUSSIA), False))
     elif c == "EU":
         for p in polys(shape(f["geometry"]).buffer(0)):
             pt = p.representative_point()
             home = "EU" if COUNTRY_BOX.contains(pt) else overseas_continent(pt)
-            groups[home].append(to_shifted(p) if home in SHIFTED else p)
+            groups[home].append((to_shifted(p) if home in SHIFTED else p, False))
     elif c in SHIFTED:
-        groups[c].append(to_shifted(f["geometry"]))
+        groups[c].append((to_shifted(f["geometry"]), keep_all))
     else:
-        groups[c].append(shape(f["geometry"]).buffer(0))
+        groups[c].append((shape(f["geometry"]).buffer(0), keep_all))
 
 out = []
 for code, parts in groups.items():
-    parts = [q for q in (drop_tiny_outside_europe(x) for x in parts if not x.is_empty) if q is not None]
+    parts = [q for q in (drop_tiny_outside_europe(x, k) for x, k in parts if not x.is_empty) if q is not None]
     if code == "AN":
         geom = antarctica
         print(code, "Original übernommen")
@@ -131,7 +145,9 @@ for f in fc["features"]:
         prev["geometry"] = mapping(unary_union([shape(prev["geometry"]).buffer(0), shape(f["geometry"]).buffer(0)]))
         print("vereinigt:", info["code"], "+", f["properties"]["name"])
     else:
-        items[info["code"]] = {"properties": f["properties"], "geometry": f["geometry"]}
+        items[info["code"]] = {"properties": {**f["properties"], "country": info}, "geometry": f["geometry"]}
+    if f["properties"]["name"] in TINY_ONLY:
+        items[info["code"]]["keep_all"] = True
 
 # Marokko: in den Quelldaten (world-atlas 1:10m) samt dem von Marokko kontrollierten Teil der Westsahara.
 # Als Item gilt Marokko wie bei den Vereinten Nationen ohne Westsahara: Grenze 27°40′ N.
@@ -153,9 +169,9 @@ for code, f in items.items():
     else:
         # wie beim Kontinent: Kleinstinseln (< ~30 km²) weglassen, damit beide Ebenen deckungsgleich sind
         g = shape(f["geometry"]).buffer(0)
-        ps = [orient(p, sign=-1.0) for p in polys(g) if p.area >= MIN_ISLAND_DEG2]
+        ps = [orient(p, sign=-1.0) for p in polys(g) if f.get("keep_all") or p.area >= MIN_ISLAND_DEG2]
         geom = mapping(MultiPolygon(ps))
     countries.append({"type": "Feature", "id": code,
                       "properties": {"name": info["name"], "region": info["region"]}, "geometry": geom})
-print("Staaten:", len(countries), {r: sum(c["properties"]["region"] == r for c in countries) for r in ("EU", "NA", "SA", "AF")})
+print("Staaten:", len(countries), {r: sum(c["properties"]["region"] == r for c in countries) for r in ("EU", "NA", "SA", "AF", "AS")})
 json.dump({"type": "FeatureCollection", "features": countries}, open("tmp/countries-items.geojson", "w"))
