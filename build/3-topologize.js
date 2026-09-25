@@ -1,6 +1,6 @@
 // Schritt 3: Kontinente und spielbare Staaten in eine gemeinsame TopoJSON überführen.
 // Gemeinsame Topologie = gemeinsame Kanten: Küsten und Grenzen passen zwischen beiden Ebenen exakt.
-// Vereinfachung ortsabhängig: Europa volle 1:10m-Genauigkeit, Nordamerika fast 1:10m, sonst etwa 1:50m.
+// Vereinfachung ortsabhängig: Europa volle 1:10m-Genauigkeit, Nord- und Südamerika fast 1:10m, sonst etwa 1:50m.
 const fs = require("fs");
 const { topology } = require("topojson-server");
 const { presimplify, sphericalTriangleArea } = require("topojson-simplify");
@@ -11,6 +11,8 @@ const OUT = "../worldmapguessr/static/data/world.topo.json";
 const REGIONS = [
   { name: "Europa", lon: [-32, 62], lat: [27, 83], minWeight: 1e-11 },          // nur fast kollineare Punkte weg
   { name: "Nordamerika", lon: [-180, -10], lat: [5, 84], minWeight: +(process.env.NA_WEIGHT ?? 1e-10) },
+  // inkl. Galápagos und Osterinsel (Chile)
+  { name: "Südamerika", lon: [-110, -25], lat: [-60, 13], minWeight: +(process.env.SA_WEIGHT ?? 1e-10) },
 ];
 const MIN_WEIGHT_OUTSIDE = 8e-7;   // übrige Welt: etwa 1:50m-Detailgrad
 

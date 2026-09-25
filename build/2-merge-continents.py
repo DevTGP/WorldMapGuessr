@@ -1,5 +1,5 @@
 """Schritt 2: Länder je Kontinent vereinigen (GEOS) und spielbare Staaten (Europa, Nordamerika)
-als eigene Ebene ausgeben. Russland wird für die Kontinente am Ural / Ural-Fluss geteilt, als Staat
+als eigene Ebene ausgeben (Europa, Nord- und Südamerika). Russland wird für die Kontinente am Ural / Ural-Fluss geteilt, als Staat
 bleibt es ganz. Überseegebiete europäischer Staaten (Französisch-Guayana, Guadeloupe, Réunion,
 Karibische Niederlande …) zählen zum Kontinent, auf dem sie liegen – nicht zu Europa.
 
@@ -116,7 +116,7 @@ for code, parts in groups.items():
 
 json.dump({"type": "FeatureCollection", "features": out}, open("tmp/continents.geojson", "w"))
 
-# ---------- Spielbare Staaten (Europa, Nordamerika) ----------
+# ---------- Spielbare Staaten (Europa, Nord- und Südamerika) ----------
 # Über die Datumsgrenze reichende Staaten: im Rahmen 0…360° ohne Naht (Tschukotka, Aleuten)
 SHIFTED_COUNTRIES = {"RUS", "USA"}
 countries = []
@@ -140,5 +140,5 @@ for f in fc["features"]:
         geom = mapping(MultiPolygon(ps))
     countries.append({"type": "Feature", "id": code,
                       "properties": {"name": info["name"], "region": info["region"]}, "geometry": geom})
-print("Staaten:", len(countries), {r: sum(c["properties"]["region"] == r for c in countries) for r in ("EU", "NA")})
+print("Staaten:", len(countries), {r: sum(c["properties"]["region"] == r for c in countries) for r in ("EU", "NA", "SA")})
 json.dump({"type": "FeatureCollection", "features": countries}, open("tmp/countries-items.geojson", "w"))

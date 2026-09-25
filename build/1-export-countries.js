@@ -1,5 +1,5 @@
 // Schritt 1: Länder (Natural Earth 1:10m via world-atlas) als GeoJSON exportieren –
-// mit Kontinent-Zuordnung und, für spielbare Staaten (Europa, Nordamerika), ISO-Code,
+// mit Kontinent-Zuordnung und, für spielbare Staaten (Europa, Nord- und Südamerika), ISO-Code,
 // deutschem Namen und Region.
 const fs = require("fs");
 const topo = require("world-atlas/countries-10m.json");
@@ -50,11 +50,13 @@ function countryItem(f) {
   if (c.region === "Europe" && !EXCLUDED_EUROPE.has(c.cca3)) return { ...item, region: "EU" };
   // Nordamerika: Nord-, Mittelamerika und Karibik – 23 Staaten
   if (c.region === "Americas" && c.subregion !== "South America") return { ...item, region: "NA" };
+  // Südamerika – 12 Staaten (ohne Französisch-Guayana und Falklandinseln)
+  if (c.region === "Americas" && c.subregion === "South America") return { ...item, region: "SA" };
   return null;
 }
 
 const fc = feature(topo, topo.objects.countries);
-const count = { EU: 0, NA: 0 };
+const count = { EU: 0, NA: 0, SA: 0 };
 for (const f of fc.features) {
   if (f.properties.name === "Vatican") f.geometry = { type: "Polygon", coordinates: VATICAN_OUTLINE };
   f.properties.continent = continentOf(f);

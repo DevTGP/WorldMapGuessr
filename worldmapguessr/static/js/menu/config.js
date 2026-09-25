@@ -13,6 +13,7 @@ export const GROUPS = [
   { id: "continent", title: "Kontinente", preview: ["AF", "SA", "OC"] },
   { id: "country-eu", title: "Staaten Europas", preview: ["ITA", "DEU", "NOR"] },
   { id: "country-na", title: "Staaten Nordamerikas", preview: ["USA", "MEX", "CUB"] },
+  { id: "country-sa", title: "Staaten Südamerikas", preview: ["BRA", "ARG", "COL"] },
 ];
 export const GROUP_LABELS = Object.fromEntries(GROUPS.map((g) => [g.id, g]));
 
