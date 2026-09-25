@@ -35,7 +35,7 @@ export class Inventory {
       btn.className = "slot entering";
       btn.dataset.id = p.id;
       btn.dataset.state = "ready";
-      btn.setAttribute("aria-label", "Umriss aufnehmen");
+      btn.setAttribute("aria-label", "Item aufnehmen");
       btn.innerHTML = '<svg aria-hidden="true" preserveAspectRatio="xMidYMid meet"><path class="shape"/></svg>';
       btn.addEventListener("click", () => this.onSlotClick(p.id));
       this.container.append(btn);

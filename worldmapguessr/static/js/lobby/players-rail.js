@@ -1,5 +1,5 @@
-// Mitspieler-Spalte am linken Rand (Lobby): ein Feld je Online-Mitspieler mit Anzahl seiner Umrisse.
-// Umriss aufnehmen, dann ein Feld anklicken → Umriss wird an diesen Spieler gesendet.
+// Mitspieler-Spalte am linken Rand (Lobby): ein Feld je Online-Mitspieler mit Anzahl seiner Items.
+// Item aufnehmen, dann ein Feld anklicken → Item wird an diesen Spieler gesendet.
 // Nur sichtbar, wenn der Host das Senden erlaubt und eine Runde läuft.
 
 export class PlayersRail {
@@ -37,9 +37,9 @@ export class PlayersRail {
       const count = btn.querySelector(".rail-count");
       count.innerHTML = "<b></b><span></span>";
       count.firstChild.textContent = n;
-      count.lastChild.textContent = n === 1 ? " Umriss" : " Umrisse";
-      btn.title = `Gehaltenen Umriss an ${p.name} senden`;
-      btn.setAttribute("aria-label", `${p.name}, ${n} Umrisse – gehaltenen Umriss senden`);
+      count.lastChild.textContent = n === 1 ? " Item" : " Items";
+      btn.title = `Gehaltenes Item an ${p.name} senden`;
+      btn.setAttribute("aria-label", `${p.name}, ${n} Items – gehaltenes Item senden`);
       btn.addEventListener("click", () => this._send(p, btn));
       li.append(btn);
       return li;
@@ -49,7 +49,7 @@ export class PlayersRail {
   _send(player, btn) {
     const g = this.game;
     if (g.busy) return;
-    if (!g.held.active) return g.toast("Erst einen Umriss aus dem Inventar aufnehmen");
+    if (!g.held.active) return g.toast("Erst ein Item aus dem Inventar aufnehmen");
     g.giveHeld(player.id, player.name, btn.querySelector(".avatar"));
   }
 }

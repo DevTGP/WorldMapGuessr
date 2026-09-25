@@ -1,4 +1,4 @@
-// Menü vor jeder Runde: Spielteile (Arten + Einzelauswahl), Leben, Startteile, Nachschub.
+// Menü vor jeder Runde: Item-Arten + Einzelauswahl, Leben, Start-Items, Nachschub.
 // Einzelspiel: Einstellungen gelten nur für die gestartete Runde; innerhalb der geöffneten Seite
 // merkt sich das Menü die letzte Auswahl. In einer Lobby übernimmt lobby/lobby-menu.js
 // Titel, Hauptaktion und Schreibschutz (nur der Host stellt ein).
@@ -32,9 +32,17 @@ export class Menu {
     /** Aufruf nach jeder Änderung durch den Nutzer (Lobby: an den Server senden) */
     this.onConfigEdited = null;
     /** Beschriftung/Zustand des Hauptknopfs; im Lobby-Modus ersetzt */
-    this.primaryLabel = (pool) => (pool ? `Runde starten · ${pool} Teile` : "Runde starten");
+    this.primaryLabel = (pool) => (pool ? `Runde starten · ${pool} Items` : "Runde starten");
     /** HTML vor der Zusammenfassung (Lobby: Hinweis für Gäste) */
     this.summaryPrefix = () => "";
+    /** Zusammenfassung der Regeln (HTML); im Lobby-Modus ersetzt */
+    this.summaryRules = (c, start) =>
+      `<b>${c.lives}</b> Leben · Start mit <b>${start}</b>${start < c.startItems ? " (alle)" : ""} · ` +
+      `je <b>${c.refillEvery}</b> Treffer → <b>${c.refillCount}</b> neue`;
+    /** Hinweis über den Rundeneinstellungen (null = keiner); im Lobby-Modus ersetzt */
+    this.roundNote = () => (this.canCancel ? "Es läuft eine Runde. Änderungen gelten ab der nächsten Runde." : null);
+    /** Läuft eine Runde? (Kennzeichnung „gilt ab der nächsten Runde“); im Lobby-Modus ersetzt */
+    this.roundRunning = () => this.canCancel;
 
     this.groups = [
       { kind: "continent", features: map.layers.continents },
@@ -95,6 +103,7 @@ export class Menu {
   setCloseable(canCancel) {
     this.canCancel = canCancel;
     document.getElementById("menu-close").hidden = !canCancel;
+    this._update();
   }
 
   _edited() {
@@ -119,7 +128,7 @@ export class Menu {
       btn.innerHTML = `
         <span class="kind-preview" aria-hidden="true">${preview}</span>
         <span class="kind-title">${label}</span>
-        <span class="kind-count">${features.length} Teile</span>
+        <span class="kind-count">${features.length} Items</span>
         <span class="kind-check" aria-hidden="true"></span>`;
       btn.addEventListener("click", () => {
         const on = !this.config.kinds.has(kind);
@@ -140,10 +149,10 @@ export class Menu {
       onChange: (v) => { this.config[key] = v; this._edited(); },
     });
     this.steppers = {
-      lives: make("lives", "Leben", "Fehlversuche bis Rundenende"),
-      startItems: make("startItems", "Startteile", "Umrisse im Inventar zu Beginn"),
-      refillCount: make("refillCount", "Neue Teile", "pro Nachschub"),
-      refillEvery: make("refillEvery", "Nach Treffern", "Nachschub alle … Treffer"),
+      lives: make("lives", "Leben", "Fehlwürfe bis Rundenende"),
+      startItems: make("startItems", "Start-Items", "im Inventar zu Beginn"),
+      refillCount: make("refillCount", "Neue Items", "pro Nachschub"),
+      refillEvery: make("refillEvery", "Nachschub alle", "… richtige Treffer"),
     };
     const fields = document.getElementById("rule-fields");
     const refill = document.createElement("div");
@@ -164,19 +173,22 @@ export class Menu {
     const start = Math.min(c.startItems, pool);
     const summary = document.getElementById("menu-summary");
     const button = document.getElementById("menu-start");
+    const note = this.roundNote();
+    const noteEl = document.getElementById("round-note");
+    noteEl.hidden = !note;
+    noteEl.textContent = note ?? "";
+    document.getElementById("round-scope").hidden = !this.roundRunning();
     const label = this.primaryLabel(pool);
     button.textContent = typeof label === "string" ? label : label.text;
     button.disabled = pool === 0 || (typeof label === "object" && label.disabled);
     if (!pool) {
-      summary.innerHTML = c.kinds.size ? "Keine Teile ausgewählt." : "Mindestens eine Art von Spielteilen wählen.";
+      summary.innerHTML = c.kinds.size ? "Keine Items ausgewählt." : "Mindestens eine Item-Art wählen.";
       summary.className = "warn";
       return;
     }
     summary.className = "";
     const excluded = total - pool;
     summary.innerHTML = this.summaryPrefix() +
-      `<b>${pool}</b> Teile${excluded ? ` (${excluded} ausgeschlossen)` : ""} · <b>${c.lives}</b> Leben · ` +
-      `Start mit <b>${start}</b>${start < c.startItems ? " (alle)" : ""} · ` +
-      `je <b>${c.refillEvery}</b> Treffer → <b>${c.refillCount}</b> neue`;
+      `<b>${pool}</b> Items${excluded ? ` (${excluded} ausgeschlossen)` : ""} · ` + this.summaryRules(c, start);
   }
 }

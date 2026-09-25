@@ -22,6 +22,7 @@ export class RemoteRound {
     this.finished = false;
     this.queued = null;     // {lobby, hand}, während einer Animation zurückgestellt
     game.remote = this;
+    game.lives.setTitle("Gemeinsame Leben der Lobby");
 
     client.addEventListener("error", ({ detail: err }) => {
       if (!RESYNC_ERRORS.has(err.code)) return;
@@ -92,6 +93,7 @@ export class RemoteRound {
 
     g.lives.set(round.lives);
     g.setProgress(round.placed.length, round.total);
+    g.setRefill(round.sinceRefill ?? 0, round.poolCount);
 
     this._announce(lobby, round, fresh ? 0 : added.filter((p) => p.id !== gift).length);
 
@@ -109,17 +111,17 @@ export class RemoteRound {
     const me = this.client.me?.id;
     const g = this.game;
 
-    const more = refilled ? `${refilled} neue Umrisse` : "";
+    const more = refilled ? `${refilled} neue Items` : "";
     if (isNew && ev.type === "miss") {
       const who = ev.player === me ? "Daneben" : `${this._name(lobby, ev.player)} lag daneben`;
       return g.toast(round.lives > 0 ? `${who} – noch ${round.lives} Leben` : who, "bad");
     }
     if (isNew && ev.type === "gift" && ev.to === me) {
-      const piece = g.pieceFor(ev.key)?.name ?? "ein Teil";
+      const piece = g.pieceFor(ev.key)?.name ?? "ein Item";
       return g.toast([`${this._name(lobby, ev.player)} hat dir ${piece} geschickt`, more].filter(Boolean).join(" · "), "good");
     }
     if (isNew && ev.type === "placed") {
-      const piece = g.pieceFor(ev.key)?.name ?? "Ein Teil";
+      const piece = g.pieceFor(ev.key)?.name ?? "Ein Item";
       const what = ev.player === me ? `${piece} sitzt` : `${this._name(lobby, ev.player)} hat ${piece} eingesetzt`;
       // eigener Treffer ohne Nachschub wurde schon beim Einsetzen gemeldet
       if (ev.player !== me || more) g.toast([what, more].filter(Boolean).join(" · "), "good");

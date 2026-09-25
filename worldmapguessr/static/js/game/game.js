@@ -10,6 +10,7 @@ import { sample, seededRandom } from "./random.js";
 import { HeldPiece } from "./held-piece.js";
 import { Inventory } from "./inventory.js";
 import { Lives } from "./lives.js";
+import { RefillMeter } from "./refill-meter.js";
 import { createToast } from "./toast.js";
 import { ItemTracker } from "../api/items-api.js";
 import { poolFor } from "../menu/config.js";
@@ -28,10 +29,13 @@ export class Game {
     this.held = new HeldPiece(map, document.getElementById("held-layer"));
     this.inventory = new Inventory(document.getElementById("slots"), (id) => this._onSlot(id));
     this.lives = new Lives(document.getElementById("lives"));
+    this.refillMeter = new RefillMeter(document.getElementById("refill-meter"));
     this.config = null;       // Konfiguration der laufenden Runde
     this.remote = null;       // Lobby-Runde (RemoteRound) oder null im Einzelspiel
     this.toast = createToast(document.getElementById("toast"));
     this.progressEl = document.getElementById("progress");
+    this.progressFill = document.getElementById("progress-fill");
+    this.progressWrap = document.getElementById("progress-wrap");
     this.dialog = document.getElementById("round-dialog");
 
     addEventListener("pointermove", (e) => {
@@ -87,6 +91,8 @@ export class Game {
     this.pieces = new Map();
     this.correct = 0;
     this.total = 0;
+    this.sinceRefill = 0;
+    this.refillMeter.hide();
     this._updateProgress();
   }
 
@@ -145,7 +151,21 @@ export class Game {
   }
 
   _updateProgress() {
-    this.progressEl.textContent = `${this.correct} / ${this.total}`;
+    this.progressEl.textContent = `${this.correct}/${this.total}`;
+    this.progressFill.style.width = `${this.total ? (100 * this.correct) / this.total : 0}%`;
+    this.progressWrap.setAttribute("aria-label", `Eingesetzt: ${this.correct} von ${this.total} Items`);
+    if (!this.remote && this.total) this._updateRefill(this.sinceRefill, this.pool.length);
+  }
+
+  /** Lobby: gemeinsamer Nachschub-Zähler und Vorrat vom Server */
+  setRefill(since, poolLeft) {
+    this.sinceRefill = since;
+    this._updateRefill(since, poolLeft);
+  }
+
+  _updateRefill(since, poolLeft) {
+    const c = this.config;
+    this.refillMeter.update({ since, every: c.refillEvery, count: c.refillCount, poolLeft, shared: !!this.remote });
   }
 
   /** Animation vorbei: Eingaben wieder frei, zurückgestellten Lobby-Zustand anwenden */
@@ -191,7 +211,7 @@ export class Game {
       if (this.sinceRefill >= this.config.refillEvery && this.pool.length) {
         this.sinceRefill = 0;
         const n = this._deal(this.config.refillCount);
-        this.toast(`${piece.name} sitzt · ${n} neue Umrisse`, "good");
+        this.toast(`${piece.name} sitzt · ${n} neue Items`, "good");
       } else {
         this.toast(`${piece.name} sitzt`, "good");
       }
@@ -261,10 +281,24 @@ export class Game {
   _finish(won) {
     this.over = true;
     this.cancelHeld();
-    document.getElementById("dlg-title").textContent = won ? "Runde geschafft" : "Keine Leben mehr";
-    document.getElementById("dlg-text").textContent = won
-      ? `Alle ${this.total} Umrisse sitzen – mit ${this.lives.value} von ${this.lives.max} Leben übrig.`
-      : `${this.correct} von ${this.total} Umrissen richtig eingesetzt.`;
+    const lives = `${this.lives.value} von ${this.lives.max}`;
+    let title, text;
+    if (!this.remote) {
+      title = won ? "Runde geschafft" : "Keine Leben mehr";
+      text = won
+        ? `Alle ${this.total} Items sitzen – mit ${lives} Leben übrig.`
+        : `${this.correct} von ${this.total} Items richtig eingesetzt.`;
+    } else {
+      title = won ? "Gemeinsam geschafft" : "Keine Leben mehr";
+      text = won
+        ? `Die Lobby hat alle ${this.total} Items eingesetzt – mit ${lives} gemeinsamen Leben übrig.`
+        : `Die Lobby hat ${this.correct} von ${this.total} Items eingesetzt.`;
+      text += this.remote.client.isHost
+        ? " Starte die nächste Runde, wenn alle bereit sind."
+        : " Der Host startet die nächste Runde.";
+    }
+    document.getElementById("dlg-title").textContent = title;
+    document.getElementById("dlg-text").textContent = text;
     this.dialog.showModal();
   }
 }

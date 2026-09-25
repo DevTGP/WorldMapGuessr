@@ -6,7 +6,8 @@ import pytest
 from worldmapguessr.lobbies import round as rounds
 
 CATALOG = {"continent": [f"continent:{i}" for i in range(3)], "country": [f"country:{i}" for i in range(12)]}
-CONFIG = {"lives": 3, "startItems": 2, "refillCount": 2, "refillEvery": 2,
+# startItems/refillCount sind Gesamtzahlen für die Lobby (reihum verteilt): bei 2 Spielern je 2
+CONFIG = {"lives": 3, "startItems": 4, "refillCount": 4, "refillEvery": 2,
           "kinds": ["continent", "country"], "excluded": ["country:0"]}
 
 
@@ -61,12 +62,41 @@ def test_shared_refill_counter_deals_to_everyone():
     assert_unique(rnd)
 
 
-def test_late_join_and_return_hand():
-    rnd = new(online=["a"])
-    assert rounds.join(rnd, "b") == 2 and rounds.join(rnd, "b") == 0  # nur einmal
+def test_example_start_and_refill_continue_the_loop():
+    """3 Spieler, 2 Startteile → A, B; 2 neue nach Erfolg → C, A (Schleife beginnt von vorne)."""
+    rnd = new(online=["A", "B", "C"], startItems=2, refillCount=2, refillEvery=1)
+    assert {p: len(h) for p, h in rnd["hands"].items()} == {"A": 1, "B": 1, "C": 0}
+    rounds.place(rnd, "A", rnd["hands"]["A"][0], True, ["A", "B", "C"])
+    assert rnd["dealt"] == {"A": 2, "B": 1, "C": 1}
+    assert {p: len(h) for p, h in rnd["hands"].items()} == {"A": 1, "B": 1, "C": 1}
+
+
+def test_everyone_gets_the_same_number_of_items():
+    online = ["a", "b", "c"]
+    rnd = new(online=online, startItems=5, refillCount=4, refillEvery=1)
+    while rnd["status"] == rounds.RUNNING:
+        pid = next(p for p in online if rnd["hands"].get(p))
+        rounds.place(rnd, pid, rnd["hands"][pid][0], True, online)
+        dealt = [rnd["dealt"].get(p, 0) for p in online]
+        assert max(dealt) - min(dealt) <= 1
+    assert sum(rnd["dealt"].values()) == rnd["total"]
+
+
+def test_offline_players_are_skipped():
+    rnd = new(online=["a", "b", "c"], startItems=3, refillCount=2, refillEvery=1)
+    rounds.place(rnd, "a", rnd["hands"]["a"][0], True, ["a", "c"])  # b getrennt → a, c
+    assert rnd["dealt"] == {"a": 2, "b": 1, "c": 2}
+
+
+def test_late_join_waits_for_next_deal_and_return_hand():
+    rnd = new(online=["a"], refillCount=2, refillEvery=1)
+    assert rounds.join(rnd, "b") is True and rounds.join(rnd, "b") is False  # nur einmal
+    assert rnd["hands"]["b"] == [] and rnd["order"] == ["a", "b"]
+    rounds.place(rnd, "a", rnd["hands"]["a"][0], True, ["a", "b"])       # Nachschub: b, a (reihum)
+    assert len(rnd["hands"]["b"]) == 1
     hand = list(rnd["hands"]["b"])
-    assert rounds.return_hand(rnd, "b", ["a"], random.Random(1)) == 2
-    assert "b" not in rnd["hands"] and set(hand) <= set(rnd["pool"])
+    assert rounds.return_hand(rnd, "b", ["a"], random.Random(1)) == 1
+    assert "b" not in rnd["hands"] and "b" not in rnd["order"] and set(hand) <= set(rnd["pool"])
     assert_unique(rnd)
 
 
@@ -93,6 +123,7 @@ def test_public_view_hides_pool_and_hands():
     view = rounds.public_view(new())
     assert "pool" not in view and "hands" not in view and "seed" not in view
     assert view["poolCount"] == 10 and view["handCounts"] == {"a": 2, "b": 2}
+    assert view["sinceRefill"] == 0
 
 
 def test_give_moves_item_between_hands():

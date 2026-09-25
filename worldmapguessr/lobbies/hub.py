@@ -73,7 +73,7 @@ class LobbyHub:
             online.setdefault(player["id"], []).append(conn)
             self.offline_since.pop((code, player["id"]), None)
             self._fix_host(code)
-            self.store.round_join(code, player["id"])  # Nachzügler bekommt Startteile
+            self.store.round_join(code, player["id"])  # Nachzügler reiht sich ins Verteilen ein
             self.store.touch(code)
 
         welcome = {"type": "welcome", "player": {"id": player["id"], "name": player["name"]}}

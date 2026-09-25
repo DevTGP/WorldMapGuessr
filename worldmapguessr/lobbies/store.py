@@ -141,7 +141,9 @@ class LobbyStore:
             lobby = self._require(code)
             self._require_host(lobby, player_id)
             number = (lobby["round"] or {}).get("number", 0) + 1
-            players = [p for p in online if p in lobby["players"]] or [player_id]
+            # Reihenfolge fürs Verteilen: wer am längsten in der Lobby ist, zuerst
+            players = sorted((p for p in online if p in lobby["players"]),
+                             key=lambda p: lobby["players"][p]["joined"]) or [player_id]
             lobby["round"] = rounds.new_round(
                 number, lobby["settings"]["config"], self.catalog, players,
                 seed=secrets.randbits(31), now=self.clock(),
@@ -149,16 +151,16 @@ class LobbyStore:
             self.touch(code)
             return lobby
 
-    def round_join(self, code, player_id) -> int:
-        """Spieler ist (wieder) da: Startteile, falls er in der laufenden Runde noch nichts hat."""
+    def round_join(self, code, player_id) -> bool:
+        """Spieler ist (wieder) da: reiht sich in die Verteil-Reihenfolge der laufenden Runde ein."""
         with self.lock:
             lobby = self._require(code)
             if not lobby["round"]:
-                return 0
-            n = rounds.join(lobby["round"], player_id)
-            if n:
+                return False
+            joined = rounds.join(lobby["round"], player_id)
+            if joined:
                 self.touch(code)
-            return n
+            return joined
 
     def place(self, code, player_id, key, correct, online=()) -> dict:
         with self.lock:

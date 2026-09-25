@@ -146,8 +146,9 @@ def round_of(conn):
 
 def two_players(store, **config):
     hub = LobbyHub(store, clock=Clock())
-    lobby, host = store.create(player_name="Host", config={"startItems": 3, "refillEvery": 2,
-                                                          "refillCount": 2, "lives": 2, **config})
+    # Gesamtzahlen, reihum verteilt: 6 Startteile → je 3, 4 neue → je 2
+    lobby, host = store.create(player_name="Host", config={"startItems": 6, "refillEvery": 2,
+                                                          "refillCount": 4, "lives": 2, **config})
     code = lobby["code"]
     h = connect(hub, code, playerId=host["id"], token=host["token"])
     g = connect(hub, code, name="Gast")
@@ -168,6 +169,7 @@ def test_round_items_exclusive_and_placements_synced(store):
     r = round_of(g)
     assert r["placed"] == [hh[0]] and r["placedBy"][hh[0]] == h.player_id
     assert r["last"]["type"] == "placed" and hh[0] not in hand_of(h)
+    assert r["sinceRefill"] == 1                       # Anzeige: noch 1 Treffer bis Nachschub
     # zweiter Treffer der Lobby → jeder bekommt 2 neue
     hub.handle(code, g, {"type": "place", "key": gh[0], "correct": True})
     assert len(hand_of(h)) == 4 and len(hand_of(g)) == 4
@@ -181,13 +183,17 @@ def test_shared_lives_end_round_for_everyone(store):
     assert round_of(h)["status"] == "lost" and round_of(h)["lives"] == 0
 
 
-def test_late_joiner_gets_items_and_leaver_returns_them(store):
+def test_late_joiner_waits_for_next_deal_and_leaver_returns_them(store):
     hub, code, h, g = two_players(store)
     late = connect(hub, code, name="Spät")
-    assert len(hand_of(late)) == 3
+    assert hand_of(late) == [] and round_of(h)["handCounts"][late.player_id] == 0
+    hub.handle(code, h, {"type": "place", "key": hand_of(h)[0], "correct": True})
+    hub.handle(code, g, {"type": "place", "key": hand_of(g)[0], "correct": True})
+    late_hand = hand_of(late)
+    assert len(late_hand) == 1                          # Nachschub H, G, Spät, H
     hub.handle(code, late, {"type": "leave"})
     r = round_of(h)
-    assert late.player_id is None and r["poolCount"] == 23 - 6 and late.ws.sent[-1]["type"] == "left"
+    assert late.player_id is None and r["poolCount"] == 23 - 6 - 4 + len(late_hand) and late.ws.sent[-1]["type"] == "left"
 
 
 def test_disconnected_player_keeps_hand_during_grace(store):

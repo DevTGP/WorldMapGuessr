@@ -235,3 +235,9 @@ body.is-holding .rail-hint { color: var(--piece); }
 @media (prefers-reduced-motion: reduce) {
   .rail-player, .field.toggle input, .field.toggle input::after { transition: none; }
 }
+
+/* Schmal: Badge nur mit Spielerzahl */
+.lobby-badge span { white-space: nowrap; }
+@media (max-width: 520px) {
+  .lobby-badge b { display: none; }
+}

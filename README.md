@@ -9,18 +9,20 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
 - Die Karte lässt sich wie ein Globus um die Längsachse drehen: seitlich ziehen oder die Pfeile oben (bzw. `←`/`→`), die in 45°-Schritten (π/4) auf 0°, 45°, 90° … weiterdrehen. Was in der Mitte liegt, ist am wenigsten verzerrt.
 - Bei 100 % ist die Y-Achse fest (Ziehen dreht nur). Erst nach dem Hineinzoomen lässt sich die Karte auch senkrecht verschieben.
 - Vor jeder Runde öffnet sich das Menü (auch über „Neue Runde“ oben rechts und nach Rundenende über „Einstellungen“):
-  - **Spielteile:** Arten an-/abwählen (7 Kontinente, 45 Staaten Europas – klassisches Europa inkl. Russland und Kosovo, ohne Türkei, Zypern und Kaukasus).
-  - **Auswahl:** einzelne Teile ausschließen (Suche, „Alle“/„Keine“ je Gruppe).
-  - **Regeln:** Leben (Standard 10), Startteile (Standard 5), Nachschub: neue Teile (Standard 4) nach je … Treffern (Standard 3).
+  - **Item-Arten:** an-/abwählen (7 Kontinente, 45 Staaten Europas – klassisches Europa inkl. Russland und Kosovo, ohne Türkei, Zypern und Kaukasus).
+  - **Einzelne Items:** ausschließen (Suche, „Alle“/„Keine“ je Gruppe).
+  - **Regeln:** Leben (Standard 10), Start-Items (Standard 5), Nachschub: neue Items (Standard 4) nach je … Treffern (Standard 3).
   - Die Einstellungen gelten nur für die gestartete Runde und werden nicht gespeichert; solange die Seite offen ist, merkt sich das Menü die letzte Auswahl. „Nochmal“ im Rundenende-Dialog startet mit denselben Einstellungen neu gemischt.
-  - Während einer laufenden Runde schließt `Esc` bzw. × das Menü wieder, ohne die Runde zu verlieren.
+  - Während einer laufenden Runde schließt `Esc` bzw. × das Menü wieder, ohne die Runde zu verlieren; ein Hinweis sagt, dass Änderungen erst ab der nächsten Runde gelten.
+- Statusleiste oben rechts: Fortschrittsbalken mit „eingesetzt/gesamt“ und Leben als Herz mit „9/10“ (bei wenigen Leben rot).
+- Begriff in der Oberfläche: durchgängig „Items“ (Kontinente, Staaten …).
 - Staatsgrenzen sind auf der Karte unsichtbar, sichtbar sind nur Küsten und Kontinentgrenzen. Ein richtig eingesetzter Staat erscheint aufgehellt mit seinem Umriss (Kleinststaaten zusätzlich mit einem Ring, solange sie zu klein zum Erkennen sind).
 - Ein gehaltener Kleinststaat (Vatikan, Monaco, San Marino …) bekommt einen gestrichelten Ring, damit man ihn sieht.
-- Klick auf einen Umriss nimmt ihn auf; er folgt dem Mauszeiger in der aktuellen Ansicht (gleiche Drehung, gleicher Zoom).
+- Klick auf ein Item im Inventar nimmt es auf; er folgt dem Mauszeiger in der aktuellen Ansicht (gleiche Drehung, gleicher Zoom).
 - Klick auf die Karte setzt ihn ein. Liegt er innerhalb einer kleinen Toleranz richtig, rastet er ein und die Fläche wird eine Stufe heller.
-- Helligkeitsstufen: Das Land startet fast schwarz. Jedes eingesetzte Teil hellt seine Fläche um eine Stufe auf (additiv, Reihenfolge egal). Sind alle Ebenen an einer Stelle eingesetzt – derzeit Kontinent und Staat –, ist sie fast weiß. Kommen später Ebenen hinzu (Bundesländer, Regionen), werden die Stufen automatisch feiner.
-- Daneben: Der Umriss fliegt zurück ins Inventar, ein Leben weniger. Bei 0 Leben endet die Runde. Ab 11 Leben zeigt die Anzeige ein Herz mit Zahl statt einzelner Herzen.
-- Nachschub: Nach der eingestellten Zahl richtiger Treffer kommen neue Umrisse ins Inventar, bis der Vorrat leer ist.
+- Helligkeitsstufen: Das Land startet fast schwarz. Jedes eingesetzte Item hellt seine Fläche um eine Stufe auf (additiv, Reihenfolge egal). Sind alle Ebenen an einer Stelle eingesetzt – derzeit Kontinent und Staat –, ist sie fast weiß. Kommen später Ebenen hinzu (Bundesländer, Regionen), werden die Stufen automatisch feiner.
+- Daneben: Das Item fliegt zurück ins Inventar, ein Leben weniger. Bei 0 Leben endet die Runde.
+- Nachschub: Nach der eingestellten Zahl richtiger Treffer kommen neue Items ins Inventar, bis der Vorrat leer ist.
 - Zurücklegen ohne Strafe: Klick auf den Slot, `Esc` oder Rechtsklick.
 
 ## Lobbys
@@ -39,15 +41,16 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
 
 ## Mehrspieler-Runde
 
-Der Server führt die Runde (`lobbies/round.py`); der Browser prüft nur, ob ein Teil passt, und meldet das Ergebnis.
+Der Server führt die Runde (`lobbies/round.py`); der Browser prüft nur, ob ein Item passt, und meldet das Ergebnis.
 
-- **Jedes Teil nur einmal:** Ein gemeinsamer, gemischter Vorrat. Jedes Teil liegt entweder im Vorrat, im Inventar genau eines Spielers oder ist eingesetzt. Fremde Inventare sieht niemand (nur deren Größe); Teile anderer Spieler kann man nicht einsetzen.
-- **Eingesetzte Teile synchron:** Jeder richtig eingesetzte Umriss erscheint sofort bei allen auf der Karte (mit Helligkeitsstufe und Grenze), dazu eine kurze Meldung „Name hat Frankreich eingesetzt“. Fortschritt `eingesetzt / gesamt` gilt für die Lobby.
+- **Jedes Item nur einmal:** Ein gemeinsamer, gemischter Vorrat. Jedes Item liegt entweder im Vorrat, im Inventar genau eines Spielers oder ist eingesetzt. Fremde Inventare sieht niemand (nur deren Größe); Items anderer Spieler kann man nicht einsetzen.
+- **Eingesetzte Items synchron:** Jedes richtig eingesetzte Item erscheint sofort bei allen auf der Karte (mit Helligkeitsstufe und Grenze), dazu eine kurze Meldung „Name hat Frankreich eingesetzt“. Fortschritt `eingesetzt / gesamt` gilt für die Lobby.
 - **Gemeinsame Leben:** Jeder Fehlwurf kostet der ganzen Lobby ein Leben. Bei 0 endet die Runde für alle.
-- **Start und Nachschub:** Jeder Online-Spieler bekommt `Startteile`. Nach je `Nachschub alle` Treffern der *ganzen Lobby* bekommt jeder Online-Spieler `Nachschub` neue Teile (reihum verteilt, solange der Vorrat reicht). Hat niemand mehr ein Teil, der Vorrat aber schon, wird sofort nachgelegt.
-- **Später beitreten:** Wer in eine laufende Runde kommt, bekommt `Startteile` aus dem Vorrat und sieht alle bisher eingesetzten Teile.
-- **Verlassen / Verbindung weg:** Wer die Lobby verlässt, gibt seine Teile sofort zurück in den Vorrat. Bei einem Verbindungsabbruch bleiben sie 60 s reserviert (Neu laden behält das Inventar), danach gehen sie ebenfalls zurück.
-- **Items senden:** Links am Rand steht ein Feld je Online-Mitspieler (Name, Anzahl seiner Umrisse). Umriss aufnehmen, dann ein Feld anklicken → der Umriss fliegt hinüber und liegt danach im Inventar des Mitspielers, der eine Meldung bekommt. Keine Einschränkung (Anzahl, Abklingzeit); nur an verbundene Spieler. Ist „Items senden“ aus, verschwindet die Spalte und der Server lehnt Senden ab.
+- **Start und Nachschub reihum:** `Start-Items` und `Neue Items` sind in der Lobby Gesamtzahlen. Der Server geht in fester Reihenfolge (wer am längsten in der Lobby ist, zuerst) durch die Spieler und merkt sich, wer als Nächstes dran ist – über alle Verteilungen der Runde hinweg. Beispiel mit 3 Spielern: 2 Start-Items → Spieler 1, Spieler 2; nach dem Nachschub 2 neue → Spieler 3, Spieler 1. So bekommt jeder am Ende gleich viele Items vom Server (höchstens eins Unterschied). Nachschub gibt es nach je `Nachschub alle` Treffern der *ganzen Lobby*; getrennte Spieler werden übersprungen. Hat niemand mehr ein Item, der Vorrat aber schon, wird sofort nachgelegt. Über dem Inventar zeigt eine Leiste, wie viele Treffer (der Lobby) noch bis zum nächsten Nachschub fehlen – auch im Einzelspiel.
+- **Später beitreten:** Wer in eine laufende Runde kommt, sieht alle bisher eingesetzten Items, bekommt aber nicht sofort Items: Er reiht sich hinten in die Reihenfolge ein und bekommt Items, sobald die Schleife beim Verteilen bei ihm ankommt (Mitspieler können ihm vorher Items senden).
+- **Verlassen / Verbindung weg:** Wer die Lobby verlässt, gibt seine Items sofort zurück in den Vorrat und verlässt die Reihenfolge. Bei einem Verbindungsabbruch bleiben sie 60 s reserviert (Neu laden behält das Inventar), danach gehen sie ebenfalls zurück; beim Wiederkommen reiht sich der Spieler hinten neu ein.
+- **Items senden:** Links am Rand steht ein Feld je Online-Mitspieler (Name, Anzahl seiner Items). Item aufnehmen, dann ein Feld anklicken → das Item fliegt hinüber und liegt danach im Inventar des Mitspielers, der eine Meldung bekommt. Keine Einschränkung (Anzahl, Abklingzeit); nur an verbundene Spieler. Ist „Items senden“ aus, verschwindet die Spalte und der Server lehnt Senden ab.
+- **Menü in der Lobby:** zwei Blöcke – *Lobby* („wirkt sofort“: Spielerzahl, Passwort, Items senden) und *Runde* (Item-Arten, Regeln; läuft eine Runde, gilt „ab der nächsten Runde“). Ein Hinweis zeigt, was gerade gilt und wer einstellt; „So läuft eine Lobby-Runde“ erklärt die Regeln aufklappbar. Die Regler zeigen, was sie in der Lobby bewirken (z. B. „für alle zusammen, reihum (jetzt 3 + 2)“), der Fuß fasst alles zusammen. Startet der Host neu, während eine Runde läuft, fragt ein Dialog nach („bricht die Runde für alle ab“).
 - **Rundenende:** Gewonnen (alles eingesetzt) oder verloren (keine Leben) – der Dialog erscheint bei allen. Nur der Host sieht „Neue Runde für alle“. Eine Rangliste gibt es noch nicht.
 - Der Rundenzustand wird mit der Lobby gespeichert und übersteht einen Server-Neustart.
 
@@ -150,12 +153,14 @@ worldmapguessr/
   static/js/stats/sort.js     Sortierung, Trefferquote
   static/js/stats/render.js   Tabelle, Zusammenfassung, JSON-Ansicht
   static/js/game/game.js      Spielablauf nach Konfiguration (Wellen, Einsetzen, Leben, Tracking)
+  static/js/game/refill-meter.js  Anzeige „Noch n Treffer bis +k neue“ am Inventar
   static/js/game/remote.js    Lobby-Runde: Server-Zustand auf Karte, Inventar, Leben abbilden
   static/js/menu/menu.js      Menü vor der Runde (Einzelspiel und Lobby)
   static/js/lobby/client.js   WebSocket-Client mit automatischem Wiederverbinden
   static/js/lobby/lobby-menu.js  Lobby-Bereich im Menü (Link, Spieler, Einstellungen, Rechte)
   static/js/lobby/identity.js Spieler-ID/Token und Name im Browser
   static/js/lobby/join-dialog.js  Name/Passwort-Dialog, Hinweis „Lobby nicht verfügbar/beendet“
+  static/js/lobby/rules-text.js   Lobby-Erklärtexte (Aufteilung reihum, Hinweise, Zusammenfassung)
   static/js/lobby/players-rail.js  Mitspieler-Spalte links: Umrisse an Mitspieler senden
   static/js/lobby/confirm.js  Bestätigungsdialog (Verlassen, Beenden)
   static/js/menu/config.js    Standardwerte, Grenzen, Teile-Pool einer Konfiguration

@@ -21,7 +21,7 @@
 
 <header class="hud hud-title">
   <h1>WorldMapGuessr</h1>
-  <p>Umriss anklicken, dann an der richtigen Stelle auf die Karte klicken · Karte seitlich ziehen oder Pfeile oben zum Drehen</p>
+  <p id="title-hint">Item anklicken, dann an der richtigen Stelle auf die Karte klicken · Karte seitlich ziehen oder Pfeile oben zum Drehen</p>
 </header>
 
 <nav class="hud hud-rotate" aria-label="Karte drehen">
@@ -39,8 +39,11 @@
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c.8-3.4 3.2-5 6-5s5.2 1.6 6 5M16 5.5a3 3 0 010 5.6M18.5 14c1.4.7 2.2 2.2 2.5 4"/></svg>
     <b></b><span></span>
   </button>
-  <span class="progress" title="Richtig eingesetzt"><b id="progress">0 / 0</b></span>
-  <div class="lives" id="lives" role="img"></div>
+  <div class="progress" id="progress-wrap" role="img" aria-label="Eingesetzt: 0 von 0" title="Eingesetzte Items">
+    <span class="progress-fill" id="progress-fill"></span>
+    <b id="progress">0 / 0</b>
+  </div>
+  <div class="lives" id="lives" role="img" title="Leben"></div>
   <button class="btn" id="new-round" type="button">Neue Runde</button>
   <a class="btn btn-icon" href="{{ url_for('main.stats') }}" title="Statistik" aria-label="Statistik">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-6"/></svg>
@@ -48,14 +51,15 @@
 </div>
 
 <section class="hud hud-inventory" aria-label="Inventar">
+  <div class="refill-meter" id="refill-meter" role="status" hidden><span class="pips" aria-hidden="true"></span><span class="refill-text"></span></div>
   <span class="label" aria-hidden="true">Inventar</span>
   <div class="slots" id="slots"></div>
 </section>
 
-<nav class="hud hud-players" id="players-rail" aria-label="Mitspieler – Umrisse senden" hidden>
-  <h2>Mitspieler</h2>
+<nav class="hud hud-players" id="players-rail" aria-label="Mitspieler – Items senden" hidden>
+  <h2>Items senden</h2>
   <ul></ul>
-  <p class="rail-hint">Umriss aufnehmen, dann Mitspieler anklicken</p>
+  <p class="rail-hint">Item aus dem Inventar aufnehmen, dann Mitspieler anklicken</p>
 </nav>
 
 <svg class="held-layer" id="held-layer" aria-hidden="true"></svg>
@@ -85,7 +89,10 @@
     <div class="menu-body">
       <div class="menu-col">
         <section class="menu-section lobby-section" id="lobby-section" aria-labelledby="sec-lobby" hidden>
-          <h3 id="sec-lobby">Lobby <span class="lobby-count" id="lobby-count"></span></h3>
+          <div class="block-head">
+            <h3 id="sec-lobby">Lobby <span class="lobby-count" id="lobby-count"></span></h3>
+            <span class="scope" title="Lobby-Einstellungen gelten sofort für alle">wirkt sofort</span>
+          </div>
           <div class="invite">
             <input id="lobby-link" type="text" readonly aria-label="Einladungslink">
             <button type="button" class="btn" id="lobby-copy">Link kopieren</button>
@@ -105,27 +112,45 @@
               </div>
             </div>
             <label class="field toggle host-only" for="lobby-allow-send">
-              <span>Items senden<small>Spieler können Umrisse an Mitspieler schicken</small></span>
+              <span>Items senden<small>Mitspieler können sich Items über die Spalte links schicken</small></span>
               <input id="lobby-allow-send" type="checkbox" role="switch" checked>
             </label>
           </div>
         </section>
+        <div class="round-block">
+          <div class="block-head">
+            <h3 id="sec-round">Runde</h3>
+            <span class="scope" id="round-scope" hidden>gilt ab der nächsten Runde</span>
+          </div>
+          <p class="round-note" id="round-note" hidden></p>
+          <details class="mp-rules" id="mp-rules" hidden>
+            <summary>So läuft eine Lobby-Runde</summary>
+            <ul>
+              <li><b>Jedes Item gibt es nur einmal.</b> Was in deinem Inventar liegt, hat kein anderer.</li>
+              <li><b>Eingesetzte Items</b> erscheinen sofort bei allen auf der Karte.</li>
+              <li><b>Leben sind gemeinsam:</b> jeder Fehlwurf kostet allen ein Leben. Bei 0 endet die Runde für alle.</li>
+              <li><b>Verteilen reihum:</b> Start-Items und neue Items sind Gesamtzahlen für die Lobby und werden reihum an alle verteilt. Die Treffer aller Spieler zählen für den Nachschub.</li>
+              <li id="mp-rule-send"><b>Items senden:</b> Item aufnehmen und links einen Mitspieler anklicken.</li>
+              <li><b>Später dazugekommen?</b> Du reihst dich ein und bekommst beim nächsten Verteilen Items.</li>
+            </ul>
+          </details>
+        </div>
         <section class="menu-section game-settings" aria-labelledby="sec-kinds">
-          <h3 id="sec-kinds">Spielteile</h3>
+          <h4 id="sec-kinds">Item-Arten</h4>
           <div class="kind-cards" id="kind-cards"></div>
         </section>
         <section class="menu-section game-settings" aria-labelledby="sec-rules">
-          <h3 id="sec-rules">Regeln</h3>
+          <h4 id="sec-rules">Regeln</h4>
           <div class="fields" id="rule-fields"></div>
         </section>
       </div>
 
       <section class="menu-section menu-col picker game-settings" aria-labelledby="sec-picker">
         <div class="picker-head">
-          <h3 id="sec-picker">Auswahl</h3>
-          <input type="search" id="picker-search" placeholder="Teil suchen" autocomplete="off" aria-label="Teil suchen" data-always="1">
+          <h4 id="sec-picker">Einzelne Items</h4>
+          <input type="search" id="picker-search" placeholder="Item suchen" autocomplete="off" aria-label="Item suchen" data-always="1">
         </div>
-        <p class="picker-hint">Abgewählte Teile kommen in dieser Runde nicht vor.</p>
+        <p class="picker-hint">Abgewählte Items kommen in der Runde nicht vor.</p>
         <div class="picker-list" id="picker-list"></div>
       </section>
     </div>

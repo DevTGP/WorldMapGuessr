@@ -5,6 +5,7 @@
 import { createStepper } from "../menu/stepper.js";
 import { fromWire, toWire } from "../menu/config.js";
 import { confirmDialog } from "./confirm.js";
+import { roundNote, ruleHints, ruleSummary } from "./rules-text.js";
 
 const SEND_DELAY_MS = 250;
 const CROWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></svg>';
@@ -58,18 +59,31 @@ export class LobbyMenu {
       clearTimeout(this.sendTimer);
       this.sendTimer = setTimeout(() => client.sendSettings({ config: toWire(config) }), SEND_DELAY_MS);
     };
-    menu.primaryAction = () => {
-      if (client.isHost) client.startRound();
-      else if (isPlaying()) onJoinRound();
+    const running = () => client.state?.round?.status === "running";
+    menu.primaryAction = async () => {
+      if (client.isHost) {
+        if (running() && !(await this._confirmRestart())) return;
+        client.startRound();
+      } else if (isPlaying()) onJoinRound();
     };
     menu.primaryLabel = (pool) => {
       if (!client.connected) return { text: "Verbinde …", disabled: true };
-      if (client.isHost) return pool ? `Neue Runde für alle · ${pool} Teile` : "Neue Runde für alle";
+      if (client.isHost) {
+        const what = running() ? "Runde neu starten" : "Runde für alle starten";
+        return pool ? `${what} · ${pool} Items` : what;
+      }
       if (isPlaying()) return "Zurück zur Runde";
       return { text: "Warten auf den Host …", disabled: true };
     };
 
-    menu.summaryPrefix = () => (client.isHost ? "" : '<span class="guest-note">Der Host stellt die Runde ein.</span> · ');
+    // Was die Einstellungen in der Lobby bewirken: Hinweise, Zusammenfassung, Rundenstatus
+    const players = () => Math.max(1, (client.state?.players ?? []).filter((p) => p.online).length);
+    menu.summaryRules = (c, start) => ruleSummary(c, start, players());
+    menu.roundNote = () => roundNote(client.state?.round, client.isHost);
+    menu.roundRunning = running;
+    document.getElementById("mp-rules").hidden = false;
+    document.getElementById("title-hint").textContent =
+      "Item anklicken und auf der Karte einsetzen – oder links an einen Mitspieler senden · Karte ziehen oder Pfeile zum Drehen";
     client.addEventListener("state", (e) => this.apply(e.detail));
     client.addEventListener("connection", () => this.menu._update());
   }
@@ -92,6 +106,11 @@ export class LobbyMenu {
     document.getElementById("lobby-password-clear").hidden = !state.settings.private;
     document.getElementById("lobby-close").hidden = !host;
     this.allowSend.checked = state.settings.allowSend !== false;
+    document.getElementById("mp-rule-send").innerHTML = state.settings.allowSend !== false
+      ? "<b>Items senden:</b> Item aufnehmen und links einen Mitspieler anklicken."
+      : "<b>Items senden</b> ist in dieser Lobby ausgeschaltet.";
+    const online = state.players.filter((p) => p.online).length;
+    for (const [key, text] of Object.entries(ruleHints(this.menu.config, online))) this.menu.steppers[key].setHint(text);
 
     this._renderPlayers(state);
     this.menu._update();
@@ -109,6 +128,17 @@ export class LobbyMenu {
       li.title = p.host ? (p.online ? "Host" : "Host – gerade nicht verbunden") : "Spieler";
       return li;
     }));
+  }
+
+  _confirmRestart() {
+    const r = this.client.state?.round;
+    return confirmDialog({
+      title: "Laufende Runde abbrechen?",
+      text: `Runde ${r?.number ?? ""} wird für alle beendet (${r?.placed?.length ?? 0} von ${r?.total ?? 0} Items eingesetzt). ` +
+        "Alle Inventare werden geleert und die neue Runde startet sofort mit den aktuellen Einstellungen.",
+      confirm: "Neu starten",
+      danger: true,
+    });
   }
 
   async _leave() {

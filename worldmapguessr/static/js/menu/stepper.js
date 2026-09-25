@@ -39,7 +39,13 @@ export function createStepper({ id, label, hint, value, min, max, onChange }) {
     el: root,
     get value() { return current; },
     set value(v) { set(v, false); },
-    /** Obergrenze ändern (z. B. Startteile ≤ Teile im Spiel) */
+    /** Erklärung unter der Beschriftung ändern (z. B. Lobby-Hinweise) */
+    setHint(text) {
+      let small = root.querySelector("label small");
+      if (!small) root.querySelector("label").append(small = document.createElement("small"));
+      small.textContent = text;
+    },
+    /** Obergrenze ändern (z. B. Start-Items ≤ Items im Spiel) */
     setMax(max) { limit = { ...limit, max }; input.max = max; set(current, false); },
   };
 }
