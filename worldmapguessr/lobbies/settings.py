@@ -3,7 +3,7 @@
 LIMITS = {
     "lives": (1, 30),
     "startItems": (1, 60),
-    "refillCount": (1, 20),
+    "refillCount": (2, 21),  # immer mehr als refillEvery (Nachschub positiv), siehe clean_config
     "refillEvery": (1, 20),
     "difficulty": (0, 100),  # Schwierigkeitsregler in % (Reihenfolge der Items, siehe difficulty.py)
     "timer": (0, 600),       # s zwischen zwei Wegnahmen (0 = aus), in 10-s-Schritten
@@ -11,6 +11,9 @@ LIMITS = {
     "timerTake": (1, 20),    # Items, die je Takt reihum aus den Inventaren zurück in den Vorrat gehen
 }
 TEN_SECOND_STEPS = ("timer", "grace")
+# Spielmodi (Voreinstellungen im Browser: static/js/menu/presets.js); "custom" = unter „Erweitert“ geändert
+MODES = ("casual", "easyfocus", "focus", "tempo", "hardcore", "custom")
+LEVELS = (0, 4)  # Sehr einfach … Sehr schwer
 # Item-Gruppen (Menü-Karten); Items behalten ihre Art im Key ("country:USA")
 KINDS = ("continent", "country-eu", "country-na", "country-sa", "country-af", "country-as", "country-oc")
 # Ältere Lobbys: "country" meinte die Staaten Europas
@@ -23,9 +26,12 @@ DEFAULT_TTL = 86400
 SEND_EVERY = (0, 20)       # Sendelimit: 1 Senden je N vom Server erhaltene Items (0 = ohne Limit)
 DEFAULT_SEND_EVERY = 5
 
+# Standard = Casual, Normal
 DEFAULT_CONFIG = {
-    "lives": 10,
-    "startItems": 5,
+    "mode": "casual",
+    "level": 2,
+    "lives": 8,              # Grundwert für 1 Spieler (Lobby: + 2 je weiterem, siehe round.scaled)
+    "startItems": 6,         # dito
     "refillCount": 4,
     "refillEvery": 3,
     "difficulty": 50,
@@ -33,6 +39,7 @@ DEFAULT_CONFIG = {
     "grace": 30,
     "timerTake": 1,
     "noReturn": False,       # gehaltenes Item kann nicht zurück ins Inventar – es muss eingesetzt werden
+    "missLoses": False,      # Fehlwurf: Item geht zurück in den Vorrat (außer im Endspurt)
     "kinds": list(KINDS),
     "excluded": [],
 }
@@ -50,7 +57,13 @@ def clean_config(raw) -> dict:
     cfg = {k: _int(raw.get(k), lo, hi, DEFAULT_CONFIG[k]) for k, (lo, hi) in LIMITS.items()}
     for k in TEN_SECOND_STEPS:
         cfg[k] = int(round(cfg[k] / 10)) * 10
-    cfg["noReturn"] = clean_bool(raw.get("noReturn"), DEFAULT_CONFIG["noReturn"])
+    # Nachschub immer positiv (mehr neue Items als Treffer) und Start mindestens bis zum ersten Nachschub
+    cfg["refillEvery"] = min(cfg["refillEvery"], cfg["refillCount"] - 1)
+    cfg["startItems"] = max(cfg["startItems"], cfg["refillEvery"])
+    for k in ("noReturn", "missLoses"):
+        cfg[k] = clean_bool(raw.get(k), DEFAULT_CONFIG[k])
+    cfg["mode"] = raw.get("mode") if raw.get("mode") in MODES else DEFAULT_CONFIG["mode"]
+    cfg["level"] = _int(raw.get("level"), *LEVELS, DEFAULT_CONFIG["level"])
     wanted = set()
     for k in raw.get("kinds") or []:
         wanted.update(LEGACY_KINDS.get(k, (k,)) if isinstance(k, str) else ())

@@ -244,6 +244,7 @@
   stroke-dasharray: 3 3;
 }
 body.is-holding #map { cursor: crosshair; }
+.held-layer .lost .piece, .held-layer .lost path { stroke: var(--bad); fill: color-mix(in srgb, var(--bad) 25%, transparent); }
 
 /* ---------- Rundendialog ---------- */
 .round-dialog {

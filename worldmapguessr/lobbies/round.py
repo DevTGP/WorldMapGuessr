@@ -8,10 +8,16 @@
   (`cursor`) – über alle Verteilungen der Runde hinweg. So bekommt am Ende jeder (±1) gleich viele Teile.
   Beispiel 3 Spieler, 2 Startteile → A, B; danach 2 neue → C, A. Getrennte Spieler werden übersprungen.
 - Gemeinsamer Nachschub-Zähler: nach je `refillEvery` Treffern der Lobby werden `refillCount` Teile verteilt.
-- Wer später beitritt, bekommt nichts sofort, sondern reiht sich hinten in die Reihenfolge ein.
-- Hat kein Online-Spieler mehr ein Teil, der Vorrat aber noch welche, wird sofort nachgelegt
-  (sonst käme die Runde nie weiter).
-- Verlässt ein Spieler die Lobby (oder ist lange getrennt), gehen seine Teile zurück in den Vorrat.
+- Spielerzahl n: Start-Items und Leben sind Grundwerte für einen Spieler; die Runde startet mit
+  S + 2·(n−1) Items (reihum verteilt) und L + 2·(n−1) Leben (siehe scaled). Wer später beitritt, reiht sich
+  hinten ein, bekommt sofort 2 Items, und die Lobby +2 Leben – wie es die Formel für n+1 verlangt.
+- Verloren: 0 Leben, oder alle Inventare der Lobby sind leer, solange der Vorrat noch Items hat
+  (`lostReason` lives | empty). Geprüft wird nach dem Nachschub.
+- Fehlwurf (`config.missLoses`): das Item geht zurück in den Vorrat (sonst bleibt es im Inventar).
+- Endspurt: Ist der Vorrat zum ersten Mal leer, nimmt der Timer nichts mehr weg und ein Fehlwurf behält das
+  Item – bis Rundenende. So wird das Inventar am Schluss nur durch Treffer leer.
+- Verlässt ein Spieler die Lobby, gehen seine Teile zurück in den Vorrat. Sind danach alle Inventare leer,
+  wird sofort nachgelegt (das ist kein Fehler der anderen).
 - Teile können an Mitspieler gesendet werden (give) – sie wechseln nur das Inventar. Sendelimit
   (Lobbyeinstellung `sendEvery` = N): je N vom Server erhaltene Items darf ein Spieler 1 Item senden;
   geschenkte Items zählen nicht mit.
@@ -25,8 +31,10 @@ Rundenzustand (JSON-serialisierbar, wird mit der Lobby gespeichert):
  pool: [key], hands: {playerId: [key]}, placed: [key], placedBy: {key: playerId},
  order: [playerId], cursor, dealt: {playerId: n}, sent: {playerId: n}, sinceRefill,
  timer: {nextAt, graceUntil, pausedAt} | None, takeCursor, events, log: [event], last: event}
-Ereignis: {seq, type: placed|miss|refill|gift|take, player?, key?, count?, to?, items?}
- refill: to = {playerId: n}; take: items = [{player, key}]
+Zusätzlich: endspurt (bool), lostReason.
+Ereignis: {seq, type: placed|miss|refill|gift|take|join|endspurt|empty, player?, key?, count?, to?, items?, lost?}
+ refill: to = {playerId: n}; take: items = [{player, key}]; miss: lost = Item ging zurück in den Vorrat;
+ join: count = Items für den Neuen, lives = zusätzliche Leben
 `events` zählt Ereignisse hoch; `log` hält die letzten LOG_SIZE, der Client zeigt jedes (seq) genau einmal.
 
 Item-Statistik (spawned/correct/incorrect) zählt in der Lobby allein der Server: jedes Austeilen aus
@@ -42,6 +50,8 @@ import time
 from ..difficulty import order_by_difficulty
 
 RUNNING, WON, LOST = "running", "won", "lost"
+PER_PLAYER = 2      # Start-Items und Leben je weiterem Spieler
+MAX_LIVES = 99
 LOG_SIZE = 40
 STATS = "_stats"  # vorübergehende Liste [(key, event)] für die Item-Statistik
 
@@ -62,24 +72,32 @@ def build_pool(catalog: dict[str, list[str]], config: dict, rng: random.Random,
     return order_by_difficulty(keys, difficulty or {}, config.get("difficulty", 50), rng)
 
 
+def scaled(config: dict, players: int) -> dict:
+    """Start-Items und Leben für n Spieler: Grundwert + 2 je weiterem Spieler."""
+    extra = PER_PLAYER * max(0, players - 1)
+    return {"startItems": config["startItems"] + extra, "lives": min(MAX_LIVES, config["lives"] + extra)}
+
+
 def new_round(number: int, config: dict, catalog, online: list[str], seed: int, now: float,
               difficulty: dict[str, float] | None = None) -> dict:
     rng = random.Random(seed)
     pool = build_pool(catalog, config, rng, difficulty)
+    start = scaled(config, len(online))
     rnd = {
         "number": number, "seed": seed, "startedAt": now, "config": dict(config),
-        "status": RUNNING, "lives": config["lives"], "livesMax": config["lives"], "total": len(pool),
+        "status": RUNNING, "lives": start["lives"], "livesMax": start["lives"], "total": len(pool),
         "pool": pool, "hands": {}, "order": list(online), "cursor": 0, "dealt": {}, "sent": {},
         "placed": [], "placedBy": {}, "sinceRefill": 0, "events": 0, "log": [], "last": None,
         "timer": {"nextAt": now + config.get("grace", 0) + config["timer"], "graceUntil": now + config.get("grace", 0),
                   "pausedAt": None} if config.get("timer") else None,
-        "takeCursor": 0,
+        "takeCursor": 0, "endspurt": False, "lostReason": None,
     }
     if not pool:
         rnd["status"] = WON
     for pid in online:
         rnd["hands"][pid] = []
-    deal(rnd, online, config["startItems"])
+    deal(rnd, online, start["startItems"])
+    _check_endspurt(rnd)
     return rnd
 
 
@@ -138,13 +156,25 @@ def _event(rnd: dict, **event) -> None:
 
 
 def join(rnd: dict, pid: str) -> bool:
-    """Spieler kommt (neu) in eine laufende Runde: reiht sich hinten in die Reihenfolge ein,
-    bekommt aber erst beim nächsten Verteilen Teile. True, wenn er neu eingereiht wurde."""
+    """Spieler kommt (neu) in eine laufende Runde: reiht sich hinten in die Reihenfolge ein, bekommt sofort
+    PER_PLAYER Items aus dem Vorrat, und die Lobby PER_PLAYER Leben mehr. True, wenn er neu eingereiht wurde."""
     order = _rotation(rnd)
     if rnd["status"] != RUNNING or pid in order:
         return False
     order.append(pid)
-    rnd["hands"].setdefault(pid, [])
+    hand = rnd["hands"].setdefault(pid, [])
+    count = 0
+    while count < PER_PLAYER and rnd["pool"]:
+        key = rnd["pool"].pop(0)
+        hand.append(key)
+        rnd["dealt"][pid] = rnd["dealt"].get(pid, 0) + 1
+        _count(rnd, key, "spawned")
+        count += 1
+    lives = min(MAX_LIVES, rnd["livesMax"] + PER_PLAYER) - rnd["livesMax"]
+    rnd["livesMax"] += lives
+    rnd["lives"] += lives
+    _event(rnd, type="join", player=pid, count=count, lives=lives)
+    _check_endspurt(rnd)
     return True
 
 
@@ -159,9 +189,16 @@ def place(rnd: dict, pid: str, key: str, correct: bool, online: list[str]) -> di
     _count(rnd, key, "correct" if correct else "incorrect")
     if not correct:
         rnd["lives"] = max(0, rnd["lives"] - 1)
-        _event(rnd, type="miss", player=pid, key=key)
+        # Fehlwurf gibt das Item ab – außer im Endspurt
+        lost = bool(rnd["config"].get("missLoses")) and not rnd.get("endspurt")
+        if lost:
+            hand.remove(key)
+            rnd["pool"].insert(random.randint(0, len(rnd["pool"])), key)
+        _event(rnd, type="miss", player=pid, key=key, lost=lost)
         if rnd["lives"] == 0:
-            rnd["status"] = LOST
+            _lose(rnd, "lives")
+        else:
+            _check_empty(rnd)
         return {"refill": 0}
 
     hand.remove(key)
@@ -180,7 +217,8 @@ def place(rnd: dict, pid: str, key: str, correct: bool, online: list[str]) -> di
         refill = sum(to.values())
         if refill:
             _event(rnd, type="refill", player=None, count=refill, to=to)
-    refill += _unstick(rnd, online)
+    _check_endspurt(rnd)
+    _check_empty(rnd)
     return {"refill": refill}
 
 
@@ -223,7 +261,7 @@ def return_hand(rnd: dict, pid: str, online: list[str], rng: random.Random | Non
     rng = rng or random.Random()
     for key in hand:
         rnd["pool"].insert(rng.randint(0, len(rnd["pool"])), key)
-    _unstick(rnd, online)
+    _rescue(rnd, online)
     return len(hand)
 
 
@@ -232,7 +270,8 @@ def tick(rnd: dict, now: float, online: list[str], rng: random.Random | None = N
     Ein Takt je Aufruf. Lag der Takt mehr als eine Periode zurück (Server war aus, niemand da), wird nur
     neu angesetzt – verpasste Takte werden nicht nachgeholt."""
     timer = rnd.get("timer")
-    if not timer or rnd["status"] != RUNNING or timer.get("pausedAt") is not None or now < timer["nextAt"]:
+    if not timer or rnd["status"] != RUNNING or rnd.get("endspurt") or timer.get("pausedAt") is not None \
+            or now < timer["nextAt"]:
         return False
     every = rnd["config"]["timer"]
     if now - timer["nextAt"] > every or not online:
@@ -263,7 +302,7 @@ def take(rnd: dict, online: list[str], count: int, rng: random.Random | None = N
         taken.append({"player": pid, "key": key})
     if taken:
         _event(rnd, type="take", player=None, items=taken)
-        _unstick(rnd, online)
+        _check_empty(rnd)
     return taken
 
 
@@ -297,6 +336,9 @@ def timer_view(rnd: dict, now: float) -> dict | None:
     if not timer or rnd["status"] != RUNNING:
         return None
     c = rnd["config"]
+    if rnd.get("endspurt"):
+        return {"endspurt": True, "nextIn": 0.0, "every": c["timer"], "take": c["timerTake"], "graceLeft": 0.0,
+                "paused": False}
     ref = timer["pausedAt"] if timer.get("pausedAt") is not None else now
     return {
         "nextIn": max(0.0, round(timer["nextAt"] - ref, 2)),
@@ -317,11 +359,28 @@ def _leave_rotation(rnd: dict, pid: str) -> None:
     rnd["cursor"] = rnd["cursor"] % len(order) if order else 0
 
 
-def _unstick(rnd: dict, online: list[str]) -> int:
-    """Keiner (online) hat mehr ein Teil, der Vorrat aber schon → sofort nachlegen."""
-    if rnd["status"] != RUNNING or not rnd["pool"] or not online:
-        return 0
-    if any(rnd["hands"].get(pid) for pid in online):
+def _lose(rnd: dict, reason: str) -> None:
+    rnd["status"] = LOST
+    rnd["lostReason"] = reason
+
+
+def _check_endspurt(rnd: dict) -> None:
+    """Vorrat zum ersten Mal leer → Endspurt (keine Wegnahme, Fehlwürfe behalten das Item)."""
+    if rnd["status"] == RUNNING and not rnd.get("endspurt") and not rnd["pool"]:
+        rnd["endspurt"] = True
+        _event(rnd, type="endspurt", player=None)
+
+
+def _check_empty(rnd: dict) -> None:
+    """Alle Inventare leer, Vorrat nicht → verloren."""
+    if rnd["status"] == RUNNING and rnd["pool"] and not any(rnd["hands"].values()):
+        _lose(rnd, "empty")
+        _event(rnd, type="empty", player=None)
+
+
+def _rescue(rnd: dict, online: list[str]) -> int:
+    """Nach dem Verlassen eines Spielers: Sind alle Inventare leer, der Vorrat aber nicht → nachlegen."""
+    if rnd["status"] != RUNNING or not rnd["pool"] or not online or any(rnd["hands"].values()):
         return 0
     rnd["sinceRefill"] = 0
     to = _deal(rnd, online, rnd["config"]["refillCount"])
@@ -343,4 +402,5 @@ def public_view(rnd: dict | None, now: float | None = None) -> dict | None:
         "sinceRefill": rnd["sinceRefill"],
         "handCounts": {pid: len(h) for pid, h in rnd["hands"].items()}, "last": rnd["last"],
         "log": rnd.get("log", []), "events": rnd.get("events", 0), "timer": timer_view(rnd, now),
+        "endspurt": bool(rnd.get("endspurt")), "lostReason": rnd.get("lostReason"),
     }

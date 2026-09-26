@@ -1,7 +1,7 @@
-// Schwierigkeitsregler 0…100 % im Menü: Stufe (Sehr einfach … Unmöglich) und ein Satz, was der Wert
-// für die Reihenfolge der Items bedeutet.
+// Regler „Reihenfolge“ 0…100 % (unter „Erweitert“): wie stark leichte bzw. schwere Items zuerst kommen,
+// und ein Satz, was der Wert bedeutet. Die Schwierigkeit als Ganzes wählt man über Modus und Stufe.
 
-import { difficultyExplain, difficultyLabel } from "../game/difficulty.js";
+import { difficultyExplain, difficultyLabel, orderLabel } from "../game/difficulty.js";
 
 /**
  * @param {{value: number, onChange: (v: number) => void}} opts
@@ -12,7 +12,7 @@ export function createDifficultySlider({ value, onChange }) {
   root.className = "field difficulty";
   root.innerHTML = `
     <div class="difficulty-head">
-      <label for="cfg-difficulty">Schwierigkeit<small>Reihenfolge, in der die Items kommen</small></label>
+      <label for="cfg-difficulty">Reihenfolge<small>leichte oder schwere Items zuerst</small></label>
       <output for="cfg-difficulty" class="difficulty-value"><b></b><span></span></output>
     </div>
     <input id="cfg-difficulty" type="range" min="0" max="100" step="1">
@@ -28,10 +28,10 @@ export function createDifficultySlider({ value, onChange }) {
     input.value = v;
     input.style.setProperty("--pos", `${v}%`);
     pct.textContent = `${v} %`;
-    label.textContent = difficultyLabel(v);
+    label.textContent = orderLabel(v);
     root.dataset.level = difficultyLabel(v).toLowerCase().replace(/\s+/g, "-");
     explain.textContent = difficultyExplain(v);
-    input.setAttribute("aria-valuetext", `${v} %, ${difficultyLabel(v)}`);
+    input.setAttribute("aria-valuetext", `${v} %, ${orderLabel(v)}`);
   };
   input.addEventListener("input", () => { show(Number(input.value)); onChange(current); });
   show(value);

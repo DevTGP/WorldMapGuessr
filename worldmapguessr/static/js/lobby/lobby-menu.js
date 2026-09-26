@@ -11,7 +11,8 @@ import { SOLO_HINTS } from "../menu/menu.js";
 import { confirmDialog } from "./confirm.js";
 import { identity } from "./identity.js";
 import { askPlayer } from "./join-dialog.js";
-import { roundNote, ruleHints, ruleSummary, sendRule } from "./rules-text.js";
+import { roundNote, ruleHints, sendRule } from "./rules-text.js";
+import { MODE } from "../menu/presets.js";
 
 const SEND_DELAY_MS = 250;
 const CROWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></svg>';
@@ -71,7 +72,11 @@ export class LobbyMenu {
       if (!client.isHost) return;
       this.lastLocalEdit = Date.now();
       clearTimeout(this.sendTimer);
-      this.sendTimer = setTimeout(() => client.sendSettings({ config: toWire(config) }), SEND_DELAY_MS);
+      // Neuer Modus → auch sein Sendelimit (danach frei einstellbar)
+      const settings = { config: toWire(config) };
+      if (config.mode !== this.sentMode && MODE[config.mode]) settings.sendEvery = MODE[config.mode].sendEvery;
+      this.sentMode = config.mode;
+      this.sendTimer = setTimeout(() => client.sendSettings(settings), SEND_DELAY_MS);
     };
     const running = () => client.state?.round?.status === "running";
     menu.primaryAction = async () => {
@@ -92,9 +97,8 @@ export class LobbyMenu {
 
     // Was die Einstellungen in der Lobby bewirken: Hinweise, Zusammenfassung, Rundenstatus
     const players = () => Math.max(1, (client.state?.players ?? []).filter((p) => p.online).length);
-    const soloSummary = menu.summaryRules;
     const soloNote = menu.roundNote;
-    menu.summaryRules = (c, start) => (this.solo ? soloSummary(c, start) : ruleSummary(c, start, players()));
+    menu.players = () => (this.solo ? 1 : players());
     menu.roundNote = () => (this.solo ? soloNote() : roundNote(client.state?.round, client.isHost));
     menu.roundRunning = running;
     this.titleHint = document.getElementById("title-hint").textContent;
@@ -125,6 +129,7 @@ export class LobbyMenu {
     // Spielkonfiguration vom Server übernehmen – außer der Host tippt gerade (sonst springt der Regler)
     if (!host || Date.now() - (this.lastLocalEdit ?? 0) > 1000) {
       this.menu.applyConfig(fromWire(state.settings.config));
+      this.sentMode ??= state.settings.config.mode;
     }
     this.menu.setReadOnly(!host);
     this.maxPlayers.value = state.settings.maxPlayers;

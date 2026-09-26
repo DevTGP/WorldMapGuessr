@@ -1,28 +1,36 @@
-// Menü vor jeder Runde: Item-Arten + Einzelauswahl, Leben, Start-Items, Nachschub.
-// Einzelspiel: Einstellungen gelten nur für die gestartete Runde; innerhalb der geöffneten Seite
-// merkt sich das Menü die letzte Auswahl. In einer Lobby übernimmt lobby/lobby-menu.js
-// Titel, Hauptaktion und Schreibschutz (nur der Host stellt ein).
+// Menü vor jeder Runde.
+//
+// Einfache Ansicht: Spielmodus, Schwierigkeit (Voreinstellungen aus menu/presets.js) und Item-Auswahl
+// (Kontinente / Länder / Bundesländer). „Erweiterte Einstellungen“ zeigt alle Einzelwerte, die Item-Gruppen
+// und die Einzelauswahl, „Aufbewahren“ und in der Lobby deren Einstellungen. Wer dort einen Regelwert ändert,
+// hat „Eigene Einstellungen“ (mode = "custom"); ein Klick auf Modus oder Stufe setzt wieder die Voreinstellung.
+// In einer Lobby übernimmt lobby/lobby-menu.js Titel, Hauptaktion und Schreibschutz (nur der Host stellt ein).
 
 import { iconPath } from "../map/icon.js";
 import { createStepper } from "./stepper.js";
 import { createDifficultySlider } from "./difficulty-slider.js";
-import { difficultyLabel } from "../game/difficulty.js";
 import { ItemPicker } from "./item-picker.js";
 import { createToggle } from "./toggle.js";
 import { createTtlField } from "./ttl-field.js";
-import { GROUPS, LIMITS, cloneConfig, defaultConfig, poolFor, timerRule } from "./config.js";
+import { ModePicker } from "./mode-picker.js";
+import { DEFAULT_LEVEL, DEFAULT_MODE, LEVELS, MODE, applyPreset, metrics, mmss, perMinute, valuesLine } from "./presets.js";
+import { GROUPS, LIMITS, SCOPES, cloneConfig, defaultConfig, enforceBalance, poolFor } from "./config.js";
+
+const ADVANCED_KEY = "wmg.menu.advanced";
+const MAX_TEMPO = 6; // Treffer pro Minute – darüber warnt „Erweitert“
 
 /** Hinweise unter den Reglern im Einzelspiel (die Lobby ersetzt sie, siehe lobby/rules-text.js) */
 export const SOLO_HINTS = {
   lives: "Fehlwürfe bis Rundenende",
   startItems: "im Inventar zu Beginn",
-  refillCount: "pro Nachschub",
+  refillCount: "pro Nachschub (mehr als Treffer)",
   refillEvery: "… richtige Treffer",
-  difficulty: "Reihenfolge, in der die Items kommen",
+  difficulty: "leichte oder schwere Items zuerst",
   timer: "alle … Sekunden Items weg (0 = aus)",
   grace: "ab Rundenbeginn bis zum ersten Takt",
   timerTake: "Items je Takt zurück in den Vorrat",
   noReturn: "Ein aufgenommenes Item muss eingesetzt werden",
+  missLoses: "Das Item geht zurück in den Vorrat (außer im Endspurt)",
 };
 
 const KIND_ICON_W = 44;
@@ -51,12 +59,8 @@ export class Menu {
     this.primaryLabel = (pool) => (pool ? `Runde starten · ${pool} Items` : "Runde starten");
     /** HTML vor der Zusammenfassung (Lobby: Hinweis für Gäste) */
     this.summaryPrefix = () => "";
-    /** Zusammenfassung der Regeln (HTML); im Lobby-Modus ersetzt */
-    this.summaryRules = (c, start) =>
-      `<b>${difficultyLabel(c.difficulty)}</b> (${c.difficulty} %) · <b>${c.lives}</b> Leben · ` +
-      `Start mit <b>${start}</b>${start < c.startItems ? " (alle)" : ""} · ` +
-      `je <b>${c.refillEvery}</b> Treffer → <b>${c.refillCount}</b> neue` +
-      (c.timer ? ` · ${timerRule(c)}` : "") + (c.noReturn ? " · <b>kein Zurücklegen</b>" : "");
+    /** Spieler, für die Start-Items und Leben gerechnet werden; im Lobby-Modus ersetzt */
+    this.players = () => 1;
     /** Hinweis über den Rundeneinstellungen (null = keiner); im Lobby-Modus ersetzt */
     this.roundNote = () => (this.canCancel ? "Es läuft eine Runde. Änderungen gelten ab der nächsten Runde." : null);
     /** Läuft eine Runde? (Kennzeichnung „gilt ab der nächsten Runde“); im Lobby-Modus ersetzt */
@@ -72,9 +76,16 @@ export class Menu {
       .map((g) => ({ kind: g.id, title: g.title, preview: g.preview, features: map.features.filter((f) => f.group === g.id) }))
       .filter((g) => g.features.length);
     this.config = defaultConfig(this.groups.map((g) => g.kind));
+    this.lastMode = DEFAULT_MODE; // für „Stufe wählen“ bei eigenen Einstellungen
 
+    this.modePicker = new ModePicker({
+      onMode: (id) => this._preset(id, this.config.mode === "custom" ? this.config.level ?? DEFAULT_LEVEL : this.config.level),
+      onLevel: (level) => this._preset(this.config.mode === "custom" ? this.lastMode : this.config.mode, level),
+      onScope: (id, on) => this._scope(id, on),
+    }, new Map(this.groups.map((g) => [g.kind, g.features.length])));
     this._buildKinds();
     this._buildRules();
+    this._bindAdvanced();
     this.picker = new ItemPicker(document.getElementById("picker-list"), this.groups, () => this._edited());
     document.getElementById("picker-search").addEventListener("input", (e) => this.picker.filter(e.target.value));
 
@@ -121,6 +132,55 @@ export class Menu {
       el.disabled = readOnly || el.dataset.lockedByLimit === "1";
     });
     if (!readOnly) this._syncControls(); // Stepper-Grenzen (−/+) wieder korrekt setzen
+  }
+
+  /** Voreinstellung (Modus + Stufe) übernehmen */
+  _preset(modeId, level) {
+    applyPreset(this.config, modeId, level);
+    this.lastMode = modeId;
+    this._syncControls();
+    this._edited();
+  }
+
+  /** Einfache Item-Auswahl: alle Gruppen eines Bereichs an/aus */
+  _scope(id, on) {
+    const scope = SCOPES.find((s) => s.id === id);
+    for (const g of scope.groups) {
+      if (!this.groups.some((x) => x.kind === g)) continue;
+      if (on) this.config.kinds.add(g); else this.config.kinds.delete(g);
+    }
+    this._syncControls();
+    this.picker.refresh();
+    this._edited();
+  }
+
+  /** Regelwert unter „Erweitert“ geändert → eigene Einstellungen (Balancing-Regeln bleiben erhalten) */
+  _custom(key, value) {
+    this.config[key] = value;
+    enforceBalance(this.config, key);
+    if (this.config.mode !== "custom") this.lastMode = this.config.mode;
+    this.config.mode = "custom";
+    this._syncControls();
+    this._edited();
+  }
+
+  /** Umschalter „Erweiterte Einstellungen“ (Zustand merkt sich der Browser) */
+  _bindAdvanced() {
+    const card = this.dialog.querySelector(".menu-card");
+    const btn = document.getElementById("menu-advanced");
+    const set = (on) => {
+      card.classList.toggle("advanced", on);
+      btn.setAttribute("aria-expanded", String(on));
+      btn.querySelector("span").textContent = on ? "Weniger Einstellungen" : "Erweiterte Einstellungen";
+    };
+    let on = false;
+    try { on = localStorage.getItem(ADVANCED_KEY) === "1"; } catch { /* ohne Speicher */ }
+    set(on);
+    btn.addEventListener("click", () => {
+      on = !card.classList.contains("advanced");
+      set(on);
+      try { localStorage.setItem(ADVANCED_KEY, on ? "1" : "0"); } catch { /* egal */ }
+    });
   }
 
   /** Hinweise unter den Reglern setzen (z. B. SOLO_HINTS oder Lobby-Hinweise) */
@@ -173,7 +233,7 @@ export class Menu {
     const c = this.config;
     const make = (key, label, extra = {}) => createStepper({
       id: `cfg-${key}`, label, hint: SOLO_HINTS[key], value: c[key], ...LIMITS[key], ...extra,
-      onChange: (v) => { this.config[key] = v; this._edited(); },
+      onChange: (v) => this._custom(key, v),
     });
     this.steppers = {
       lives: make("lives", "Leben"),
@@ -182,14 +242,18 @@ export class Menu {
       refillEvery: make("refillEvery", "Nachschub alle"),
       difficulty: createDifficultySlider({
         value: c.difficulty,
-        onChange: (v) => { this.config.difficulty = v; this._edited(); },
+        onChange: (v) => this._custom("difficulty", v),
       }),
       timer: make("timer", "Timer", { unit: "s" }),
       grace: make("grace", "Schonfrist", { unit: "s" }),
       timerTake: make("timerTake", "Wegnahme"),
       noReturn: createToggle({
         id: "cfg-noReturn", label: "Kein Zurücklegen", hint: SOLO_HINTS.noReturn, value: c.noReturn,
-        onChange: (v) => { this.config.noReturn = v; this._edited(); },
+        onChange: (v) => this._custom("noReturn", v),
+      }),
+      missLoses: createToggle({
+        id: "cfg-missLoses", label: "Fehlwurf kostet das Item", hint: SOLO_HINTS.missLoses, value: c.missLoses,
+        onChange: (v) => this._custom("missLoses", v),
       }),
     };
     const fields = document.getElementById("rule-fields");
@@ -204,7 +268,7 @@ export class Menu {
     sub.textContent = "Zeitdruck";
     const s = this.steppers;
     fields.append(s.difficulty.el, s.lives.el, s.startItems.el, pair(s.refillCount, s.refillEvery),
-      sub, pair(s.timer, s.grace), s.timerTake.el, s.noReturn.el);
+      sub, pair(s.timer, s.grace), s.timerTake.el, s.noReturn.el, s.missLoses.el);
   }
 
   _syncControls() {
@@ -212,14 +276,40 @@ export class Menu {
     for (const [key, s] of Object.entries(this.steppers)) s.value = this.config[key];
     // Schonfrist und Wegnahme wirken nur mit Timer
     for (const key of ["grace", "timerTake"]) this.steppers[key].el.classList.toggle("muted", !this.config.timer);
+    this.modePicker.sync(this.config, this.players());
+  }
+
+  /** Kennzahlen unter „Erweitert“: Mindesttempo, Puffer */
+  _balanceNote() {
+    const c = this.config;
+    const n = this.players();
+    const m = metrics(c, n);
+    const el = document.getElementById("balance-note");
+    const parts = [];
+    let warn = false;
+    if (c.timer) {
+      warn = m.tempo > MAX_TEMPO;
+      parts.push(`Mindesttempo <b>${perMinute(m.tempo)}</b> Treffer/min${n > 1 ? " (ganze Lobby)" : ""}` +
+        `${warn ? " – kaum zu schaffen" : ""} · ohne Treffer leer nach <b>${mmss(m.emptyAfter)}</b>`);
+    }
+    if (!m.bufferOk) {
+      warn = true;
+      parts.push(`Puffer zu klein: Das Inventar kann leer werden, bevor die Leben ausgehen – empfohlen mindestens ` +
+        `<b>${m.bufferNeeded}</b> Start-Items.`);
+    } else if (!c.timer) {
+      parts.push("Das Inventar kann nicht leer werden – es entscheiden die Leben.");
+    }
+    el.innerHTML = parts.join("<br>");
+    el.classList.toggle("warn", warn);
   }
 
   _update() {
     const c = this.config;
     for (const key of ["grace", "timerTake"]) this.steppers[key].el.classList.toggle("muted", !c.timer);
+    this.modePicker.sync(c, this.players());
+    this._balanceNote();
     const pool = this._pool().length;
     const total = this.groups.filter((g) => c.kinds.has(g.kind)).reduce((n, g) => n + g.features.length, 0);
-    const start = Math.min(c.startItems, pool);
     const summary = document.getElementById("menu-summary");
     const button = document.getElementById("menu-start");
     const note = this.roundNote();
@@ -238,6 +328,24 @@ export class Menu {
     summary.className = "";
     const excluded = total - pool;
     summary.innerHTML = this.summaryPrefix() +
-      `<b>${pool}</b> Items${excluded ? ` (${excluded} ausgeschlossen)` : ""} · ` + this.summaryRules(c, start);
+      `<b>${pool}</b> Items${excluded ? ` (${excluded} ausgeschlossen)` : ""} · ${modeText(c)} · ` +
+      escapeHtml(valuesLine(c, this.players())) + flagText(c);
   }
+}
+
+/** „Tempo · Normal“ bzw. „Eigene Einstellungen“ */
+function modeText(c) {
+  return c.mode === "custom" || !MODE[c.mode] ? "<b>Eigene Einstellungen</b>" : `<b>${MODE[c.mode].title}</b> ${LEVELS[c.level]}`;
+}
+
+/** Regeln, die man der Kurzzeile nicht ansieht */
+function flagText(c) {
+  const f = [];
+  if (c.noReturn) f.push("kein Zurücklegen");
+  if (c.missLoses) f.push("Fehlwurf kostet das Item");
+  return f.length ? ` · ${f.join(" · ")}` : "";
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
 }

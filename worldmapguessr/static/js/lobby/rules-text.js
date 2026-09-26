@@ -1,7 +1,6 @@
 // Texte, die erklären, was die Rundeneinstellungen in einer Lobby bewirken.
 
-import { difficultyLabel } from "../game/difficulty.js";
-import { timerRule } from "../menu/config.js";
+import { scaled } from "../menu/presets.js";
 
 /**
  * Wie viele Items bekommt jeder, wenn `total` reihum an `players` Spieler geht?
@@ -17,31 +16,25 @@ export function splitText(total, players) {
 
 /** Hinweise unter den Reglern im Lobby-Modus */
 export function ruleHints(config, players) {
+  const s = scaled(config, players);
   return {
-    lives: "gemeinsam – jeder Fehlwurf kostet allen eins",
+    lives: players > 1
+      ? `für einen Spieler, +2 je weiterem – jetzt ${s.lives}, gemeinsam`
+      : "für einen Spieler, +2 je weiterem – gemeinsam",
     startItems: players > 1
-      ? `für alle zusammen, reihum (jetzt ${splitText(config.startItems, players)})`
-      : "für alle zusammen, reihum verteilt",
+      ? `für einen Spieler, +2 je weiterem – jetzt ${s.startItems}, reihum (${splitText(s.startItems, players)})`
+      : "für einen Spieler, +2 je weiterem – reihum verteilt",
     refillCount: "insgesamt, reihum weiterverteilt",
     refillEvery: "… Treffer der ganzen Lobby",
     difficulty: "Reihenfolge, in der der Server austeilt",
     timer: "gemeinsamer Takt ab Rundenbeginn (0 = aus)",
     grace: "ab Rundenbeginn bis zum ersten Takt",
     timerTake: players > 1
-      ? "insgesamt, reihum aus den Inventaren – je das älteste"
+      ? "für die ganze Lobby, reihum aus den Inventaren – je das älteste"
       : "Items je Takt zurück in den Vorrat – das älteste zuerst",
     noReturn: "Aufgenommenes muss eingesetzt (oder gesendet) werden",
+    missLoses: "Das Item geht zurück in den Vorrat (außer im Endspurt)",
   };
-}
-
-/** Regel-Zusammenfassung im Fuß des Menüs (HTML) */
-export function ruleSummary(config, start, players) {
-  const split = players > 1 ? ` reihum (${splitText(start, players)})` : "";
-  return `<b>${difficultyLabel(config.difficulty ?? 50)}</b> (${config.difficulty ?? 50} %) · ` +
-    `<b>${config.lives}</b> gemeinsame Leben · Start: <b>${start}</b>${split} · ` +
-    `alle <b>${config.refillEvery}</b> Treffer der Lobby → <b>${config.refillCount}</b> neue` +
-    (config.timer ? ` · ${timerRule(config, { shared: players > 1 })}` : "") +
-    (config.noReturn ? " · <b>kein Zurücklegen</b>" : "");
 }
 
 /** Regeltext zum Senden (Menü „So läuft eine Lobby-Runde“) */

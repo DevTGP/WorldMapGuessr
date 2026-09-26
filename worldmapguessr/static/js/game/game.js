@@ -177,6 +177,12 @@ export class Game {
       this.map.setPlaced(piece.id, true);
       this.inventory.setState(piece.id, "placed");
       this._endHolding();
+    } else if (this.remote.missLoses) {
+      // Fehlwurf kostet das Item: es verschwindet (Server legt es zurück in den Vorrat)
+      this.inventory.setState(piece.id, "flying");
+      this._endHolding();
+      await this.held.vanish();
+      this.inventory.remove(piece.id);
     } else {
       await this._flyBack(piece);
     }
@@ -220,19 +226,22 @@ export class Game {
     this._rearm = setTimeout(() => this.map.setDblClickZoom(true), DBLCLICK_REARM_MS);
   }
 
-  _finish(won) {
+  /** @param {boolean} won  @param {"lives"|"empty"|null} [reason]  warum verloren */
+  _finish(won, reason = "lives") {
     this.over = true;
     this.timerMeter.hide();
     this.cancelHeld();
     const lives = `${this.lives.value} von ${this.lives.max}`;
     let title, text;
+    const empty = !won && reason === "empty";
     if (this.remote.solo) {
-      title = won ? "Runde geschafft" : "Keine Leben mehr";
+      title = won ? "Runde geschafft" : empty ? "Inventar leer" : "Keine Leben mehr";
       text = won
         ? `Alle ${this.total} Items sitzen – mit ${lives} Leben übrig.`
-        : `${this.correct} von ${this.total} Items richtig eingesetzt.`;
+        : `${empty ? "Keine Items mehr im Inventar, obwohl der Vorrat noch welche hatte. " : ""}` +
+          `${this.correct} von ${this.total} Items richtig eingesetzt.`;
     } else {
-      title = won ? "Gemeinsam geschafft" : "Keine Leben mehr";
+      title = won ? "Gemeinsam geschafft" : empty ? "Alle Inventare leer" : "Keine Leben mehr";
       text = won
         ? `Die Lobby hat alle ${this.total} Items eingesetzt – mit ${lives} gemeinsamen Leben übrig.`
         : `Die Lobby hat ${this.correct} von ${this.total} Items eingesetzt.`;

@@ -22,6 +22,7 @@ export class TimerMeter {
     this.every = t.every;
     this.take = t.take;
     this.paused = !!t.paused;
+    this.endspurt = !!t.endspurt;
     this.frozenAt = undefined;
     this.el.hidden = false;
     if (!this.id) this.id = setInterval(() => this._render(), FRAME_MS);
@@ -35,6 +36,14 @@ export class TimerMeter {
   }
 
   _render() {
+    if (this.endspurt) {
+      this.text.innerHTML = '<b>Endspurt</b><span class="long"> · keine Wegnahme mehr</span>';
+      this.ring.style.strokeDashoffset = "0";
+      this.el.classList.add("grace");
+      this.el.classList.remove("urgent");
+      this.el.setAttribute("aria-label", "Endspurt: Der Timer nimmt keine Items mehr weg");
+      return;
+    }
     if (this.paused) {
       // angehalten (Einzelspiel mit offenem Menü): Werte einfrieren
       const shift = performance.now() - (this.frozenAt ??= performance.now());

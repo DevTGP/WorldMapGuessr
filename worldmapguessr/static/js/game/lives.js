@@ -12,9 +12,10 @@ export class Lives {
     this.reset(max);
   }
 
-  reset(max = this.max) {
+  /** Neu aufbauen (ohne Animation); value: aktueller Stand (Standard: voll) */
+  reset(max = this.max, value = max) {
     this.max = max;
-    this.value = max;
+    this.value = Math.max(0, Math.min(max, value));
     this.compact = max > MAX_HEARTS;
     const n = this.compact ? 1 : max;
     this.container.classList.toggle("compact", this.compact);

@@ -10,6 +10,7 @@ import { Game } from "./game/game.js";
 import { RemoteRound } from "./game/remote.js";
 import { Menu } from "./menu/menu.js";
 import { toWire } from "./menu/config.js";
+import { MODE } from "./menu/presets.js";
 import { LobbyClient } from "./lobby/client.js";
 import { LobbyMenu } from "./lobby/lobby-menu.js";
 import { PlayersRail } from "./lobby/players-rail.js";
@@ -112,7 +113,10 @@ async function newLobby(body) {
 async function startSolo(config, ctx) {
   let lobby;
   try {
-    lobby = await newLobby({ name: identity.name || "Spieler", config: toWire(config), solo: true, ttl: ctx.menu.ttl.value });
+    lobby = await newLobby({
+      name: identity.name || "Spieler", config: toWire(config), solo: true, ttl: ctx.menu.ttl.value,
+      sendEvery: MODE[config.mode]?.sendEvery,
+    });
   } catch (err) {
     return alert(`Die Runde konnte nicht gestartet werden (${err.message}).`);
   }
@@ -133,7 +137,7 @@ async function createLobby(config, ttl) {
   if (!who) return;
   let lobby;
   try {
-    lobby = await newLobby({ name: who.name, config: toWire(config), ttl });
+    lobby = await newLobby({ name: who.name, config: toWire(config), ttl, sendEvery: MODE[config.mode]?.sendEvery });
   } catch {
     return alert("Die Lobby konnte nicht erstellt werden.");
   }

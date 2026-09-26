@@ -132,7 +132,7 @@
             <button type="button" class="btn" id="lobby-leave">Lobby verlassen</button>
             <button type="button" class="btn btn-danger" id="lobby-close" hidden>Lobby beenden</button>
           </div>
-          <div class="fields" id="lobby-fields">
+          <div class="fields adv-only" id="lobby-fields">
             <div class="field password host-only">
               <label for="lobby-password">Passwort<small id="lobby-privacy"></small></label>
               <div class="password-row">
@@ -147,7 +147,7 @@
             </label>
           </div>
         </section>
-        <div class="field keep-field" id="keep-field">
+        <div class="field keep-field adv-only" id="keep-field">
           <label for="keep-ttl">Aufbewahren<small>Ohne Aktivität bleibt die Runde so lange erhalten – auch im Einzelspiel. Danach wird sie gelöscht.</small></label>
           <select id="keep-ttl"></select>
         </div>
@@ -162,26 +162,41 @@
             <ul>
               <li><b>Jedes Item gibt es nur einmal.</b> Was in deinem Inventar liegt, hat kein anderer.</li>
               <li><b>Eingesetzte Items</b> erscheinen sofort bei allen auf der Karte.</li>
-              <li><b>Leben sind gemeinsam:</b> jeder Fehlwurf kostet allen ein Leben. Bei 0 endet die Runde für alle.</li>
-              <li><b>Verteilen reihum:</b> Start-Items und neue Items sind Gesamtzahlen für die Lobby und werden reihum an alle verteilt. Die Treffer aller Spieler zählen für den Nachschub.</li>
+              <li><b>Leben sind gemeinsam:</b> jeder Fehlwurf kostet allen ein Leben. Bei 0 endet die Runde für alle – ebenso, wenn alle Inventare leer sind, solange der Vorrat noch Items hat.</li>
+              <li><b>Mehr Spieler:</b> Start-Items und Leben sind Werte für einen Spieler; je weiterem Spieler kommen 2 dazu. Die Start-Items werden reihum verteilt, die Treffer aller zählen für den Nachschub.</li>
               <li id="mp-rule-send"><b>Items senden:</b> Item aufnehmen und links einen Mitspieler anklicken.</li>
-              <li><b>Timer (falls an):</b> Nach der Schonfrist gehen in festem Takt Items zurück in den Vorrat – reihum, bei jedem das älteste. Wer keins hat, wird übersprungen.</li>
+              <li><b>Timer (Tempo, Hardcore):</b> Nach der Schonfrist gehen in festem Takt Items zurück in den Vorrat – insgesamt für die Lobby, reihum, bei jedem das älteste.</li>
+              <li><b>Endspurt:</b> Ist der Vorrat leer, nimmt der Timer nichts mehr weg und Fehlwürfe behalten das Item.</li>
               <li><b>Meldungen und Chat</b> stehen unten rechts.</li>
-              <li><b>Später dazugekommen?</b> Du reihst dich ein und bekommst beim nächsten Verteilen Items.</li>
+              <li><b>Später dazugekommen?</b> Du bekommst sofort 2 Items, die Lobby 2 Leben mehr, und du reihst dich ins Verteilen ein.</li>
             </ul>
           </details>
         </div>
-        <section class="menu-section game-settings" aria-labelledby="sec-kinds">
-          <h4 id="sec-kinds">Item-Arten</h4>
-          <div class="kind-cards" id="kind-cards"></div>
+        <section class="menu-section game-settings mode-section" aria-labelledby="sec-mode">
+          <h4 id="sec-mode">Modus <span class="custom-badge" id="custom-badge" hidden>Eigene Einstellungen</span></h4>
+          <div class="mode-cards" id="mode-cards" role="radiogroup" aria-labelledby="sec-mode"></div>
+          <h4 id="sec-level">Schwierigkeit</h4>
+          <div class="level-bar" id="level-bar" role="radiogroup" aria-labelledby="sec-level"></div>
+          <p class="preset-values" id="preset-values"></p>
+          <h4 id="sec-scope">Items</h4>
+          <div class="scope-toggles" id="scope-toggles"></div>
         </section>
-        <section class="menu-section game-settings" aria-labelledby="sec-rules">
+        <button type="button" class="adv-toggle" id="menu-advanced" aria-expanded="false" aria-controls="menu-form">
+          <span>Erweiterte Einstellungen</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <section class="menu-section game-settings adv-only" aria-labelledby="sec-rules">
           <h4 id="sec-rules">Regeln</h4>
           <div class="fields" id="rule-fields"></div>
+          <p class="balance-note" id="balance-note"></p>
+        </section>
+        <section class="menu-section game-settings adv-only" aria-labelledby="sec-kinds">
+          <h4 id="sec-kinds">Item-Gruppen</h4>
+          <div class="kind-cards" id="kind-cards"></div>
         </section>
       </div>
 
-      <section class="menu-section menu-col picker game-settings" aria-labelledby="sec-picker">
+      <section class="menu-section menu-col picker game-settings adv-only" aria-labelledby="sec-picker">
         <div class="picker-head">
           <h4 id="sec-picker">Einzelne Items</h4>
           <input type="search" id="picker-search" placeholder="Item suchen" autocomplete="off" aria-label="Item suchen" data-always="1">

@@ -156,8 +156,9 @@ def round_of(conn):
 def two_players(store, **config):
     hub = LobbyHub(store, clock=Clock())
     # Gesamtzahlen, reihum verteilt: 6 Startteile → je 3, 4 neue → je 2
-    lobby, host = store.create(player_name="Host", config={"startItems": 6, "refillEvery": 2,
-                                                          "refillCount": 4, "lives": 2, **config})
+    # Grundwerte für 1 Spieler: bei 2 Spielern 4 + 2 = 6 Start-Items (je 3) und 1 + 2 = 3 Leben
+    lobby, host = store.create(player_name="Host", config={"startItems": 4, "refillEvery": 2,
+                                                          "refillCount": 4, "lives": 1, **config})
     code = lobby["code"]
     h = connect(hub, code, playerId=host["id"], token=host["token"])
     g = connect(hub, code, name="Gast")
@@ -186,23 +187,27 @@ def test_round_items_exclusive_and_placements_synced(store):
 
 def test_shared_lives_end_round_for_everyone(store):
     hub, code, h, g = two_players(store)
+    assert round_of(g)["lives"] == 3                                               # 1 + 2 für den 2. Spieler
+    hub.handle(code, h, {"type": "place", "key": hand_of(h)[0], "correct": False})
     hub.handle(code, h, {"type": "place", "key": hand_of(h)[0], "correct": False})
     assert round_of(g)["lives"] == 1
     hub.handle(code, g, {"type": "place", "key": hand_of(g)[0], "correct": "yes"})  # nur True zählt
-    assert round_of(h)["status"] == "lost" and round_of(h)["lives"] == 0
+    assert round_of(h)["status"] == "lost" and round_of(h)["lives"] == 0 and round_of(h)["lostReason"] == "lives"
 
 
-def test_late_joiner_waits_for_next_deal_and_leaver_returns_them(store):
+def test_late_joiner_gets_two_items_and_lives_and_leaver_returns_them(store):
     hub, code, h, g = two_players(store)
     late = connect(hub, code, name="Spät")
-    assert hand_of(late) == [] and round_of(h)["handCounts"][late.player_id] == 0
+    r = round_of(h)
+    assert len(hand_of(late)) == 2 and r["handCounts"][late.player_id] == 2 and r["lives"] == r["livesMax"] == 5
+    assert r["last"]["type"] == "join" and r["last"]["player"] == late.player_id
     hub.handle(code, h, {"type": "place", "key": hand_of(h)[0], "correct": True})
     hub.handle(code, g, {"type": "place", "key": hand_of(g)[0], "correct": True})
     late_hand = hand_of(late)
-    assert len(late_hand) == 1                          # Nachschub H, G, Spät, H
+    assert len(late_hand) == 3                          # Nachschub H, G, Spät, H
     hub.handle(code, late, {"type": "leave"})
     r = round_of(h)
-    assert late.player_id is None and r["poolCount"] == 23 - 6 - 4 + len(late_hand) and late.ws.sent[-1]["type"] == "left"
+    assert late.player_id is None and r["poolCount"] == 23 - 6 - 2 - 4 + len(late_hand) and late.ws.sent[-1]["type"] == "left"
 
 
 def test_disconnected_player_keeps_hand_until_leaving(store):
@@ -453,3 +458,12 @@ def test_pause_is_ignored_in_multiplayer_lobbies(store):
     hub, code, h, g = two_players(store, timer=30)
     hub.handle(code, h, {"type": "pause", "paused": True})
     assert round_of(h)["timer"]["paused"] is False
+
+
+def test_config_keeps_refill_positive_and_start_reachable():
+    from worldmapguessr.lobbies.settings import clean_config
+    c = clean_config({"refillCount": 3, "refillEvery": 5, "startItems": 1, "mode": "hardcore", "level": 9,
+                      "missLoses": True})
+    assert c["refillEvery"] == 2 and c["startItems"] == 2          # C > E, S ≥ E
+    assert c["mode"] == "hardcore" and c["level"] == 4 and c["missLoses"] is True
+    assert clean_config({"mode": "egal"})["mode"] == "casual"

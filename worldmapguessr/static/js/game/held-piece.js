@@ -110,6 +110,20 @@ export class HeldPiece {
     return this._flyTo(`translate(${tx},${ty}) scale(${s})`, ms);
   }
 
+  /** Fehlwurf mit Verlust: Teil verblasst an Ort und Stelle (es geht zurück in den Vorrat) */
+  vanish(ms = 420) {
+    const g = this.g;
+    if (!g) return Promise.resolve();
+    this._flying = true;
+    this.ringEl.attr("hidden", true);
+    g.classed("lost", true);
+    return g.transition().duration(dur(ms)).ease(d3.easeCubicIn)
+      .style("opacity", 0)
+      .end()
+      .catch(() => {})
+      .then(() => { if (this.g === g) this.cancel(); });
+  }
+
   cancel() {
     if (this.g) this.g.interrupt().remove();
     this.g = null;

@@ -58,6 +58,12 @@ export class RemoteRound {
   /** Einzelspiel (Solo-Lobby)? */
   get solo() { return !!this.client.state?.settings?.solo; }
 
+  /** Kostet ein Fehlwurf gerade das Item? (Modus-Regel, nicht im Endspurt) */
+  get missLoses() {
+    const r = this.client.state?.round;
+    return !!r?.config?.missLoses && !r.endspurt;
+  }
+
   apply(lobby, hand) {
     const solo = !!lobby.settings.solo;
     this.game.feed.setChat(solo ? null : (text) => this.client.chat(text));
@@ -109,6 +115,7 @@ export class RemoteRound {
     const added = hand.filter((key) => !g.inventory.pieces.has(key)).map((key) => g.pieceFor(key)).filter(Boolean);
     if (added.length) g.addPieces(added);
 
+    if (g.lives.max !== round.livesMax) g.lives.reset(round.livesMax, round.lives); // Nachzügler: mehr Leben
     g.lives.set(round.lives);
     g.setProgress(round.placed.length, round.total);
     g.setRefill(round.sinceRefill ?? 0, round.poolCount);
@@ -119,7 +126,7 @@ export class RemoteRound {
 
     if (round.status !== "running" && !this.finished) {
       this.finished = true;
-      g._finish(round.status === "won");
+      g._finish(round.status === "won", round.lostReason);
     }
   }
 
@@ -165,6 +172,7 @@ export class RemoteRound {
   _message(lobby, round, ev) {
     const me = this.client.me?.id;
     const g = this.game;
+    const items = (n) => `${n} ${n === 1 ? "Item" : "Items"}`;
     const item = (key) => ({ item: g.pieceFor(key)?.name ?? "ein Item" });
     const who = (id, du = "Du") => (id === me ? { who: du, id } : { who: this._name(lobby, id), id });
     switch (ev.type) {
@@ -176,8 +184,19 @@ export class RemoteRound {
         return {
           kind: "bad",
           parts: [...(ev.player === me ? ["Daneben – "] : [who(ev.player), " lag daneben – "]), item(ev.key),
-            round.lives > 0 ? ` · noch ${round.lives} Leben` : ""],
+            ev.lost ? " geht zurück in den Vorrat" : "", round.lives > 0 ? ` · noch ${round.lives} Leben` : ""],
         };
+      case "join":
+        return ev.player === me
+          ? { kind: "refill", parts: ["Du bist dazugekommen: ", { b: items(ev.count) }, ` · Lobby +${ev.lives} Leben`] }
+          : { kind: "refill", parts: [who(ev.player), " ist dazugekommen: ", { b: `+${ev.lives} Leben` }, ` · ${items(ev.count)} für `, who(ev.player)] };
+      case "endspurt": {
+        const c = round.config ?? {};
+        const rules = [c.timer ? "keine Wegnahme mehr" : "", c.missLoses ? "Fehlwürfe behalten das Item" : ""].filter(Boolean);
+        return { kind: "info", parts: [{ b: "Endspurt" }, ": Der Vorrat ist leer", rules.length ? ` – ${rules.join(", ")}` : ""] };
+      }
+      case "empty":
+        return { kind: "bad", parts: [{ b: "Inventar leer" }, " – die Runde ist verloren"] };
       case "gift":
         if (ev.to === me) return { kind: "gift", parts: [who(ev.player), " hat dir ", item(ev.key), " geschickt"] };
         if (ev.player === me) return { kind: "gift", parts: ["Du hast ", item(ev.key), " an ", who(ev.to), " gesendet"] };

@@ -2,7 +2,16 @@
 // (worldmapguessr/difficulty.py): je Item Wert = (1 − z) · Schwierigkeit/10 + z · Zufall mit
 // z = min(Regler, 1 − Regler); bis 50 % kleinster Wert zuerst, darüber größter.
 
-/** Stufe zum Reglerwert */
+/** Kurzform der Reihenfolge zum Reglerwert (Regler „Reihenfolge“ unter „Erweitert“) */
+export function orderLabel(level) {
+  if (level <= 15) return "Leicht zuerst";
+  if (level <= 45) return "Eher leicht zuerst";
+  if (level <= 55) return "Gemischt";
+  if (level <= 85) return "Eher schwer zuerst";
+  return "Schwer zuerst";
+}
+
+/** Stufe zum Reglerwert (Farbe des Reglers) */
 export function difficultyLabel(level) {
   if (level <= 15) return "Sehr einfach";
   if (level <= 35) return "Einfach";

@@ -80,7 +80,7 @@ class LobbyStore:
 
     # ---------- Anlegen / Beitreten ----------
     def create(self, *, player_name, config=None, max_players=None, password="", solo=False,
-               ttl=None) -> tuple[dict, dict]:
+               ttl=None, send_every=None) -> tuple[dict, dict]:
         """Neue Lobby; der Ersteller wird Host. solo: Einzelspiel (niemand kann beitreten).
         Gibt (lobby, player_with_token) zurück."""
         with self.lock:
@@ -97,7 +97,7 @@ class LobbyStore:
                     "maxPlayers": clean_max_players(max_players),
                     "passwordHash": generate_password_hash(password) if password else "",
                     "allowSend": DEFAULT_ALLOW_SEND,
-                    "sendEvery": DEFAULT_SEND_EVERY,
+                    "sendEvery": clean_send_every(send_every) if send_every is not None else DEFAULT_SEND_EVERY,
                     "solo": bool(solo),
                     "ttl": clean_ttl(ttl),
                 },
