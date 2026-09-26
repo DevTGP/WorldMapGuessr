@@ -6,6 +6,12 @@ import { GROUP_LABELS } from "./config.js";
 
 const ICON_W = 34;
 const ICON_H = 24;
+const ICON_PAD = 1.5;
+
+/** Icon einer Zeile vorab berechnen (Ladebildschirm), damit das Menü danach schnell steht */
+export function prepareRowIcon(feature) {
+  iconPath(feature, ICON_W, ICON_H, ICON_PAD);
+}
 const collator = new Intl.Collator("de");
 
 export class ItemPicker {
@@ -45,7 +51,7 @@ export class ItemPicker {
         li.innerHTML = `
           <label>
             <input type="checkbox">
-            <svg viewBox="0 0 ${ICON_W} ${ICON_H}" aria-hidden="true"><path d="${iconPath(f, ICON_W, ICON_H, 1.5)}"/></svg>
+            <svg viewBox="0 0 ${ICON_W} ${ICON_H}" aria-hidden="true"><path d="${iconPath(f, ICON_W, ICON_H, ICON_PAD)}"/></svg>
             <span class="name"></span>
             <span class="code"></span>
           </label>`;

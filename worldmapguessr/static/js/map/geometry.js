@@ -33,22 +33,39 @@ export function featureGeometry(feature) {
  * @returns {{geometry: object, center: number[]|null, radius: number}[]}
  */
 export function splitParts(geometry) {
+  return [...partsOf(geometry)];
+}
+
+/** Wie splitParts, aber Teil für Teil (der Ladebildschirm kann zwischendurch Fortschritt zeigen) */
+export function* partsOf(geometry) {
   const { type, coordinates } = geometry;
   const items = type === "MultiPolygon" ? coordinates.map((c) => ({ type: "Polygon", coordinates: c }))
     : type === "MultiLineString" ? coordinates.map((c) => ({ type: "LineString", coordinates: c }))
     : [geometry];
-  return items.map((g) => {
-    const pts = g.type === "Polygon" ? g.coordinates[0] : g.coordinates;
-    const center = d3.geoCentroid(g);
-    const [[lon0], [lon1]] = d3.geoBounds(g); // lon0 > lon1: Teil liegt über ±180°
-    if (!Number.isFinite(center[0]) || !Number.isFinite(center[1])) {
-      return { geometry: g, center: null, radius: Math.PI, lon0: -180, lon1: 180 };
-    }
-    let radius = 0;
-    for (const p of pts) radius = Math.max(radius, d3.geoDistance(center, p));
-    // Polygone um einen Pol (Antarktika) oder riesige Teile: immer zeichnen
-    return { geometry: g, center: radius > 1.5 ? null : center, radius, lon0, lon1 };
-  });
+  for (const g of items) yield describePart(g);
+}
+
+/** Anzahl der Punkte (Maß für den Rechenaufwand beim Zerlegen) */
+export function pointCount(geometry) {
+  const { type, coordinates } = geometry;
+  if (type === "Polygon") return coordinates.reduce((n, r) => n + r.length, 0);
+  if (type === "MultiPolygon") return coordinates.reduce((n, p) => n + p.reduce((m, r) => m + r.length, 0), 0);
+  if (type === "LineString") return coordinates.length;
+  if (type === "MultiLineString") return coordinates.reduce((n, l) => n + l.length, 0);
+  return 1;
+}
+
+function describePart(g) {
+  const pts = g.type === "Polygon" ? g.coordinates[0] : g.coordinates;
+  const center = d3.geoCentroid(g);
+  const [[lon0], [lon1]] = d3.geoBounds(g); // lon0 > lon1: Teil liegt über ±180°
+  if (!Number.isFinite(center[0]) || !Number.isFinite(center[1])) {
+    return { geometry: g, center: null, radius: Math.PI, lon0: -180, lon1: 180, points: pointCount(g) };
+  }
+  let radius = 0;
+  for (const p of pts) radius = Math.max(radius, d3.geoDistance(center, p));
+  // Polygone um einen Pol (Antarktika) oder riesige Teile: immer zeichnen
+  return { geometry: g, center: radius > 1.5 ? null : center, radius, lon0, lon1, points: pointCount(g) };
 }
 
 /**

@@ -11,19 +11,48 @@ import { LobbyMenu } from "./lobby/lobby-menu.js";
 import { PlayersRail } from "./lobby/players-rail.js";
 import { identity } from "./lobby/identity.js";
 import { askPlayer, showLobbyGone } from "./lobby/join-dialog.js";
+import { prepareRowIcon } from "./menu/item-picker.js";
+import { LoadingScreen, yielder } from "./ui/loading-screen.js";
 
 const WMG = window.WMG ?? {};
-const loading = document.getElementById("loading");
 
-createMap({ canvas: document.getElementById("map"), dataUrl: WMG.dataUrl ?? "data/world.topo.json" })
+// Ladephasen mit Gewicht ≈ typischem Zeitanteil (Download hängt von der Leitung ab)
+const loading = new LoadingScreen(document.getElementById("loading"), [
+  { id: "download", label: "Kartendaten herunterladen", weight: 30 },
+  { id: "parse", label: "Kartendaten lesen", weight: 4 },
+  { id: "simplify", label: "Detailstufen berechnen", weight: 14 },
+  { id: "shapes", label: "Umrisse vorbereiten", weight: 30 },
+  { id: "icons", label: "Items vorbereiten", weight: 17 },
+  { id: "start", label: "Karte zeichnen", weight: 5 },
+]);
+
+/** Icons für das Menü vorab berechnen – mit Fortschritt statt einer langen Pause beim Menüaufbau */
+async function prepareIcons(features) {
+  const tick = yielder();
+  loading.enter("icons", `0 / ${features.length} Items`);
+  for (let i = 0; i < features.length; i++) {
+    prepareRowIcon(features[i]);
+    if (await tick()) loading.report((i + 1) / features.length, `${i + 1} / ${features.length} Items`);
+  }
+}
+
+createMap({
+  canvas: document.getElementById("map"),
+  dataUrl: WMG.dataUrl ?? "data/world.topo.json",
+  dataSize: WMG.dataSize,
+  loading,
+})
   .then(async (map) => {
+    await prepareIcons(map.features);
+    loading.enter("start");
+    await yielder()(true);
     bindMapControls(map);
     const game = new Game(map, { apiBase: WMG.apiBase });
     const menu = new Menu(map, (config) => game.newRound(config), {
       onCreateLobby: WMG.lobbyCode ? null : (config) => createLobby(config),
     });
     Object.assign(WMG, { game, map, menu }); // Debug-Zugriff über die Konsole
-    loading.hidden = true;
+    loading.done(); // blendet aus, während das Menü schon aufgeht
 
     const roundDialog = document.getElementById("round-dialog");
     document.getElementById("new-round").addEventListener("click", () => menu.open({ canCancel: game.running }));
@@ -42,8 +71,7 @@ createMap({ canvas: document.getElementById("map"), dataUrl: WMG.dataUrl ?? "dat
     else menu.open();
   })
   .catch((err) => {
-    loading.hidden = false;
-    loading.textContent = `Die Kartendaten konnten nicht geladen werden (${err.message}). Bitte Seite neu laden.`;
+    loading.fail(`${err.message} – bitte Verbindung prüfen und neu laden.`);
     console.error(err);
   });
 

@@ -17,10 +17,16 @@ const DOT_R = 1.4;
  * @param {object} feature  mit feature.geom.centerLon (und feature.parts, siehe geometry.js)
  */
 export function iconPath(feature, w, h, pad = 3) {
-  const projection = d3.geoNaturalEarth1()
-    .rotate([-feature.geom.centerLon, 0])
-    .fitExtent([[pad, pad], [w - pad, h - pad]], feature);
-  return (lodPath(projection, LOD_ICON_PX2)(feature) ?? "") + scatteredDots(feature, projection);
+  // je Feature und Größe nur einmal berechnen (Menü, Inventar, Lobby nutzen dieselben Icons)
+  const cache = (feature._icons ??= new Map());
+  const key = `${w}x${h}x${pad}`;
+  if (!cache.has(key)) {
+    const projection = d3.geoNaturalEarth1()
+      .rotate([-feature.geom.centerLon, 0])
+      .fitExtent([[pad, pad], [w - pad, h - pad]], feature);
+    cache.set(key, (lodPath(projection, LOD_ICON_PX2)(feature) ?? "") + scatteredDots(feature, projection));
+  }
+  return cache.get(key);
 }
 
 function scatteredDots(feature, projection) {

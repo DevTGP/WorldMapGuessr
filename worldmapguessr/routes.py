@@ -1,16 +1,25 @@
 """Seiten-Routen."""
-from flask import Blueprint, abort, redirect, render_template, url_for
-
+import os
 import re
+
+from flask import Blueprint, abort, current_app, redirect, render_template, url_for
 
 from .lobbies.codes import PATTERN, normalize
 
 bp = Blueprint("main", __name__)
 
 
+def _data_size() -> int:
+    """Unkomprimierte Größe der Kartendaten – für einen genauen Download-Fortschritt im Browser."""
+    try:
+        return os.path.getsize(os.path.join(current_app.static_folder, "data", "world.topo.json"))
+    except OSError:
+        return 0
+
+
 @bp.get("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", data_size=_data_size())
 
 
 @bp.get("/stats")
@@ -24,7 +33,7 @@ def lobby(code):
     """Lobby-Link, so kurz wie möglich: /K7Q2M (klein geschrieben → Weiterleitung)"""
     if code != code.upper():
         return redirect(url_for("main.lobby", code=code.upper()))
-    return render_template("index.html", lobby_code=code)
+    return render_template("index.html", lobby_code=code, data_size=_data_size())
 
 
 @bp.get("/l/<code>")

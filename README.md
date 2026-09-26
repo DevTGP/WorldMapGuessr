@@ -8,6 +8,7 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
 
 - Die Karte lässt sich wie ein Globus um die Längsachse drehen: seitlich ziehen oder die Pfeile oben (bzw. `←`/`→`), die in 45°-Schritten (π/4) auf 0°, 45°, 90° … weiterdrehen. Was in der Mitte liegt, ist am wenigsten verzerrt.
 - Bei 100 % ist die Y-Achse fest (Ziehen dreht nur). Erst nach dem Hineinzoomen lässt sich die Karte auch senkrecht verschieben.
+- Beim Start zeigt ein Ladebildschirm den Fortschritt: Kartendaten herunterladen (in MB, der Server gibt die unkomprimierte Dateigröße mit), lesen, Detailstufen berechnen, Umrisse vorbereiten, Items (Icons) vorbereiten, Karte zeichnen. Der Balken läuft nie rückwärts; ein Schimmer zeigt auch während längerer Rechenschritte, dass noch etwas passiert. Schlägt das Laden fehl, gibt es eine Meldung mit „Neu laden“.
 - Vor jeder Runde öffnet sich das Menü (auch über „Neue Runde“ oben rechts und nach Rundenende über „Einstellungen“):
   - **Item-Arten:** sieben Karten zum An-/Abwählen – 7 Kontinente, 45 Staaten Europas (klassisches Europa inkl. Russland und Kosovo, ohne Türkei, Zypern und Kaukasus), 23 Staaten Nordamerikas (USA, Kanada, Mexiko, 7 Staaten Mittelamerikas, 13 Karibikstaaten; ohne abhängige Gebiete wie Grönland oder Puerto Rico), 12 Staaten Südamerikas (ohne Französisch-Guayana und Falklandinseln), 54 Staaten Afrikas (ohne Westsahara, Réunion, Mayotte, St. Helena), 49 Staaten Asiens (46 unabhängige Staaten inkl. Türkei, Kaukasus und Kasachstan, dazu Zypern, Taiwan und Palästina; Russland zählt als Ganzes zu Europa), 14 Staaten Ozeaniens (ohne abhängige Gebiete wie Neukaledonien, Französisch-Polynesien, Cookinseln, Niue, Guam).
   - **Einzelne Items:** ausschließen (Suche, „Alle“/„Keine“ je Gruppe).
@@ -155,6 +156,7 @@ worldmapguessr/
   static/css/menu.css         Menü
   static/css/lobby.css        Lobby (HUD, Menü-Bereich, Beitritt)
   static/js/main.js           Einstiegspunkt (ES-Module)
+  static/js/ui/loading-screen.js  Ladebildschirm: Phasen mit Gewicht, Fortschritt, Fehlerzustand
   static/js/map/map.js        Daten laden, Projektion, Ansicht (Drehung, Zoom, vertikal verschieben)
   static/js/map/renderer.js   Canvas-Zeichnung (Kontinente, eingesetzte Teile, Kleinststaat-Ringe)
   static/js/map/geometry.js   Anker, Fläche, Zerlegung in Teile (Sichtbarkeit, Datumsgrenze)

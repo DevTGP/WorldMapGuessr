@@ -4,7 +4,8 @@
 import { Renderer } from "./renderer.js";
 import { Gestures } from "./gestures.js";
 import { lodPath, LOD_PIECE_PX2 } from "./lod.js";
-import { featureGeometry, splitParts } from "./geometry.js";
+import { yielder } from "../ui/loading-screen.js";
+import { featureGeometry, partsOf, pointCount } from "./geometry.js";
 
 export const MIN_ZOOM = 1;
 export const MAX_ZOOM = 40; // Europa liegt in 1:10m vor; für Kleinststaaten weit hineinzoomen
@@ -18,26 +19,88 @@ const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
  * Lädt die Kartendaten und liefert die fertige Karte.
+ * @param {{canvas: HTMLCanvasElement, dataUrl: string, dataSize?: number,
+ *          loading?: import("../ui/loading-screen.js").LoadingScreen}} opts
+ *   dataSize: unkomprimierte Dateigröße (vom Server) – für einen genauen Download-Fortschritt
+ *   loading:  Ladebildschirm mit den Phasen "download", "parse", "simplify", "shapes"
  * @returns {Promise<WorldMap>}
  */
-export async function createMap({ canvas, dataUrl }) {
-  const res = await fetch(dataUrl);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const topo = topojson.presimplify(await res.json(), topojson.sphericalTriangleArea);
-  const layer = (object, kind) => topojson.feature(topo, topo.objects[object]).features.map((f) => {
-    f.kind = kind;
-    f.key = `${kind}:${f.id}`;
-    // Item-Gruppe im Menü: Kontinente, Staaten Europas, Staaten Nordamerikas …
-    f.group = kind === "country" ? `country-${(f.properties.region ?? "EU").toLowerCase()}` : kind;
+export async function createMap({ canvas, dataUrl, dataSize = 0, loading = null }) {
+  const phase = (id, detail) => loading?.enter(id, detail);
+  const report = (f, detail) => loading?.report(f, detail);
+  const tick = yielder();
+
+  phase("download");
+  const text = await download(dataUrl, dataSize, report);
+
+  phase("parse");
+  await tick(true);
+  const raw = JSON.parse(text);
+
+  phase("simplify");
+  await tick(true); // Beschriftung zeigen, bevor der Browser eine Weile rechnet
+  const topo = topojson.presimplify(raw, topojson.sphericalTriangleArea);
+
+  const layers = {
+    continents: topojson.feature(topo, topo.objects.continents).features.map((f) => prepare(f, "continent")),
+    countries: topojson.feature(topo, topo.objects.countries).features.map((f) => prepare(f, "country")),
+  };
+  // Fortschritt nach Rechenaufwand (Punkte), nicht nach Anzahl: Kontinente sind viel größer als Staaten
+  const all = [...layers.continents, ...layers.countries];
+  const total = all.reduce((n, f) => n + pointCount(f.geometry), 0);
+  let done = 0;
+  const status = (i) => `${i} / ${all.length} Umrisse`;
+  phase("shapes", status(0));
+  for (let i = 0; i < all.length; i++) {
+    const f = all[i];
     f.geom = featureGeometry(f); // Anker, Fläche, Mittel-Länge
-    f.parts = splitParts(f.geometry); // für das Überspringen unsichtbarer Teile beim Zeichnen
-    return f;
-  });
-  return new WorldMap(canvas, {
-    continents: layer("continents", "continent"),
-    countries: layer("countries", "country"),
-  });
+    f.parts = [];                // Einzelteile, um Unsichtbares beim Zeichnen zu überspringen
+    for (const part of partsOf(f.geometry)) {
+      f.parts.push(part);
+      done += part.points;
+      if (await tick()) report(done / total, status(i));
+    }
+  }
+  report(1, status(all.length));
+  return new WorldMap(canvas, layers);
 }
+
+function prepare(f, kind) {
+  f.kind = kind;
+  f.key = `${kind}:${f.id}`;
+  // Item-Gruppe im Menü: Kontinente, Staaten Europas, Staaten Nordamerikas …
+  f.group = kind === "country" ? `country-${(f.properties.region ?? "EU").toLowerCase()}` : kind;
+  return f;
+}
+
+/** Datei als Text laden und dabei den Fortschritt melden (Stream, falls der Browser ihn anbietet) */
+async function download(url, expected, report) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  // Content-Length ist bei komprimierter Übertragung die komprimierte Größe → Servergröße bevorzugen
+  const total = expected || Number(res.headers.get("Content-Length")) || 0;
+  if (!res.body?.getReader || !total) {
+    report(null, "wird geladen …");
+    return res.text();
+  }
+  const reader = res.body.getReader();
+  const chunks = [];
+  let got = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    got += value.length;
+    report(Math.min(1, got / total), `${mb(Math.min(got, total))} / ${mb(total)} MB`);
+  }
+  const bytes = new Uint8Array(got);
+  let offset = 0;
+  for (const c of chunks) { bytes.set(c, offset); offset += c.length; }
+  return new TextDecoder().decode(bytes);
+}
+
+const mbFmt = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const mb = (bytes) => mbFmt.format(bytes / 1e6);
 
 export class WorldMap {
   /**

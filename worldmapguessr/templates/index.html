@@ -17,7 +17,15 @@
 <div id="stage">
   <canvas id="map" role="img" aria-label="Drehbare Weltkarte mit Kontinentumrissen"></canvas>
 </div>
-<div id="loading">Karte wird geladen …</div>
+<div id="loading" class="loading" role="progressbar" aria-label="Karte wird geladen" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+  <div class="loading-card">
+    <p class="loading-title">WorldMapGuessr</p>
+    <div class="loading-track"><i class="loading-fill"></i><i class="loading-shimmer"></i></div>
+    <p class="loading-row"><span class="loading-label">Programm laden</span><b class="loading-pct">0 %</b></p>
+    <p class="loading-detail"></p>
+    <button class="btn btn-primary loading-retry" type="button" onclick="location.reload()" hidden>Neu laden</button>
+  </div>
+</div>
 
 <header class="hud hud-title">
   <h1>WorldMapGuessr</h1>
@@ -220,6 +228,7 @@
 <script>
   window.WMG = {
     dataUrl: "{{ url_for('static', filename='data/world.topo.json') }}",
+    dataSize: {{ data_size | tojson }}, // unkomprimierte Größe für den Download-Fortschritt
     apiBase: "{{ request.script_root }}/api",
     lobbyCode: {{ (lobby_code or none) | tojson }},
   };

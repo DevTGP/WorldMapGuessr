@@ -58,3 +58,10 @@ def test_stats_page(client):
     r = client.get("/stats")
     assert r.status_code == 200 and b'id="table"' in r.data
     assert b"stats/stats.js" in r.data
+
+
+def test_index_passes_map_size_for_loading_bar(app, client):
+    import os
+    size = os.path.getsize(os.path.join(app.static_folder, "data", "world.topo.json"))
+    html = client.get("/").get_data(as_text=True)
+    assert f"dataSize: {size}," in html and 'class="loading"' in html
