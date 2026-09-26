@@ -1,4 +1,8 @@
-// Einstiegspunkt: Karte laden, Steuerung binden, Menü öffnen – im Einzelspiel oder in einer Lobby.
+// Einstiegspunkt: Karte laden, Steuerung binden, Menü öffnen.
+//
+// Jede Runde läuft auf dem Server als Lobby: das Einzelspiel ist eine Solo-Lobby (nur ein Spieler). Der
+// Browser merkt sich ihren Code; die Startseite setzt sie fort (die Adresse wird zu /CODE), bis sie
+// verfällt. Gibt es keine, öffnet das Menü – „Runde starten“ legt dann eine Solo-Lobby an.
 
 import { createMap } from "./map/map.js";
 import { bindMapControls } from "./map/controls.js";
@@ -46,17 +50,17 @@ createMap({
     loading.enter("start");
     await yielder()(true);
     bindMapControls(map);
-    const game = new Game(map, { apiBase: WMG.apiBase });
-    const menu = new Menu(map, (config) => game.newRound(config), {
-      onCreateLobby: WMG.lobbyCode ? null : (config) => createLobby(config),
+    const game = new Game(map);
+    const ctx = { map, game, menu: null };
+    const menu = new Menu(map, (config) => startSolo(config, ctx), {
+      onCreateLobby: (config) => createLobby(config, menu.ttl.value),
     });
+    ctx.menu = menu;
     Object.assign(WMG, { game, map, menu }); // Debug-Zugriff über die Konsole
     loading.done(); // blendet aus, während das Menü schon aufgeht
 
     const roundDialog = document.getElementById("round-dialog");
     document.getElementById("new-round").addEventListener("click", () => menu.open({ canCancel: game.running }));
-    // Einzelspiel: gleiche Einstellungen, neu gemischt. Lobby: startLobby ersetzt das.
-    game.again = () => game.newRound(game.config);
     document.getElementById("dlg-again").addEventListener("click", () => {
       roundDialog.close();
       game.again();
@@ -66,16 +70,59 @@ createMap({
       menu.open();
     });
 
-    if (WMG.lobbyCode) await startLobby(WMG.lobbyCode, { map, game, menu });
-    else menu.open();
+    if (WMG.lobbyCode) return startLobby(WMG.lobbyCode, ctx);
+    // Startseite: eigenes Einzelspiel fortsetzen, falls es noch besteht
+    const solo = identity.solo;
+    if (solo && identity.get(solo) && (await lobbyInfo(solo))?.solo) {
+      history.replaceState(null, "", `/${solo}`);
+      return startLobby(solo, ctx);
+    }
+    identity.solo = null;
+    menu.open();
   })
   .catch((err) => {
     loading.fail(`${err.message} – bitte Verbindung prüfen und neu laden.`);
     console.error(err);
   });
 
-/** Einzelspiel → neue Lobby mit der aktuellen Menü-Konfiguration */
-async function createLobby(config) {
+/** Öffentliche Infos einer Lobby oder null (gibt es nicht mehr) */
+async function lobbyInfo(code) {
+  try {
+    const res = await fetch(`${WMG.apiBase}/lobbies/${code}`);
+    return res.ok ? await res.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Neue Lobby anlegen (solo: Einzelspiel) → {code, url, player} */
+async function newLobby(body) {
+  const res = await fetch(`${WMG.apiBase}/lobbies`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const lobby = await res.json();
+  identity.set(lobby.code, lobby.player);
+  return lobby;
+}
+
+/** Einzelspiel starten: Solo-Lobby mit der Menü-Konfiguration anlegen und die Runde darin starten */
+async function startSolo(config, ctx) {
+  let lobby;
+  try {
+    lobby = await newLobby({ name: identity.name || "Spieler", config: toWire(config), solo: true, ttl: ctx.menu.ttl.value });
+  } catch (err) {
+    return alert(`Die Runde konnte nicht gestartet werden (${err.message}).`);
+  }
+  identity.solo = lobby.code;
+  history.replaceState(null, "", lobby.url);
+  await startLobby(lobby.code, ctx, { autoStart: true });
+}
+
+/** Startseite → neue Mehrspieler-Lobby mit der aktuellen Menü-Konfiguration */
+async function createLobby(config, ttl) {
   const who = await askPlayer({
     title: "Lobby erstellen",
     text: "Du wirst Host. Die aktuellen Einstellungen werden übernommen; Passwort und Spielerzahl stellst du danach in der Lobby ein.",
@@ -84,23 +131,32 @@ async function createLobby(config) {
     cancelable: true,
   });
   if (!who) return;
-  const res = await fetch(`${WMG.apiBase}/lobbies`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: who.name, config: toWire(config) }),
-  });
-  if (!res.ok) return alert("Die Lobby konnte nicht erstellt werden.");
-  const { code, url, player } = await res.json();
-  identity.set(code, player);
-  identity.name = player.name;
-  location.href = url;
+  let lobby;
+  try {
+    lobby = await newLobby({ name: who.name, config: toWire(config), ttl });
+  } catch {
+    return alert("Die Lobby konnte nicht erstellt werden.");
+  }
+  identity.name = lobby.player.name;
+  location.href = lobby.url;
 }
 
-/** Lobby-Seite: beitreten (Name/Passwort), verbinden, Menü im Lobby-Modus, Runden übernehmen */
-async function startLobby(code, { game, menu }) {
-  const infoRes = await fetch(`${WMG.apiBase}/lobbies/${code}`);
-  if (!infoRes.ok) return showLobbyGone("Diese Lobby gibt es nicht (mehr). Lobbys verfallen nach 24 Stunden ohne Aktivität.");
-  const info = await infoRes.json();
+/**
+ * Server-Runde (Einzelspiel oder Lobby): beitreten (Name/Passwort), verbinden, Menü im Lobby-Modus,
+ * Runden übernehmen. autoStart: gleich eine Runde starten (neues Einzelspiel).
+ */
+async function startLobby(code, { game, menu }, { autoStart = false } = {}) {
+  const info = await lobbyInfo(code);
+  if (!info) {
+    if (code === identity.solo) { // eigenes Einzelspiel verfallen → neu anfangen
+      identity.solo = null;
+      return location.replace("/");
+    }
+    return showLobbyGone("Diese Lobby gibt es nicht (mehr). Lobbys verfallen nach der eingestellten Zeit ohne Aktivität.");
+  }
+  if (info.solo && !identity.get(code)) {
+    return showLobbyGone("Das ist die Einzelspieler-Runde eines anderen Spielers. Beitreten geht erst, wenn sie zur Lobby gemacht wird.", "Einzelspiel");
+  }
 
   const client = new LobbyClient(code);
   // Gemeinsame Runde: Server verteilt die Teile (jedes nur einmal), Einsetzen wird für alle synchronisiert
@@ -110,20 +166,28 @@ async function startLobby(code, { game, menu }) {
     onJoinRound: () => menu.dialog.close(),
     isPlaying: () => remote.number > 0 && game.running,
   });
-  document.getElementById("new-round").textContent = "Lobby";
-  document.getElementById("dlg-menu").textContent = "Lobby";
   const again = document.getElementById("dlg-again");
-  again.textContent = "Neue Runde für alle";
   game.again = () => client.startRound();
 
   const hud = document.getElementById("lobby-badge");
-  hud.hidden = false;
   hud.addEventListener("click", () => menu.open({ canCancel: game.running }));
 
+  let started = !autoStart;
   client.addEventListener("state", ({ detail: state }) => {
+    // Neues Einzelspiel: Runde starten, sobald die Verbindung steht
+    if (!started && client.isHost) {
+      started = true;
+      if (!state.round) client.startRound();
+    }
+    // Einzelspiel sieht aus wie bisher; erst als Lobby gibt es Badge, „Lobby“-Knopf und „für alle“
+    const solo = !!state.settings.solo;
+    hud.hidden = solo;
+    document.getElementById("new-round").textContent = solo ? "Neue Runde" : "Lobby";
+    document.getElementById("dlg-menu").textContent = solo ? "Einstellungen" : "Lobby";
+    again.textContent = solo ? "Nochmal" : "Neue Runde für alle";
     const online = state.players.filter((p) => p.online).length;
     hud.querySelector("b").textContent = code;
-    hud.querySelector("span").textContent = `${online} ${online === 1 ? "Spieler" : "Spieler"}`;
+    hud.querySelector("span").textContent = `${online} Spieler`;
     // Neue Runde vom Host (oder laufende Runde beim ersten Beitritt) → mitspielen
     if (state.round && state.round.number !== remote.number && menu.isOpen) menu.dialog.close();
     remote.apply(state, client.hand);
@@ -132,7 +196,10 @@ async function startLobby(code, { game, menu }) {
     menu.setCloseable(game.running);
   });
   // Verlassen: zurück zum Einzelspiel. Beendet (vom Host): Hinweis für alle.
-  client.addEventListener("left", () => { location.href = "/"; });
+  client.addEventListener("left", () => {
+    if (code === identity.solo) identity.solo = null;
+    location.href = "/";
+  });
   client.addEventListener("closed", ({ detail }) => {
     if (client.isHost) location.href = "/";
     else showLobbyGone(detail.message, "Lobby beendet");
@@ -156,7 +223,7 @@ async function startLobby(code, { game, menu }) {
     join = who;
     identity.name = who.name;
   }
-  menu.open();
+  if (!autoStart) menu.open();
   client.addEventListener("error", async ({ detail: err }) => {
     if (!err.fatal) return console.warn("Lobby:", err.message);
     if (err.code === "password" || err.code === "full") {

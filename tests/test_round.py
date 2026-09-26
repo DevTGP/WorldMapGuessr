@@ -142,7 +142,7 @@ def test_give_moves_item_between_hands():
 # ---------- Timer: fester Takt ab Start, Wegnahme reihum ----------
 def test_timer_waits_for_grace_then_takes_round_robin_oldest_first():
     rnd = new(timer=30, grace=60, timerTake=3)  # a, b je 2 Items
-    assert rnd["timer"] == {"nextAt": 90}
+    assert rnd["timer"] == {"nextAt": 90, "graceUntil": 60, "pausedAt": None}
     oldest_a, oldest_b = rnd["hands"]["a"][0], rnd["hands"]["b"][0]
     assert not rounds.tick(rnd, 89.9, ["a", "b"])
     assert rounds.timer_view(rnd, 50)["graceLeft"] == 10 and rounds.timer_view(rnd, 50)["nextIn"] == 40

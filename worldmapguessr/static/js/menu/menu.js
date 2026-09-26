@@ -9,10 +9,16 @@ import { createDifficultySlider } from "./difficulty-slider.js";
 import { difficultyLabel } from "../game/difficulty.js";
 import { ItemPicker } from "./item-picker.js";
 import { createToggle } from "./toggle.js";
+import { createTtlField } from "./ttl-field.js";
 import { GROUPS, LIMITS, cloneConfig, defaultConfig, poolFor, timerRule } from "./config.js";
 
-/** Hinweise unter den Zeitdruck-Reglern (Einzelspiel; die Lobby ersetzt sie, siehe lobby/rules-text.js) */
-export const TIMER_HINTS = {
+/** Hinweise unter den Reglern im Einzelspiel (die Lobby ersetzt sie, siehe lobby/rules-text.js) */
+export const SOLO_HINTS = {
+  lives: "Fehlwürfe bis Rundenende",
+  startItems: "im Inventar zu Beginn",
+  refillCount: "pro Nachschub",
+  refillEvery: "… richtige Treffer",
+  difficulty: "Reihenfolge, in der die Items kommen",
   timer: "alle … Sekunden Items weg (0 = aus)",
   grace: "ab Rundenbeginn bis zum ersten Takt",
   timerTake: "Items je Takt zurück in den Vorrat",
@@ -55,6 +61,11 @@ export class Menu {
     this.roundNote = () => (this.canCancel ? "Es läuft eine Runde. Änderungen gelten ab der nächsten Runde." : null);
     /** Läuft eine Runde? (Kennzeichnung „gilt ab der nächsten Runde“); im Lobby-Modus ersetzt */
     this.roundRunning = () => this.canCancel;
+    /** „Lobby erstellen“; im Einzelspiel (Solo-Lobby) ersetzt durch „Mitspieler einladen“ */
+    this.onCreateLobby = onCreateLobby ?? null;
+    /** Aufbewahren geändert (Lobby: an den Server) */
+    this.onTtlEdited = null;
+    this.ttl = createTtlField(document.getElementById("keep-field"), (v) => this.onTtlEdited?.(v));
 
     // Item-Gruppen (Kontinente, Staaten Europas, Staaten Nordamerikas …); "kind" = Gruppen-ID
     this.groups = GROUPS
@@ -72,8 +83,8 @@ export class Menu {
       if (!document.getElementById("menu-start").disabled) this.primaryAction();
     });
     const create = document.getElementById("menu-create-lobby");
-    if (onCreateLobby) create.addEventListener("click", () => onCreateLobby(cloneConfig(this.config)));
-    else create.hidden = true;
+    create.addEventListener("click", () => this.onCreateLobby?.(cloneConfig(this.config)));
+    create.hidden = !onCreateLobby;
     document.getElementById("menu-close").addEventListener("click", () => this.dialog.close());
     // Esc schließt nur, wenn eine Runde läuft, zu der man zurückkehren kann
     this.dialog.addEventListener("cancel", (e) => { if (!this.canCancel) e.preventDefault(); });
@@ -110,6 +121,11 @@ export class Menu {
       el.disabled = readOnly || el.dataset.lockedByLimit === "1";
     });
     if (!readOnly) this._syncControls(); // Stepper-Grenzen (−/+) wieder korrekt setzen
+  }
+
+  /** Hinweise unter den Reglern setzen (z. B. SOLO_HINTS oder Lobby-Hinweise) */
+  setHints(hints) {
+    for (const [key, text] of Object.entries(hints)) this.steppers[key]?.setHint(text);
   }
 
   setCloseable(canCancel) {
@@ -155,24 +171,24 @@ export class Menu {
 
   _buildRules() {
     const c = this.config;
-    const make = (key, label, hint, extra = {}) => createStepper({
-      id: `cfg-${key}`, label, hint, value: c[key], ...LIMITS[key], ...extra,
+    const make = (key, label, extra = {}) => createStepper({
+      id: `cfg-${key}`, label, hint: SOLO_HINTS[key], value: c[key], ...LIMITS[key], ...extra,
       onChange: (v) => { this.config[key] = v; this._edited(); },
     });
     this.steppers = {
-      lives: make("lives", "Leben", "Fehlwürfe bis Rundenende"),
-      startItems: make("startItems", "Start-Items", "im Inventar zu Beginn"),
-      refillCount: make("refillCount", "Neue Items", "pro Nachschub"),
-      refillEvery: make("refillEvery", "Nachschub alle", "… richtige Treffer"),
+      lives: make("lives", "Leben"),
+      startItems: make("startItems", "Start-Items"),
+      refillCount: make("refillCount", "Neue Items"),
+      refillEvery: make("refillEvery", "Nachschub alle"),
       difficulty: createDifficultySlider({
         value: c.difficulty,
         onChange: (v) => { this.config.difficulty = v; this._edited(); },
       }),
-      timer: make("timer", "Timer", TIMER_HINTS.timer, { unit: "s" }),
-      grace: make("grace", "Schonfrist", TIMER_HINTS.grace, { unit: "s" }),
-      timerTake: make("timerTake", "Wegnahme", TIMER_HINTS.timerTake),
+      timer: make("timer", "Timer", { unit: "s" }),
+      grace: make("grace", "Schonfrist", { unit: "s" }),
+      timerTake: make("timerTake", "Wegnahme"),
       noReturn: createToggle({
-        id: "cfg-noReturn", label: "Kein Zurücklegen", hint: TIMER_HINTS.noReturn, value: c.noReturn,
+        id: "cfg-noReturn", label: "Kein Zurücklegen", hint: SOLO_HINTS.noReturn, value: c.noReturn,
         onChange: (v) => { this.config.noReturn = v; this._edited(); },
       }),
     };

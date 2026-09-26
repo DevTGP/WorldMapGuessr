@@ -37,6 +37,10 @@ export class LobbyClient extends EventTarget {
   place(key, correct) { this._send({ type: "place", key, correct }); }
   /** Teil aus dem eigenen Inventar an einen Mitspieler senden */
   give(key, to) { this._send({ type: "give", key, to }); }
+  /** Einzelspiel: Rundentimer anhalten, solange Menü oder Dialog offen sind */
+  pause(paused) { this._send({ type: "pause", paused }); }
+  /** Eigenen Namen ändern */
+  rename(name) { this._send({ type: "rename", name }); }
   /** Chat-Nachricht an alle in der Lobby */
   chat(text) { this._send({ type: "chat", text }); }
   /** Lobby endgültig verlassen (alle Tabs dieses Spielers) */

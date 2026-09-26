@@ -17,6 +17,9 @@ KINDS = ("continent", "country-eu", "country-na", "country-sa", "country-af", "c
 LEGACY_KINDS = {"country": ("country-eu",)}
 MAX_PLAYERS = (1, 50)
 DEFAULT_ALLOW_SEND = True  # Items an Mitspieler senden
+# Verfall: Lobby (samt Runde) wird nach so langer Untätigkeit gelöscht – wählbare Stufen in Sekunden
+TTL_STEPS = (3600, 3 * 3600, 6 * 3600, 12 * 3600, 86400, 2 * 86400, 3 * 86400, 7 * 86400)
+DEFAULT_TTL = 86400
 SEND_EVERY = (0, 20)       # Sendelimit: 1 Senden je N vom Server erhaltene Items (0 = ohne Limit)
 DEFAULT_SEND_EVERY = 5
 
@@ -60,6 +63,15 @@ def clean_config(raw) -> dict:
 
 def clean_bool(value, default: bool) -> bool:
     return value if isinstance(value, bool) else default
+
+
+def clean_ttl(value, default=DEFAULT_TTL) -> int:
+    """Nächstliegende Stufe aus TTL_STEPS (1 h … 7 d)."""
+    try:
+        v = int(value)
+    except (TypeError, ValueError):
+        return default
+    return min(TTL_STEPS, key=lambda s: abs(s - v))
 
 
 def clean_send_every(value, default=DEFAULT_SEND_EVERY) -> int:

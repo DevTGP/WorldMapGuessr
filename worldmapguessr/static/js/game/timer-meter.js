@@ -21,6 +21,8 @@ export class TimerMeter {
     this.graceUntil = now + t.graceLeft * 1000;
     this.every = t.every;
     this.take = t.take;
+    this.paused = !!t.paused;
+    this.frozenAt = undefined;
     this.el.hidden = false;
     if (!this.id) this.id = setInterval(() => this._render(), FRAME_MS);
     this._render();
@@ -33,6 +35,15 @@ export class TimerMeter {
   }
 
   _render() {
+    if (this.paused) {
+      // angehalten (Einzelspiel mit offenem Menü): Werte einfrieren
+      const shift = performance.now() - (this.frozenAt ??= performance.now());
+      this.deadline += shift;
+      this.graceUntil += shift;
+      this.frozenAt = performance.now();
+    } else {
+      this.frozenAt = undefined;
+    }
     const now = performance.now();
     const left = Math.max(0, (this.deadline - now) / 1000);
     const grace = now < this.graceUntil;
@@ -46,6 +57,7 @@ export class TimerMeter {
     this.text.innerHTML = text;
     const frac = grace ? 1 : Math.min(1, left / this.every);
     this.ring.style.strokeDashoffset = String(1 - frac);
+    if (this.paused) this.text.innerHTML += '<span class="long"> · pausiert</span>';
     this.el.classList.toggle("grace", grace);
     this.el.classList.toggle("urgent", !grace && left <= URGENT_S);
     this.el.setAttribute("aria-label", grace

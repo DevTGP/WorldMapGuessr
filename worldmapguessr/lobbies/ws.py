@@ -5,6 +5,7 @@ Protokoll (JSON):
                    · place {key, correct} (Einsetzversuch eines Teils aus dem eigenen Inventar)
                    · give {key, to} (Teil an einen Online-Mitspieler senden, wenn settings.allowSend;
                      Sendelimit settings.sendEvery) · chat {text} (Nachricht an alle, max. 200 Zeichen)
+                   · pause {paused} (nur Einzelspiel/Solo-Lobby: Rundentimer anhalten, z. B. Menü offen)
                    · leave (Lobby verlassen) · close (nur Host: Lobby beenden) · ping
   Server → Client  welcome {player} · state {lobby, hand, sends} · error {code, message} · left · closed {message}
                    · pong

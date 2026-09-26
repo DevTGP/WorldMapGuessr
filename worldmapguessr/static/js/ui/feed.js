@@ -47,11 +47,11 @@ export class Feed {
     this._fader = setInterval(() => this._fade(), 2000);
   }
 
-  /** Chat-Eingabe zeigen (Lobby) */
-  enableChat(onChat) {
+  /** Chat-Eingabe zeigen (Lobby mit Mitspielern) oder ausblenden (Einzelspiel) */
+  setChat(onChat) {
     this.onChat = onChat;
-    this.form.hidden = false;
-    this.root.classList.add("with-chat");
+    this.form.hidden = !onChat;
+    this.root.classList.toggle("with-chat", !!onChat);
   }
 
   setCollapsed(collapsed, remember = true) {

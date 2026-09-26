@@ -1,10 +1,16 @@
-// Menü im Lobby-Modus: Einladungslink, Spielerliste, Lobbyeinstellungen (max. Spieler, Passwort)
-// und die Spielkonfiguration. Nur der Host darf ändern; Änderungen gehen sofort an den Server
-// und kommen als Lobby-Zustand bei allen an.
+// Menü einer Server-Runde. Zwei Modi:
+// - Einzelspiel (Solo-Lobby): wie ein normales Einzelspiel-Menü, dazu „Aufbewahren“ und
+//   „Mitspieler einladen“ (macht daraus eine Lobby, die Runde läuft weiter).
+// - Lobby: Einladungslink, Spielerliste, Lobbyeinstellungen (max. Spieler, Passwort, Senden) und die
+//   Spielkonfiguration. Nur der Host darf ändern; Änderungen gehen sofort an den Server und kommen als
+//   Lobby-Zustand bei allen an.
 
 import { createStepper } from "../menu/stepper.js";
 import { fromWire, toWire } from "../menu/config.js";
+import { SOLO_HINTS } from "../menu/menu.js";
 import { confirmDialog } from "./confirm.js";
+import { identity } from "./identity.js";
+import { askPlayer } from "./join-dialog.js";
 import { roundNote, ruleHints, ruleSummary, sendRule } from "./rules-text.js";
 
 const SEND_DELAY_MS = 250;
@@ -21,10 +27,11 @@ export class LobbyMenu {
     this.client = client;
     this.isPlaying = isPlaying;
     this.section = document.getElementById("lobby-section");
-    this.section.hidden = false;
-    document.getElementById("menu-create-lobby").hidden = true;
-    document.getElementById("menu-title").textContent = `Lobby ${client.code}`;
-    document.querySelector("#menu .eyebrow").textContent = "WorldMapGuessr · Lobby";
+    this.solo = null; // Modus, wird mit dem ersten Zustand gesetzt
+    // Einzelspiel und Menü teilen sich den Knopf: dort „Mitspieler einladen“
+    menu.onCreateLobby = () => this._invite();
+    // Aufbewahren (Verfall nach Untätigkeit) gilt für Einzelspiel und Lobby
+    menu.onTtlEdited = (ttl) => { if (client.isHost) client.sendSettings({ ttl }); };
 
     // Einladungslink
     const link = `${location.origin}/${client.code}`;
@@ -76,7 +83,7 @@ export class LobbyMenu {
     menu.primaryLabel = (pool) => {
       if (!client.connected) return { text: "Verbinde …", disabled: true };
       if (client.isHost) {
-        const what = running() ? "Runde neu starten" : "Runde für alle starten";
+        const what = running() ? "Runde neu starten" : this.solo ? "Runde starten" : "Runde für alle starten";
         return pool ? `${what} · ${pool} Items` : what;
       }
       if (isPlaying()) return "Zurück zur Runde";
@@ -85,17 +92,35 @@ export class LobbyMenu {
 
     // Was die Einstellungen in der Lobby bewirken: Hinweise, Zusammenfassung, Rundenstatus
     const players = () => Math.max(1, (client.state?.players ?? []).filter((p) => p.online).length);
-    menu.summaryRules = (c, start) => ruleSummary(c, start, players());
-    menu.roundNote = () => roundNote(client.state?.round, client.isHost);
+    const soloSummary = menu.summaryRules;
+    const soloNote = menu.roundNote;
+    menu.summaryRules = (c, start) => (this.solo ? soloSummary(c, start) : ruleSummary(c, start, players()));
+    menu.roundNote = () => (this.solo ? soloNote() : roundNote(client.state?.round, client.isHost));
     menu.roundRunning = running;
-    document.getElementById("mp-rules").hidden = false;
-    document.getElementById("title-hint").textContent =
-      "Item anklicken und auf der Karte einsetzen – oder links an einen Mitspieler senden · Karte ziehen oder Pfeile zum Drehen";
+    this.titleHint = document.getElementById("title-hint").textContent;
     client.addEventListener("state", (e) => this.apply(e.detail));
     client.addEventListener("connection", () => this.menu._update());
   }
 
+  /** Einzelspiel ↔ Lobby: Menü-Teile und Texte umschalten */
+  _setMode(solo) {
+    if (solo === this.solo) return;
+    this.solo = solo;
+    this.section.hidden = solo;
+    document.getElementById("mp-rules").hidden = solo;
+    const create = document.getElementById("menu-create-lobby");
+    create.hidden = !solo;
+    create.textContent = "Mitspieler einladen";
+    create.title = "Aus diesem Einzelspiel eine Lobby machen – die Runde läuft weiter";
+    document.getElementById("menu-title").textContent = solo ? "Einzelspiel" : `Lobby ${this.client.code}`;
+    document.querySelector("#menu .eyebrow").textContent = solo ? "WorldMapGuessr" : "WorldMapGuessr · Lobby";
+    document.getElementById("title-hint").textContent = solo ? this.titleHint
+      : "Item anklicken und auf der Karte einsetzen – oder links an einen Mitspieler senden · Karte ziehen oder Pfeile zum Drehen";
+    if (solo) this.menu.setHints(SOLO_HINTS);
+  }
+
   apply(state) {
+    this._setMode(!!state.settings.solo);
     const host = this.client.isHost;
     // Spielkonfiguration vom Server übernehmen – außer der Host tippt gerade (sonst springt der Regler)
     if (!host || Date.now() - (this.lastLocalEdit ?? 0) > 1000) {
@@ -118,8 +143,10 @@ export class LobbyMenu {
     document.getElementById("lobby-close").hidden = !host;
     this.allowSend.checked = state.settings.allowSend !== false;
     document.getElementById("mp-rule-send").innerHTML = sendRule(state.settings);
+    this.menu.ttl.value = state.settings.ttl;
+    this.menu.ttl.disabled = !host;
     const online = state.players.filter((p) => p.online).length;
-    for (const [key, text] of Object.entries(ruleHints(this.menu.config, online))) this.menu.steppers[key].setHint(text);
+    if (!this.solo) this.menu.setHints(ruleHints(this.menu.config, online));
 
     this._renderPlayers(state);
     this.menu._update();
@@ -141,6 +168,15 @@ export class LobbyMenu {
 
   _confirmRestart() {
     const r = this.client.state?.round;
+    if (this.solo) {
+      return confirmDialog({
+        title: "Laufende Runde abbrechen?",
+        text: `Runde ${r?.number ?? ""} wird beendet (${r?.placed?.length ?? 0} von ${r?.total ?? 0} Items eingesetzt). ` +
+          "Die neue Runde startet sofort mit den aktuellen Einstellungen.",
+        confirm: "Neu starten",
+        danger: true,
+      });
+    }
     return confirmDialog({
       title: "Laufende Runde abbrechen?",
       text: `Runde ${r?.number ?? ""} wird für alle beendet (${r?.placed?.length ?? 0} von ${r?.total ?? 0} Items eingesetzt). ` +
@@ -148,6 +184,23 @@ export class LobbyMenu {
       confirm: "Neu starten",
       danger: true,
     });
+  }
+
+  /** Einzelspiel → Lobby: Name festlegen, dann können andere über den Link beitreten */
+  async _invite() {
+    const who = await askPlayer({
+      title: "Mitspieler einladen",
+      text: "Aus deinem Einzelspiel wird eine Lobby. Die laufende Runde geht mit allen weiter, die über den Link " +
+        "beitreten. Unter welchem Namen spielst du?",
+      submit: "Lobby daraus machen",
+      name: identity.name,
+      cancelable: true,
+    });
+    if (!who) return;
+    identity.name = who.name;
+    this.client.rename(who.name);
+    this.client.sendSettings({ solo: false });
+    identity.solo = null; // die Startseite beginnt künftig ein neues Einzelspiel
   }
 
   async _leave() {

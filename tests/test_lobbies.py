@@ -71,7 +71,7 @@ def test_only_host_changes_settings(store):
     with pytest.raises(LobbyError):
         store.update_settings(lobby["code"], guest["id"], {"maxPlayers": 3})
     store.update_settings(lobby["code"], host["id"], {"maxPlayers": 3, "password": "x"})
-    assert store.public_info(lobby["code"]) == {"code": lobby["code"], "private": True, "maxPlayers": 3}
+    assert store.public_info(lobby["code"]) == {"code": lobby["code"], "private": True, "maxPlayers": 3, "solo": False}
 
 
 def test_legacy_kind_country_means_europe(tmp_path):
@@ -205,17 +205,15 @@ def test_late_joiner_waits_for_next_deal_and_leaver_returns_them(store):
     assert late.player_id is None and r["poolCount"] == 23 - 6 - 4 + len(late_hand) and late.ws.sent[-1]["type"] == "left"
 
 
-def test_disconnected_player_keeps_hand_during_grace(store):
+def test_disconnected_player_keeps_hand_until_leaving(store):
     hub, code, h, g = two_players(store)
     gid, items = g.player_id, hand_of(g)
     hub.leave(code, g)
-    hub._hand_check(code, gid)                     # noch in der Karenzzeit
+    hub.clock.t += 3 * 3600                        # Stunden später: Inventar immer noch reserviert
     assert round_of(h)["handCounts"][gid] == 3
     g2 = connect(hub, code, playerId=gid, token=g.ws.sent[0]["player"]["token"])
     assert hand_of(g2) == items                    # Wiederverbinden: gleiches Inventar
-    hub.leave(code, g2)
-    hub.clock.t += hub.hand_grace + 1
-    hub._hand_check(code, gid)
+    hub.handle(code, g2, {"type": "leave"})        # erst Verlassen gibt es zurück
     assert gid not in round_of(h)["handCounts"] and round_of(h)["poolCount"] == 23 - 3
 
 
@@ -281,13 +279,20 @@ def test_item_event_recorder_counts_in_item_store(app):
 
 
 # ---------- HTTP ----------
+def test_http_create_solo_lobby_with_ttl(client):
+    r = client.post("/api/lobbies", json={"name": "Manu", "solo": True, "ttl": 3 * 3600})
+    code = r.get_json()["code"]
+    assert client.get(f"/api/lobbies/{code}").get_json()["solo"] is True
+    assert client.application.extensions["lobby_store"].get(code)["settings"]["ttl"] == 3 * 3600
+
+
 def test_http_create_info_and_page(client):
     r = client.post("/api/lobbies", json={"name": "Manu", "maxPlayers": 4, "password": "pw"})
     assert r.status_code == 201
     code = r.get_json()["code"]
     assert r.get_json()["url"] == f"/{code}"
     info = client.get(f"/api/lobbies/{code.lower()}").get_json()
-    assert info == {"code": code, "private": True, "maxPlayers": 4, "online": 0}
+    assert info == {"code": code, "private": True, "maxPlayers": 4, "solo": False, "online": 0}
     assert client.get(f"/{code}").status_code == 200
     assert client.get(f"/l/{code.lower()}").headers["Location"].endswith(f"/{code}")
     assert client.get("/api/lobbies/ZZZZZ").status_code == 404
@@ -353,7 +358,7 @@ def test_timer_ticks_through_hub_and_state_shows_countdown(tmp_path):
     store = LobbyStore(tmp_path / "l.json", catalog=CATALOG, clock=clock)
     hub, code, h, g = two_players(store, timer=20, grace=30, timerTake=2)
     t = round_of(h)["timer"]
-    assert t == {"nextIn": 50, "every": 20, "take": 2, "graceLeft": 30}
+    assert t == {"nextIn": 50, "every": 20, "take": 2, "graceLeft": 30, "paused": False}
     clock.t += 49
     assert hub.tick() == []
     clock.t += 1
@@ -387,3 +392,64 @@ def test_chat_is_broadcast_trimmed_and_kept(store):
     assert len(chat) == 1 and chat[0]["name"] == "Gast" and chat[0]["text"].startswith("Hallo zusammen x")
     assert len(chat[0]["text"]) == 200 and chat[0]["seq"] == 1
     assert LobbyStore(store.persistence).get(code)["chat"][0]["seq"] == 1  # gespeichert
+
+
+# ---------- Einzelspiel als Solo-Lobby, Verfallszeit, Pause ----------
+def test_solo_lobby_rejects_joiners_until_converted(store):
+    hub = LobbyHub(store, clock=Clock())
+    lobby, host = store.create(player_name="Manu", solo=True, config={"startItems": 3})
+    code = lobby["code"]
+    assert store.public_info(code)["solo"] is True
+    h = connect(hub, code, playerId=host["id"], token=host["token"])
+    hub.handle(code, h, {"type": "start"})
+    with pytest.raises(LobbyError) as e:
+        connect(hub, code, name="Gast")
+    assert e.value.code == "solo"
+    hub.handle(code, h, {"type": "settings", "settings": {"solo": False}})  # Mitspieler einladen
+    g = connect(hub, code, name="Gast")
+    assert h.ws.sent[-1]["lobby"]["settings"]["solo"] is False
+    assert round_of(g)["number"] == 1 and len(hand_of(h)) == 3   # gleiche Runde läuft weiter
+
+
+def test_lobby_expires_after_its_own_ttl(tmp_path):
+    clock = Clock()
+    store = LobbyStore(tmp_path / "l.json", catalog=CATALOG, clock=clock)
+    short, _ = store.create(player_name="A", ttl=3000)          # → Stufe 1 h
+    long, host = store.create(player_name="B")                  # Standard 1 d
+    assert short["settings"]["ttl"] == 3600 and long["settings"]["ttl"] == 86400
+    store.update_settings(long["code"], host["id"], {"ttl": 7 * 86400 + 5})
+    assert long["settings"]["ttl"] == 7 * 86400
+    clock.t += 3601
+    assert store.expire() == [short["code"]]
+    clock.t += 6 * 86400
+    assert store.expire() == [] and store.get(long["code"])
+
+
+def test_timer_pauses_while_nobody_is_online_and_in_solo_menu(tmp_path):
+    clock = Clock()
+    store = LobbyStore(tmp_path / "l.json", catalog=CATALOG, clock=clock)
+    hub = LobbyHub(store, clock=Clock())
+    lobby, host = store.create(player_name="Manu", solo=True, config={"timer": 30, "grace": 10})
+    code = lobby["code"]
+    h = connect(hub, code, playerId=host["id"], token=host["token"])
+    hub.handle(code, h, {"type": "start"})
+    clock.t += 5
+    hub.leave(code, h)                               # Tab zu: Timer steht
+    clock.t += 5 * 3600
+    h = connect(hub, code, playerId=host["id"], token=host["token"])
+    t = round_of(h)["timer"]
+    assert t["paused"] is False and t["graceLeft"] == 5 and t["nextIn"] == 35
+    hub.handle(code, h, {"type": "pause", "paused": True})   # Menü offen
+    clock.t += 100
+    assert hub.tick() == [] and round_of(h)["timer"]["paused"] is True
+    hub.handle(code, h, {"type": "pause", "paused": False})
+    assert round_of(h)["timer"]["nextIn"] == 35
+    # nach Serverneustart (neu geladen) steht der Timer, bis jemand kommt
+    again = LobbyStore(store.persistence, clock=clock)
+    assert again.get(code)["round"]["timer"]["pausedAt"] == clock.t
+
+
+def test_pause_is_ignored_in_multiplayer_lobbies(store):
+    hub, code, h, g = two_players(store, timer=30)
+    hub.handle(code, h, {"type": "pause", "paused": True})
+    assert round_of(h)["timer"]["paused"] is False

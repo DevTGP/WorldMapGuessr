@@ -24,7 +24,7 @@ Rundenzustand (JSON-serialisierbar, wird mit der Lobby gespeichert):
 {number, seed, startedAt, config, status: running|won|lost, lives, livesMax, total,
  pool: [key], hands: {playerId: [key]}, placed: [key], placedBy: {key: playerId},
  order: [playerId], cursor, dealt: {playerId: n}, sent: {playerId: n}, sinceRefill,
- timer: {nextAt} | None, takeCursor, events, log: [event], last: event}
+ timer: {nextAt, graceUntil, pausedAt} | None, takeCursor, events, log: [event], last: event}
 Ereignis: {seq, type: placed|miss|refill|gift|take, player?, key?, count?, to?, items?}
  refill: to = {playerId: n}; take: items = [{player, key}]
 `events` zählt Ereignisse hoch; `log` hält die letzten LOG_SIZE, der Client zeigt jedes (seq) genau einmal.
@@ -71,7 +71,8 @@ def new_round(number: int, config: dict, catalog, online: list[str], seed: int, 
         "status": RUNNING, "lives": config["lives"], "livesMax": config["lives"], "total": len(pool),
         "pool": pool, "hands": {}, "order": list(online), "cursor": 0, "dealt": {}, "sent": {},
         "placed": [], "placedBy": {}, "sinceRefill": 0, "events": 0, "log": [], "last": None,
-        "timer": {"nextAt": now + config.get("grace", 0) + config["timer"]} if config.get("timer") else None,
+        "timer": {"nextAt": now + config.get("grace", 0) + config["timer"], "graceUntil": now + config.get("grace", 0),
+                  "pausedAt": None} if config.get("timer") else None,
         "takeCursor": 0,
     }
     if not pool:
@@ -231,7 +232,7 @@ def tick(rnd: dict, now: float, online: list[str], rng: random.Random | None = N
     Ein Takt je Aufruf. Lag der Takt mehr als eine Periode zurück (Server war aus, niemand da), wird nur
     neu angesetzt – verpasste Takte werden nicht nachgeholt."""
     timer = rnd.get("timer")
-    if not timer or rnd["status"] != RUNNING or now < timer["nextAt"]:
+    if not timer or rnd["status"] != RUNNING or timer.get("pausedAt") is not None or now < timer["nextAt"]:
         return False
     every = rnd["config"]["timer"]
     if now - timer["nextAt"] > every or not online:
@@ -266,17 +267,42 @@ def take(rnd: dict, online: list[str], count: int, rng: random.Random | None = N
     return taken
 
 
+def pause_timer(rnd: dict | None, now: float, paused: bool) -> bool:
+    """Timer anhalten (niemand verbunden, Einzelspieler im Menü) bzw. weiterlaufen lassen – Takt und
+    Schonfrist verschieben sich um die Pause. True, wenn sich etwas geändert hat."""
+    timer = (rnd or {}).get("timer")
+    if not timer or rnd["status"] != RUNNING:
+        return False
+    since = timer.get("pausedAt")
+    if paused and since is None:
+        timer["pausedAt"] = now
+        return True
+    if not paused and since is not None:
+        gone = max(0.0, now - since)
+        timer["nextAt"] += gone
+        timer["graceUntil"] = _grace_until(rnd) + gone
+        timer["pausedAt"] = None
+        return True
+    return False
+
+
+def _grace_until(rnd: dict) -> float:
+    timer = rnd["timer"]
+    return timer.get("graceUntil", rnd["startedAt"] + rnd["config"].get("grace", 0))  # ältere Runden
+
+
 def timer_view(rnd: dict, now: float) -> dict | None:
-    """Timer für die Anzeige: Sekunden bis zum nächsten Takt, ob noch Schonfrist ist."""
+    """Timer für die Anzeige: Sekunden bis zum nächsten Takt, restliche Schonfrist, ob angehalten."""
     timer = rnd.get("timer")
     if not timer or rnd["status"] != RUNNING:
         return None
     c = rnd["config"]
-    first = rnd["startedAt"] + c.get("grace", 0) + c["timer"]
+    ref = timer["pausedAt"] if timer.get("pausedAt") is not None else now
     return {
-        "nextIn": max(0.0, round(timer["nextAt"] - now, 2)),
+        "nextIn": max(0.0, round(timer["nextAt"] - ref, 2)),
         "every": c["timer"], "take": c["timerTake"],
-        "graceLeft": max(0.0, round(rnd["startedAt"] + c.get("grace", 0) - now, 2)) if timer["nextAt"] <= first else 0.0,
+        "graceLeft": max(0.0, round(_grace_until(rnd) - ref, 2)),
+        "paused": timer.get("pausedAt") is not None,
     }
 
 

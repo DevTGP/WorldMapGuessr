@@ -1,5 +1,9 @@
 """Lobbys: im Speicher gehalten, jede Änderung sofort persistiert (JSON-Datei oder MongoDB,
-siehe persistence.py). Verfällt nach LOBBY_TTL ohne Aktivität."""
+siehe persistence.py). Eine Lobby (samt laufender Runde) verfällt erst nach ihrer eingestellten Zeit ohne
+Aktivität (settings.ttl, 1 h … 7 d, Standard 1 d) – bis dahin lässt sich jede Runde fortsetzen.
+
+Einzelspiel = Solo-Lobby (settings.solo): gleiche Runde wie im Mehrspieler, aber niemand kann beitreten.
+„Mitspieler einladen“ wandelt sie in eine normale Lobby um (solo → False), die Runde läuft weiter."""
 from __future__ import annotations
 
 import hashlib
@@ -13,10 +17,10 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from . import round as rounds
 from .codes import new_code, normalize
 from .persistence import JsonLobbyPersistence
-from .settings import (DEFAULT_ALLOW_SEND, DEFAULT_CONFIG, DEFAULT_SEND_EVERY, clean_bool, clean_config,
-                       clean_max_players, clean_name, clean_send_every)
+from .settings import (DEFAULT_ALLOW_SEND, DEFAULT_CONFIG, DEFAULT_SEND_EVERY, DEFAULT_TTL, clean_bool,
+                       clean_config, clean_max_players, clean_name, clean_send_every, clean_ttl)
 
-LOBBY_TTL = 24 * 3600  # Sekunden ohne Aktivität, danach wird die Lobby gelöscht
+LOBBY_TTL = DEFAULT_TTL  # Sekunden ohne Aktivität für Lobbys ohne eigene Einstellung (ältere)
 CHAT_KEEP = 50         # so viele Chat-Nachrichten je Lobby bleiben erhalten
 CHAT_MAX_LEN = 200
 
@@ -35,7 +39,7 @@ def _hash_token(token: str) -> str:
 
 
 class LobbyStore:
-    def __init__(self, persistence, ttl: int = LOBBY_TTL, clock=time.time, catalog=None, on_stat=None,
+    def __init__(self, persistence, ttl: int | None = None, clock=time.time, catalog=None, on_stat=None,
                  difficulty=None):
         """persistence: JsonLobbyPersistence/MongoLobbyPersistence oder ein Dateipfad (→ JSON).
         catalog: {Gruppe: [Feature-Key]} – alle Items, aus denen eine Runde gebaut wird.
@@ -47,12 +51,15 @@ class LobbyStore:
         if isinstance(persistence, (str, os.PathLike)):
             persistence = JsonLobbyPersistence(persistence)
         self.persistence = persistence
-        self.ttl = ttl
+        self.ttl = ttl  # None = je Lobby (settings.ttl); sonst fest für alle (Tests)
         self.clock = clock
         self.lock = threading.RLock()
         self._lobbies: dict[str, dict] = persistence.load_all()
+        now = clock()
         for lobby in self._lobbies.values():  # ältere Lobbys: Konfiguration ins aktuelle Format (Item-Gruppen)
             lobby["settings"]["config"] = clean_config(lobby["settings"]["config"])
+            # Nach dem Start ist noch niemand verbunden: Timer anhalten, bis jemand kommt
+            rounds.pause_timer(lobby.get("round"), now, True)
         self.expire()
 
     # ---------- Lesen ----------
@@ -68,11 +75,14 @@ class LobbyStore:
             "code": lobby["code"],
             "private": bool(lobby["settings"]["passwordHash"]),
             "maxPlayers": lobby["settings"]["maxPlayers"],
+            "solo": bool(lobby["settings"].get("solo")),
         }
 
     # ---------- Anlegen / Beitreten ----------
-    def create(self, *, player_name, config=None, max_players=None, password="") -> tuple[dict, dict]:
-        """Neue Lobby; der Ersteller wird Host. Gibt (lobby, player_with_token) zurück."""
+    def create(self, *, player_name, config=None, max_players=None, password="", solo=False,
+               ttl=None) -> tuple[dict, dict]:
+        """Neue Lobby; der Ersteller wird Host. solo: Einzelspiel (niemand kann beitreten).
+        Gibt (lobby, player_with_token) zurück."""
         with self.lock:
             code = new_code(self._lobbies)
             now = self.clock()
@@ -88,6 +98,8 @@ class LobbyStore:
                     "passwordHash": generate_password_hash(password) if password else "",
                     "allowSend": DEFAULT_ALLOW_SEND,
                     "sendEvery": DEFAULT_SEND_EVERY,
+                    "solo": bool(solo),
+                    "ttl": clean_ttl(ttl),
                 },
                 "players": {player["id"]: player},
                 "round": None,
@@ -110,6 +122,9 @@ class LobbyStore:
         """Neuer Spieler tritt bei. Prüft Passwort und Spielerlimit."""
         with self.lock:
             lobby = self._require(code)
+            if lobby["settings"].get("solo"):
+                raise LobbyError("solo", "Das ist eine Einzelspieler-Runde – beitreten geht erst, "
+                                         "wenn sie zur Lobby gemacht wird.")
             pw_hash = lobby["settings"]["passwordHash"]
             if pw_hash and not check_password_hash(pw_hash, password or ""):
                 raise LobbyError("password", "Falsches Passwort.")
@@ -138,6 +153,10 @@ class LobbyStore:
                 s["maxPlayers"] = clean_max_players(settings["maxPlayers"])
             if "allowSend" in settings:
                 s["allowSend"] = clean_bool(settings["allowSend"], s.get("allowSend", DEFAULT_ALLOW_SEND))
+            if "ttl" in settings:
+                s["ttl"] = clean_ttl(settings["ttl"], s.get("ttl", DEFAULT_TTL))
+            if settings.get("solo") is False:  # Einzelspiel → Lobby (umgekehrt nicht)
+                s["solo"] = False
             if "sendEvery" in settings:
                 s["sendEvery"] = clean_send_every(settings["sendEvery"], s.get("sendEvery", DEFAULT_SEND_EVERY))
             if "password" in settings:  # "" entfernt das Passwort
@@ -207,6 +226,15 @@ class LobbyStore:
     def send_every(lobby) -> int:
         """Sendelimit der Lobby (1 Senden je N erhaltene Items, 0 = ohne); ältere Lobbys: Standard."""
         return lobby["settings"].get("sendEvery", DEFAULT_SEND_EVERY)
+
+    def pause_timer(self, code, paused: bool) -> bool:
+        """Rundentimer anhalten/weiterlaufen lassen (niemand da; Einzelspieler im Menü)."""
+        with self.lock:
+            lobby = self.get(code)
+            if not lobby or not rounds.pause_timer(lobby["round"], self.clock(), paused):
+                return False
+            self.touch(code)
+            return True
 
     def tick(self, code, online=()) -> bool:
         """Timer der laufenden Runde weiterzählen (Hub ruft das regelmäßig). True bei Änderung."""
@@ -294,11 +322,14 @@ class LobbyStore:
                 lobby["lastActive"] = self.clock()
                 self.persistence.save(lobby)
 
+    def ttl_of(self, lobby) -> int:
+        return self.ttl if self.ttl is not None else lobby["settings"].get("ttl", LOBBY_TTL)
+
     def expire(self) -> list[str]:
-        """Lobbys ohne Aktivität seit ttl löschen."""
+        """Lobbys löschen, die länger als ihre Verfallszeit untätig sind."""
         with self.lock:
-            limit = self.clock() - self.ttl
-            gone = [c for c, l in self._lobbies.items() if l["lastActive"] < limit]
+            now = self.clock()
+            gone = [c for c, l in self._lobbies.items() if l["lastActive"] < now - self.ttl_of(l)]
             for c in gone:
                 del self._lobbies[c]
                 self.persistence.delete(c)

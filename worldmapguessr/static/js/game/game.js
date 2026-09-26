@@ -1,48 +1,33 @@
-// Spielablauf: Runde nach Konfiguration (Leben, Startteile, Nachschub, Auswahl der Teile),
-// Einsetzen, Zurücklegen, Rundenende und Item-Statistik.
+// Spielablauf im Browser: Inventar, Aufnehmen, Einsetzen, Zurücklegen, Senden, Rundenende.
 //
-// Statistik: Im Einzelspiel meldet der Browser spawned (Item aus dem Vorrat ins Inventar) und
-// correct/incorrect (Einsetzversuch). In einer Lobby zählt allein der Server – der Browser meldet nichts,
-// sonst würden Neuladen, zweite Tabs oder gesendete Items doppelt zählen.
-//
-// Einzelspiel: Vorrat, Leben und Nachschub werden hier im Browser verwaltet (newRound).
-// Lobby: der Server ist maßgeblich (game/remote.js ruft resetRound/addPieces/… auf);
-// der Browser prüft nur, ob ein Teil passt, und meldet das Ergebnis. Gehaltene Teile können dort
-// auch an Mitspieler gesendet werden (giveHeld).
+// Jede Runde läuft auf dem Server – auch das Einzelspiel (Solo-Lobby, siehe lobbies/store.py). Der Server
+// ist maßgeblich für Vorrat, Leben, Nachschub, Timer und Item-Statistik; game/remote.js bildet seinen
+// Zustand hier ab (resetRound/addPieces/…). Der Browser prüft nur, ob ein Teil passt, und meldet das Ergebnis.
 
-import { seededRandom } from "./random.js";
-import { orderByDifficulty } from "./difficulty.js";
 import { HeldPiece } from "./held-piece.js";
 import { Inventory } from "./inventory.js";
 import { Lives } from "./lives.js";
 import { RefillMeter } from "./refill-meter.js";
-import { RoundTimer } from "./round-timer.js";
 import { TimerMeter } from "./timer-meter.js";
 import { Feed } from "../ui/feed.js";
-import { ItemTracker } from "../api/items-api.js";
-import { poolFor } from "../menu/config.js";
 
 const DBLCLICK_REARM_MS = 400;
 
 export class Game {
-  constructor(map, { apiBase } = {}) {
+  constructor(map) {
     this.map = map;
     this.busy = false;         // während Animationen keine Eingaben
     this.over = false;
     this.pointer = [innerWidth / 2, innerHeight / 2];
 
-    this.tracker = new ItemTracker(apiBase);
-    this.ready = this.tracker.load();
     this.held = new HeldPiece(map, document.getElementById("held-layer"));
     this.inventory = new Inventory(document.getElementById("slots"), (id) => this._onSlot(id));
     this.lives = new Lives(document.getElementById("lives"));
     this.refillMeter = new RefillMeter(document.getElementById("refill-meter"));
     this.timerMeter = new TimerMeter(document.getElementById("timer-meter"));
-    // Einzelspiel-Timer (Lobby: Server)
-    this.roundTimer = new RoundTimer((n) => this._timerTake(n), () => this.timerMeter.set(this.roundTimer.view()));
     this.feed = new Feed(document.getElementById("feed"));
     this.config = null;       // Konfiguration der laufenden Runde
-    this.remote = null;       // Lobby-Runde (RemoteRound) oder null im Einzelspiel
+    this.remote = null;       // RemoteRound (Server-Runde, Einzelspiel oder Lobby)
     /** Kurze Meldung in der Nachrichtenleiste (Text; kind: good | bad | info | hint) */
     this.toast = (text, kind = "info") => this.feed.push(text, kind || "info");
     this.progressEl = document.getElementById("progress");
@@ -75,28 +60,7 @@ export class Game {
   /** Läuft gerade eine Runde (zum Zurückkehren aus dem Menü)? */
   get running() { return this.config !== null && !this.over; }
 
-  /**
-   * @param {object} config  siehe menu/config.js
-   * @param {{seed?: number}} [opts]  Seed → reproduzierbare Reihenfolge (Tests)
-   */
-  async newRound(config, { seed } = {}) {
-    await this.ready; // UIDs vom Server, damit schon das erste "spawned" gezählt wird
-    this.ready = this.tracker.load(); // Schwierigkeit für die nächste Runde auffrischen
-    this.resetRound(config);
-    const features = poolFor(config, this.map.features);
-    const random = Number.isInteger(seed) ? seededRandom(seed) : Math.random;
-    // Reihenfolge nach dem Schwierigkeitsregler und der Item-Schwierigkeit aus der Statistik
-    this.pool = orderByDifficulty(features, config.difficulty ?? 50, (f) => this.tracker.difficulty(f.kind, f.id), random)
-      .map((f) => this._piece(f));
-    this.total = this.pool.length;
-    this.sinceRefill = 0;
-    this._deal(config.startItems);
-    this.feed.push({ kind: "info", parts: ["Neue Runde: ", { b: `${this.total} Items` }, `, ${Math.min(config.startItems, this.total)} im Inventar`] });
-    this.roundTimer.start(config);
-    this.timerMeter.set(this.roundTimer.view());
-  }
-
-  /** Alles für eine neue Runde zurücksetzen (Einzelspiel und Lobby) */
+  /** Alles für eine neue Runde zurücksetzen */
   resetRound(config, lives = config.lives) {
     this.config = config;
     this.cancelHeld();
@@ -106,13 +70,11 @@ export class Game {
     this.map.resetPlaced();
     this.inventory.clear();
     this.lives.reset(lives);
-    this.pool = [];
     this.pieces = new Map();
     this.correct = 0;
     this.total = 0;
     this.sinceRefill = 0;
     this.refillMeter.hide();
-    this.roundTimer.stop();
     this.timerMeter.hide();
     this._updateProgress();
   }
@@ -134,16 +96,13 @@ export class Game {
     };
   }
 
-  /** Items ins Inventar legen; im Einzelspiel als "spawned" zählen (Lobby: zählt der Server) */
+  /** Items ins Inventar legen (die Statistik zählt der Server) */
   addPieces(pieces) {
-    for (const p of pieces) {
-      this.pieces.set(p.id, p);
-      if (!this.remote) this.tracker.record(p.kind, p.code, "spawned");
-    }
+    for (const p of pieces) this.pieces.set(p.id, p);
     this.inventory.add(pieces);
   }
 
-  /** Teil ohne Animation aus dem Inventar nehmen (Lobby: Server hat es zurück in den Vorrat gelegt) */
+  /** Teil ohne Animation aus dem Inventar nehmen (Server hat es zurück in den Vorrat gelegt) */
   removePiece(id) {
     if (this.held.piece?.id === id) this.cancelHeld();
     this.inventory.remove(id);
@@ -163,30 +122,17 @@ export class Game {
     this._updateProgress();
   }
 
-  /** n Teile aus dem Vorrat ins Inventar legen */
-  _deal(n) {
-    const wave = this.pool.splice(0, n);
-    this.addPieces(wave);
-    this._updateProgress();
-    return wave.length;
-  }
-
   _updateProgress() {
     this.progressEl.textContent = `${this.correct}/${this.total}`;
     this.progressFill.style.width = `${this.total ? (100 * this.correct) / this.total : 0}%`;
     this.progressWrap.setAttribute("aria-label", `Eingesetzt: ${this.correct} von ${this.total} Items`);
-    if (!this.remote && this.total) this._updateRefill(this.sinceRefill, this.pool.length);
   }
 
-  /** Lobby: gemeinsamer Nachschub-Zähler und Vorrat vom Server */
+  /** Nachschub-Zähler und Vorrat vom Server (Lobby: Treffer aller zählen) */
   setRefill(since, poolLeft) {
     this.sinceRefill = since;
-    this._updateRefill(since, poolLeft);
-  }
-
-  _updateRefill(since, poolLeft) {
     const c = this.config;
-    this.refillMeter.update({ since, every: c.refillEvery, count: c.refillCount, poolLeft, shared: !!this.remote });
+    this.refillMeter.update({ since, every: c.refillEvery, count: c.refillCount, poolLeft, shared: !this.remote?.solo });
   }
 
   /** Animation vorbei: Eingaben wieder frei, zurückgestellten Lobby-Zustand anwenden */
@@ -198,7 +144,7 @@ export class Game {
   /** Kein Zurücklegen: Hinweis statt Aktion. true = blockiert */
   _noReturn() {
     if (!this.config?.noReturn || !this.held.active) return false;
-    this.toast(`Zurücklegen ist aus – ${this.held.piece.name} muss eingesetzt werden${this.remote ? " (oder gesendet)" : ""}`, "hint");
+    this.toast(`Zurücklegen ist aus – ${this.held.piece.name} muss eingesetzt werden${this.remote?.solo ? "" : " (oder gesendet)"}`, "hint");
     return true;
   }
 
@@ -220,42 +166,11 @@ export class Game {
     this.map.setDblClickZoom(false);
   }
 
+  /** Einsetzversuch: Ergebnis an den Server; Leben, Nachschub und Rundenende kommen mit dem nächsten Zustand */
   async _tryPlace() {
     const piece = this.held.piece;
     const fits = this.held.fits();
     this.busy = true;
-    if (!this.remote) this.tracker.record(piece.kind, piece.code, fits ? "correct" : "incorrect");
-    if (this.remote) return this._tryPlaceRemote(piece, fits);
-    if (fits) {
-      await this.held.snap();
-      this.map.setPlaced(piece.id, true);
-      this.inventory.setState(piece.id, "placed");
-      this._endHolding();
-      this.busy = false;
-      this.correct += 1;
-      this.sinceRefill += 1;
-      this._updateProgress();
-
-      this.feed.push({ kind: "good", parts: [{ item: piece.name }, " sitzt"] });
-      if (this.correct === this.total) return this._finish(true);
-      if (this.sinceRefill >= this.config.refillEvery && this.pool.length) {
-        this.sinceRefill = 0;
-        const n = this._deal(this.config.refillCount);
-        this.feed.push({ kind: "refill", parts: [{ b: `+${n}` }, ` neue ${n === 1 ? "Item" : "Items"} im Inventar`] });
-      }
-      this._unstick();
-      return;
-    }
-
-    const left = this.lives.lose();
-    this.feed.push({ kind: "bad", parts: ["Daneben – ", { item: piece.name }, left > 0 ? ` · noch ${left} Leben` : ""] });
-    await this._flyBack(piece);
-    this.busy = false;
-    if (left === 0) this._finish(false);
-  }
-
-  /** Lobby: Ergebnis an den Server; Leben, Nachschub und Rundenende kommen mit dem nächsten Zustand */
-  async _tryPlaceRemote(piece, fits) {
     this.remote.send(piece.id, fits);
     if (fits) {
       await this.held.snap();
@@ -305,44 +220,13 @@ export class Game {
     this._rearm = setTimeout(() => this.map.setDblClickZoom(true), DBLCLICK_REARM_MS);
   }
 
-  /** Einzelspiel: Timer-Takt – die ältesten n Items zurück in den Vorrat (an zufällige Stellen) */
-  _timerTake(n) {
-    if (this.over || this.remote) return;
-    const ids = [...this.inventory.pieces.keys()]
-      .filter((id) => ["ready", "held"].includes(this.inventory.state(id)))
-      .slice(0, n);
-    if (!ids.length) return;
-    const names = [];
-    for (const id of ids) {
-      const piece = this.pieces.get(id);
-      this.removePiece(id);
-      this.pool.splice(Math.floor(Math.random() * (this.pool.length + 1)), 0, piece);
-      names.push(piece.name);
-    }
-    const parts = ["Zeit abgelaufen – "];
-    names.forEach((name, i) => parts.push(...(i ? [", "] : []), { item: name }));
-    parts.push(" zurück in den Vorrat");
-    this.feed.push({ kind: "take", parts });
-    this._unstick();
-    this._updateProgress();
-  }
-
-  /** Einzelspiel: nichts mehr im Inventar, aber Vorrat → sofort nachlegen (sonst ginge es nicht weiter) */
-  _unstick() {
-    if (this.remote || this.over || !this.pool.length || this.inventory.openCount > 0) return;
-    this.sinceRefill = 0;
-    const n = this._deal(this.config.refillCount);
-    this.feed.push({ kind: "refill", parts: ["Inventar leer – ", { b: `+${n}` }, ` neue ${n === 1 ? "Item" : "Items"}`] });
-  }
-
   _finish(won) {
     this.over = true;
-    this.roundTimer.stop();
     this.timerMeter.hide();
     this.cancelHeld();
     const lives = `${this.lives.value} von ${this.lives.max}`;
     let title, text;
-    if (!this.remote) {
+    if (this.remote.solo) {
       title = won ? "Runde geschafft" : "Keine Leben mehr";
       text = won
         ? `Alle ${this.total} Items sitzen – mit ${lives} Leben übrig.`

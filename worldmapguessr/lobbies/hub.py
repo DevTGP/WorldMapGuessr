@@ -1,7 +1,10 @@
 """Live-Verbindungen der Lobbys: wer ist online, Host-Übergabe, gemeinsame Runde, Broadcast.
 
 Jeder Spieler bekommt denselben Lobby-Zustand (inkl. öffentlicher Rundenansicht: eingesetzte Teile,
-Leben, Vorratsgröße) plus sein eigenes Inventar (`hand`). Fremde Inventare sieht niemand."""
+Leben, Vorratsgröße) plus sein eigenes Inventar (`hand`). Fremde Inventare sieht niemand.
+
+Getrennte Spieler behalten ihr Inventar, bis sie die Lobby verlassen oder sie verfällt (Runden lassen
+sich Stunden später fortsetzen). Ist niemand verbunden, steht der Rundentimer."""
 from __future__ import annotations
 
 import json
@@ -13,7 +16,6 @@ from .settings import DEFAULT_ALLOW_SEND, clean_name
 from .store import LobbyError, LobbyStore
 
 HOST_GRACE = 10.0         # s: so lange darf der Host weg sein (z. B. Seite neu laden), bevor die Rolle wechselt
-HAND_GRACE = 60.0         # s: so lange behält ein getrennter Spieler sein Inventar, danach zurück in den Vorrat
 EXPIRE_INTERVAL = 600.0   # s: Abstand der Aufräumläufe für verfallene Lobbys
 TICK_INTERVAL = 0.5       # s: Takt, in dem die Rundentimer geprüft werden
 CHAT_IN_STATE = 30        # letzte Chat-Nachrichten im Lobby-Zustand
@@ -37,11 +39,9 @@ class Connection:
 
 
 class LobbyHub:
-    def __init__(self, store: LobbyStore, host_grace: float = HOST_GRACE, clock=time.monotonic,
-                 hand_grace: float = HAND_GRACE):
+    def __init__(self, store: LobbyStore, host_grace: float = HOST_GRACE, clock=time.monotonic):
         self.store = store
         self.host_grace = host_grace
-        self.hand_grace = hand_grace
         self.clock = clock
         self.lock = threading.RLock()
         self.online: dict[str, dict[str, list[Connection]]] = {}  # code → player_id → Verbindungen
@@ -68,6 +68,8 @@ class LobbyHub:
                     online_count=len(self.online.get(code, {})),
                 )
             conn.player_id = player["id"]
+            if not self.online.get(code):
+                self.store.pause_timer(code, False)  # erster Spieler da → Timer läuft weiter
             online = self.online.setdefault(code, {})
             # Host noch nie verbunden (frisch erstellt oder nach Serverneustart): Karenzzeit ab jetzt
             if lobby["host"] not in online:
@@ -97,10 +99,9 @@ class LobbyHub:
                 lobby = self.store.get(code)
                 if lobby and lobby["host"] == conn.player_id:
                     self._later(self.host_grace + 0.1, self._host_check, code)
-                if lobby and lobby["round"] and lobby["round"]["hands"].get(conn.player_id):
-                    self._later(self.hand_grace + 0.1, self._hand_check, code, conn.player_id)
             if not players:
                 self.online.pop(code, None)
+                self.store.pause_timer(code, True)  # niemand mehr da → Timer anhalten
         self.broadcast(code)
 
     # ---------- Nachrichten ----------
@@ -127,6 +128,13 @@ class LobbyHub:
                              online=self._online_ids(code))
         elif kind == "rename":
             self.store.rename(code, pid, msg.get("name"))
+        elif kind == "pause":
+            # Einzelspiel: Timer steht, solange Menü oder Dialog offen sind (in Lobbys läuft er für alle weiter)
+            lobby = self.store.get(code)
+            if not lobby or not lobby["settings"].get("solo"):
+                return
+            if not self.store.pause_timer(code, msg.get("paused") is True):
+                return
         elif kind == "chat":
             if not self.store.chat(code, pid, msg.get("text")):
                 return
@@ -181,6 +189,7 @@ class LobbyHub:
                 "config": s["config"], "maxPlayers": s["maxPlayers"], "private": bool(s["passwordHash"]),
                 "allowSend": s.get("allowSend", DEFAULT_ALLOW_SEND),
                 "sendEvery": self.store.send_every(lobby),
+                "solo": bool(s.get("solo")), "ttl": self.store.ttl_of(lobby),
             },
             "round": rounds.public_view(lobby["round"], now=self.store.clock()),
             "chat": lobby.get("chat", [])[-CHAT_IN_STATE:],
@@ -208,17 +217,6 @@ class LobbyHub:
 
     def online_count(self, code: str) -> int:
         return len(self.online.get(code, {}))
-
-    # ---------- Getrennte Spieler ----------
-    def _hand_check(self, code: str, player_id: str):
-        """Nach hand_grace immer noch getrennt → Inventar zurück in den Vorrat."""
-        with self.lock:
-            since = self.offline_since.get((code, player_id))
-            if since is None or self.clock() - since < self.hand_grace:
-                return
-            n = self.store.return_hand(code, player_id, online=self._online_ids(code))
-        if n:
-            self.broadcast(code)
 
     @staticmethod
     def _later(delay: float, fn, *args):

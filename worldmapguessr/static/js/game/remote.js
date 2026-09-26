@@ -1,6 +1,7 @@
-// Lobby-Runde im Browser: bildet den Server-Zustand (gemeinsame Runde + eigenes Inventar) auf Karte,
-// Inventar, Leben und Fortschritt ab. Der Server ist maßgeblich – jedes Teil liegt in der Lobby nur
-// einmal vor; der Browser prüft nur, ob ein Teil passt, und meldet das Ergebnis.
+// Server-Runde im Browser (Einzelspiel = Solo-Lobby, oder Lobby mit Mitspielern): bildet den Server-Zustand
+// (Runde + eigenes Inventar) auf Karte, Inventar, Leben und Fortschritt ab. Der Server ist maßgeblich –
+// jedes Teil liegt in der Runde nur einmal vor; der Browser prüft nur, ob ein Teil passt, und meldet das
+// Ergebnis. Im Einzelspiel hält der Server den Timer an, solange hier ein Dialog offen ist.
 
 import { fromWire } from "../menu/config.js";
 
@@ -8,6 +9,7 @@ import { fromWire } from "../menu/config.js";
 const RESYNC_ERRORS = new Set(["not_in_hand", "round_over", "no_round", "bad_target", "send_disabled", "send_limit"]);
 /** So viele ältere Chat-Nachrichten zeigt die Leiste beim Beitreten */
 const CHAT_HISTORY = 10;
+const PAUSE_CHECK_MS = 300;
 
 export class RemoteRound {
   /**
@@ -24,9 +26,12 @@ export class RemoteRound {
     this.finished = false;
     this.queued = null;     // {lobby, hand}, während einer Animation zurückgestellt
     this.chatSeq = null;    // zuletzt angezeigte Chat-Nachricht (null = noch keine Nachricht gesehen)
+    this.paused = null;     // zuletzt gemeldeter Pausenzustand (Einzelspiel)
     game.remote = this;
-    game.lives.setTitle("Gemeinsame Leben der Lobby");
-    game.feed.enableChat((text) => client.chat(text));
+
+    // Einzelspiel: Menü/Dialog offen oder Tab im Hintergrund → Timer anhalten
+    setInterval(() => this._syncPause(), PAUSE_CHECK_MS);
+    client.addEventListener("welcome", () => { this.paused = null; });
 
     client.addEventListener("error", ({ detail: err }) => {
       if (err.code === "send_limit" || err.code === "send_disabled") game.toast(err.message, "hint");
@@ -50,7 +55,13 @@ export class RemoteRound {
   }
 
   /** Neuer Zustand vom Server; während Animationen zurückgestellt (Game ruft flush) */
+  /** Einzelspiel (Solo-Lobby)? */
+  get solo() { return !!this.client.state?.settings?.solo; }
+
   apply(lobby, hand) {
+    const solo = !!lobby.settings.solo;
+    this.game.feed.setChat(solo ? null : (text) => this.client.chat(text));
+    this.game.lives.setTitle(solo ? "Leben" : "Gemeinsame Leben der Lobby");
     this._chat(lobby);
     const t = lobby.round?.status === "running" ? lobby.round.timer : null;
     this.timer = t ? { ...t, at: performance.now() } : null;
@@ -112,6 +123,15 @@ export class RemoteRound {
     }
   }
 
+  _syncPause() {
+    const round = this.client.state?.round;
+    if (!this.solo || !this.client.connected || round?.status !== "running" || !round.timer) return;
+    const paused = !!document.querySelector("dialog[open]") || document.hidden;
+    if (paused === this.paused) return;
+    this.paused = paused;
+    this.client.pause(paused);
+  }
+
   /** Timer-Anzeige aus dem zuletzt empfangenen Server-Timer (um die seitdem vergangene Zeit korrigiert) */
   _showTimer() {
     const t = this.timer;
@@ -165,7 +185,7 @@ export class RemoteRound {
       case "refill": {
         const to = Object.entries(ev.to ?? {});
         const parts = [{ b: `+${ev.count}` }, ` neue ${ev.count === 1 ? "Item" : "Items"}`];
-        if (to.length) {
+        if (to.length && !this.solo) {
           parts.push(": ");
           to.forEach(([id, n], i) => parts.push(...(i ? [", "] : []), who(id, i ? "du" : "Du"), ` ${n}`));
         }
@@ -173,7 +193,7 @@ export class RemoteRound {
       }
       case "take": {
         const parts = ["Zeit abgelaufen – "];
-        (ev.items ?? []).forEach(({ player, key }, i) => parts.push(...(i ? [", "] : []), item(key), " (", who(player, "du"), ")"));
+        (ev.items ?? []).forEach(({ player, key }, i) => parts.push(...(i ? [", "] : []), item(key), ...(this.solo ? [] : [" (", who(player, "du"), ")"])));
         parts.push(" zurück in den Vorrat");
         return { kind: "take", parts };
       }
