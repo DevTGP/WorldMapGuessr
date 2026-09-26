@@ -1,5 +1,7 @@
 // Texte, die erklären, was die Rundeneinstellungen in einer Lobby bewirken.
 
+import { difficultyLabel } from "../game/difficulty.js";
+
 /**
  * Wie viele Items bekommt jeder, wenn `total` reihum an `players` Spieler geht?
  * 5 an 2 → "3 + 2", 2 an 3 → "1 + 1 + 0", ab 6 Spielern zusammengefasst → "je 1–2".
@@ -21,13 +23,15 @@ export function ruleHints(config, players) {
       : "für alle zusammen, reihum verteilt",
     refillCount: "insgesamt, reihum weiterverteilt",
     refillEvery: "… Treffer der ganzen Lobby",
+    difficulty: "Reihenfolge, in der der Server austeilt",
   };
 }
 
 /** Regel-Zusammenfassung im Fuß des Menüs (HTML) */
 export function ruleSummary(config, start, players) {
   const split = players > 1 ? ` reihum (${splitText(start, players)})` : "";
-  return `<b>${config.lives}</b> gemeinsame Leben · Start: <b>${start}</b>${split} · ` +
+  return `<b>${difficultyLabel(config.difficulty ?? 50)}</b> (${config.difficulty ?? 50} %) · ` +
+    `<b>${config.lives}</b> gemeinsame Leben · Start: <b>${start}</b>${split} · ` +
     `alle <b>${config.refillEvery}</b> Treffer der Lobby → <b>${config.refillCount}</b> neue`;
 }
 

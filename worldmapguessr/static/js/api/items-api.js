@@ -5,6 +5,7 @@ export class ItemTracker {
   constructor(apiBase = "/api") {
     this.base = apiBase.replace(/\/$/, "");
     this.uids = new Map(); // "kind:code" → uid
+    this.difficulties = new Map(); // "kind:code" → Schwierigkeit 0…10
   }
 
   /** UIDs laden (optional nur eine Art). Schlägt das fehl, läuft das Spiel ohne Tracking weiter. */
@@ -14,13 +15,18 @@ export class ItemTracker {
       const res = await fetch(`${this.base}/items${query}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const { items } = await res.json();
-      for (const i of items) this.uids.set(`${i.kind}:${i.code}`, i.uid);
+      for (const i of items) {
+        this.uids.set(`${i.kind}:${i.code}`, i.uid);
+        this.difficulties.set(`${i.kind}:${i.code}`, i.difficulty);
+      }
     } catch (err) {
       console.warn("Item-Tracking nicht verfügbar:", err.message);
     }
   }
 
   uid(kind, code) { return this.uids.get(`${kind}:${code}`); }
+  /** Schwierigkeit 0…10 oder undefined (unbekannt) */
+  difficulty(kind, code) { return this.difficulties.get(`${kind}:${code}`); }
 
   /** Ereignis melden (fire-and-forget; Fehler werden nur protokolliert) */
   record(kind, code, event) {

@@ -30,6 +30,7 @@ def test_catalog_groups_countries_by_region(app):
     assert len(catalog["country-as"]) == 49 and "country:CYP" in catalog["country-as"]
     assert "country:RUS" in catalog["country-eu"] and "country:CYP" not in catalog["country-eu"]
     assert len(catalog["country-oc"]) == 14 and "country:AUS" in catalog["country-oc"]
+    assert app.extensions["lobby_store"].difficulty()["country:DEU"] == 5.0  # Reihenfolge in Lobbys
 
 
 def test_record_event(client):
@@ -39,6 +40,16 @@ def test_record_event(client):
     r = client.post(f"/api/items/{uid}/events", json={"event": "correct"})
     assert r.get_json()["correct"] == 1
     assert client.get(f"/api/items/{uid}").get_json()["correct"] == 1
+
+
+def test_items_carry_difficulty(client):
+    items = client.get("/api/items").get_json()["items"]
+    assert all(i["difficulty"] == 5.0 for i in items)          # noch keine Daten → mittel
+    uid = items[0]["uid"]
+    client.post(f"/api/items/{uid}/events", json={"event": "spawned"})
+    r = client.post(f"/api/items/{uid}/events", json={"event": "correct"})
+    assert r.get_json()["difficulty"] == 0.0
+    assert client.get(f"/api/items/{uid}").get_json()["difficulty"] == 0.0
 
 
 def test_invalid_requests(client):

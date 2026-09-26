@@ -5,6 +5,8 @@
 
 import { iconPath } from "../map/icon.js";
 import { createStepper } from "./stepper.js";
+import { createDifficultySlider } from "./difficulty-slider.js";
+import { difficultyLabel } from "../game/difficulty.js";
 import { ItemPicker } from "./item-picker.js";
 import { GROUPS, LIMITS, cloneConfig, defaultConfig, poolFor } from "./config.js";
 
@@ -36,7 +38,8 @@ export class Menu {
     this.summaryPrefix = () => "";
     /** Zusammenfassung der Regeln (HTML); im Lobby-Modus ersetzt */
     this.summaryRules = (c, start) =>
-      `<b>${c.lives}</b> Leben · Start mit <b>${start}</b>${start < c.startItems ? " (alle)" : ""} · ` +
+      `<b>${difficultyLabel(c.difficulty)}</b> (${c.difficulty} %) · <b>${c.lives}</b> Leben · ` +
+      `Start mit <b>${start}</b>${start < c.startItems ? " (alle)" : ""} · ` +
       `je <b>${c.refillEvery}</b> Treffer → <b>${c.refillCount}</b> neue`;
     /** Hinweis über den Rundeneinstellungen (null = keiner); im Lobby-Modus ersetzt */
     this.roundNote = () => (this.canCancel ? "Es läuft eine Runde. Änderungen gelten ab der nächsten Runde." : null);
@@ -151,12 +154,16 @@ export class Menu {
       startItems: make("startItems", "Start-Items", "im Inventar zu Beginn"),
       refillCount: make("refillCount", "Neue Items", "pro Nachschub"),
       refillEvery: make("refillEvery", "Nachschub alle", "… richtige Treffer"),
+      difficulty: createDifficultySlider({
+        value: c.difficulty,
+        onChange: (v) => { this.config.difficulty = v; this._edited(); },
+      }),
     };
     const fields = document.getElementById("rule-fields");
     const refill = document.createElement("div");
     refill.className = "field-pair";
     refill.append(this.steppers.refillCount.el, this.steppers.refillEvery.el);
-    fields.append(this.steppers.lives.el, this.steppers.startItems.el, refill);
+    fields.append(this.steppers.difficulty.el, this.steppers.lives.el, this.steppers.startItems.el, refill);
   }
 
   _syncControls() {

@@ -12,6 +12,7 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
 - Vor jeder Runde öffnet sich das Menü (auch über „Neue Runde“ oben rechts und nach Rundenende über „Einstellungen“):
   - **Item-Arten:** sieben Karten zum An-/Abwählen – 7 Kontinente, 45 Staaten Europas (klassisches Europa inkl. Russland und Kosovo, ohne Türkei, Zypern und Kaukasus), 23 Staaten Nordamerikas (USA, Kanada, Mexiko, 7 Staaten Mittelamerikas, 13 Karibikstaaten; ohne abhängige Gebiete wie Grönland oder Puerto Rico), 12 Staaten Südamerikas (ohne Französisch-Guayana und Falklandinseln), 54 Staaten Afrikas (ohne Westsahara, Réunion, Mayotte, St. Helena), 49 Staaten Asiens (46 unabhängige Staaten inkl. Türkei, Kaukasus und Kasachstan, dazu Zypern, Taiwan und Palästina; Russland zählt als Ganzes zu Europa), 14 Staaten Ozeaniens (ohne abhängige Gebiete wie Neukaledonien, Französisch-Polynesien, Cookinseln, Niue, Guam).
   - **Einzelne Items:** ausschließen (Suche, „Alle“/„Keine“ je Gruppe).
+  - **Schwierigkeit:** Regler 0–100 % (Standard 50 %) mit Stufen Sehr einfach (≤ 15 %), Einfach (≤ 35 %), Normal (≤ 60 %), Schwierig (≤ 80 %), Sehr schwierig (≤ 95 %), Unmöglich. Er bestimmt die Reihenfolge, in der die Items kommen: Je Item Wert = (1 − z) · Item-Schwierigkeit/10 + z · Zufall mit Zufallsanteil z = min(Regler, 100 % − Regler). Bis 50 % kommt das Item mit dem kleinsten Wert zuerst (0 % = streng von leicht nach schwer, 20 % = 80 % Schwierigkeit + 20 % Zufall …), ab 51 % das mit dem größten (100 % = streng von schwer nach leicht). In Lobbys rechnet der Server genauso (`worldmapguessr/difficulty.py`, Browser: `static/js/game/difficulty.js`).
   - **Regeln:** Leben (Standard 10), Start-Items (Standard 5), Nachschub: neue Items (Standard 4) nach je … Treffern (Standard 3).
   - Die Einstellungen gelten nur für die gestartete Runde und werden nicht gespeichert; solange die Seite offen ist, merkt sich das Menü die letzte Auswahl. „Nochmal“ im Rundenende-Dialog startet mit denselben Einstellungen neu gemischt.
   - Während einer laufenden Runde schließt `Esc` bzw. × das Menü wieder, ohne die Runde zu verlieren; ein Hinweis sagt, dass Änderungen erst ab der nächsten Runde gelten.
@@ -106,15 +107,17 @@ Was wann zählt:
 | `correct` (Eingesetzt) | richtiger Einsetzversuch | vom Server angenommener richtiger Versuch |
 | `incorrect` (Fehlplatziert) | falscher Versuch (kostet ein Leben) | vom Server angenommener falscher Versuch (nicht nach Rundenende oder mit fremden Items) |
 
+**Item-Schwierigkeit** 0 (leicht) … 10 (schwer) = 10 × (1 − (75 % Eingesetzt/Spawns + 25 % Trefferquote)), auf eine Nachkommastelle. Ohne Daten gilt 5; fehlt eine der beiden Quoten (z. B. nie versucht), zählt die andere allein; Eingesetzt/Spawns wird auf 100 % begrenzt. Die API liefert sie bei jedem Item als `difficulty` mit.
+
 In der Lobby meldet der Browser nichts (`lobbies/round.py` sammelt die Ereignisse, `item_events.py` schreibt sie).
 Hinweis: Bis zu dieser Version haben in Lobbys die Browser gezählt – ältere Zahlen können dort Spawns doppelt enthalten
 (Neuladen, gesendete Items).
 
 **Statistik-Seite:** <http://127.0.0.1:5000/stats> (oder das Balken-Symbol oben rechts im Spiel). Tabelle aller Items,
 sortierbar per Klick auf den Spaltenkopf (zweiter Klick kehrt die Richtung um), Filter Kontinente/Staaten, Suche nach
-Name, Code oder UID. Oben Kacheln mit den Summen (Spawns, Eingesetzt, Fehlplatziert) und den Quoten
-**Eingesetzt / Spawns** und **Trefferquote** (eingesetzt / Versuche) – jeweils für den aktuellen Filter; dieselben
-Summen stehen als letzte Tabellenzeile. Je Item gibt es beide Quoten als Spalte. Darunter die Rohdaten als JSON
+Name, Code oder UID. Oben Kacheln mit den Summen (Spawns, Eingesetzt, Fehlplatziert), den Quoten
+**Eingesetzt / Spawns** und **Trefferquote** (eingesetzt / Versuche) sowie **Ø Schwierigkeit** – jeweils für den aktuellen Filter; dieselben
+Summen stehen als letzte Tabellenzeile. Je Item gibt es beide Quoten und die Schwierigkeit (0–10, mit Balken) als Spalte. Darunter die Rohdaten als JSON
 (gefiltert und sortiert wie die Tabelle); ein Klick auf eine UID kopiert sie.
 Ist der Server nicht erreichbar, läuft das Spiel ohne Tracking weiter (Warnung in der Konsole).
 
@@ -137,6 +140,7 @@ worldmapguessr/
   lobbies/store.py            Lobbys im Speicher, Beitritt, Passwort, Host-Aktionen, Verfall
   lobbies/hub.py              Live-Verbindungen, Online-Status, Host-Wechsel, Broadcast (mit eigenem Inventar)
   lobbies/round.py            Mehrspieler-Runde: Vorrat, Inventare, gemeinsame Leben, Nachschub
+  difficulty.py               Item-Schwierigkeit (0–10) und Reihenfolge nach dem Schwierigkeitsregler
   item_events.py              Item-Statistik aus Lobby-Runden in den Item-Store schreiben
   lobbies/catalog.py          Item-Katalog je Gruppe aus world.topo.json
   lobbies/ws.py               WebSocket-Endpunkt
@@ -168,6 +172,8 @@ worldmapguessr/
   static/js/stats/sort.js     Sortierung, Trefferquote
   static/js/stats/render.js   Tabelle, Zusammenfassung, JSON-Ansicht
   static/js/game/game.js      Spielablauf nach Konfiguration (Wellen, Einsetzen, Leben, Tracking)
+  static/js/game/difficulty.js    Reihenfolge nach Schwierigkeitsregler, Stufen-Texte
+  static/js/menu/difficulty-slider.js  Schwierigkeitsregler im Menü
   static/js/game/refill-meter.js  Anzeige „Noch n Treffer bis +k neue“ am Inventar
   static/js/game/remote.js    Lobby-Runde: Server-Zustand auf Karte, Inventar, Leben abbilden
   static/js/menu/menu.js      Menü vor der Runde (Einzelspiel und Lobby)

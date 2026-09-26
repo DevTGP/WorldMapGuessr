@@ -33,12 +33,15 @@ def _hash_token(token: str) -> str:
 
 
 class LobbyStore:
-    def __init__(self, persistence, ttl: int = LOBBY_TTL, clock=time.time, catalog=None, on_stat=None):
+    def __init__(self, persistence, ttl: int = LOBBY_TTL, clock=time.time, catalog=None, on_stat=None,
+                 difficulty=None):
         """persistence: JsonLobbyPersistence/MongoLobbyPersistence oder ein Dateipfad (→ JSON).
         catalog: {Gruppe: [Feature-Key]} – alle Items, aus denen eine Runde gebaut wird.
-        on_stat(key, event): Item-Statistik der Lobby-Runden (spawned/correct/incorrect), vom Server gezählt."""
+        on_stat(key, event): Item-Statistik der Lobby-Runden (spawned/correct/incorrect), vom Server gezählt.
+        difficulty(): {key: 0…10} – aktuelle Item-Schwierigkeit für die Austeil-Reihenfolge."""
         self.catalog = catalog or {}
         self.on_stat = on_stat
+        self.difficulty = difficulty
         if isinstance(persistence, (str, os.PathLike)):
             persistence = JsonLobbyPersistence(persistence)
         self.persistence = persistence
@@ -151,6 +154,7 @@ class LobbyStore:
             lobby["round"] = rounds.new_round(
                 number, lobby["settings"]["config"], self.catalog, players,
                 seed=secrets.randbits(31), now=self.clock(),
+                difficulty=self.difficulty() if self.difficulty else None,
             )
             self.touch(code)
             return lobby

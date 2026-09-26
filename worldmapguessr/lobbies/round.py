@@ -29,6 +29,8 @@ from __future__ import annotations
 
 import random
 
+from ..difficulty import order_by_difficulty
+
 RUNNING, WON, LOST = "running", "won", "lost"
 STATS = "_stats"  # vorübergehende Liste [(key, event)] für die Item-Statistik
 
@@ -40,17 +42,19 @@ class RoundError(Exception):
         self.message = message
 
 
-def build_pool(catalog: dict[str, list[str]], config: dict, rng: random.Random) -> list[str]:
-    """Alle Teile der Konfiguration (Arten ohne ausgeschlossene), gemischt."""
+def build_pool(catalog: dict[str, list[str]], config: dict, rng: random.Random,
+               difficulty: dict[str, float] | None = None) -> list[str]:
+    """Alle Items der Konfiguration (Gruppen ohne ausgeschlossene) in Austeil-Reihenfolge nach dem
+    Schwierigkeitsregler (config["difficulty"], 0…100 %) und der Item-Schwierigkeit."""
     excluded = set(config.get("excluded") or [])
     keys = [k for kind in config["kinds"] for k in catalog.get(kind, []) if k not in excluded]
-    rng.shuffle(keys)
-    return keys
+    return order_by_difficulty(keys, difficulty or {}, config.get("difficulty", 50), rng)
 
 
-def new_round(number: int, config: dict, catalog, online: list[str], seed: int, now: float) -> dict:
+def new_round(number: int, config: dict, catalog, online: list[str], seed: int, now: float,
+              difficulty: dict[str, float] | None = None) -> dict:
     rng = random.Random(seed)
-    pool = build_pool(catalog, config, rng)
+    pool = build_pool(catalog, config, rng, difficulty)
     rnd = {
         "number": number, "seed": seed, "startedAt": now, "config": dict(config),
         "status": RUNNING, "lives": config["lives"], "livesMax": config["lives"], "total": len(pool),

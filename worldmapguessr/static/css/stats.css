@@ -132,7 +132,7 @@ td.muted { color: var(--ink-soft); }
 }
 
 /* ---------- Summen ---------- */
-.totals { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.totals { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
 .total {
   display: flex;
   flex-direction: column;

@@ -5,6 +5,7 @@ LIMITS = {
     "startItems": (1, 60),
     "refillCount": (1, 20),
     "refillEvery": (1, 20),
+    "difficulty": (0, 100),  # Schwierigkeitsregler in % (Reihenfolge der Items, siehe difficulty.py)
 }
 # Item-Gruppen (Menü-Karten); Items behalten ihre Art im Key ("country:USA")
 KINDS = ("continent", "country-eu", "country-na", "country-sa", "country-af", "country-as", "country-oc")
@@ -18,6 +19,7 @@ DEFAULT_CONFIG = {
     "startItems": 5,
     "refillCount": 4,
     "refillEvery": 3,
+    "difficulty": 50,
     "kinds": list(KINDS),
     "excluded": [],
 }

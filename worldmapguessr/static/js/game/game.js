@@ -10,7 +10,8 @@
 // der Browser prüft nur, ob ein Teil passt, und meldet das Ergebnis. Gehaltene Teile können dort
 // auch an Mitspieler gesendet werden (giveHeld).
 
-import { sample, seededRandom } from "./random.js";
+import { seededRandom } from "./random.js";
+import { orderByDifficulty } from "./difficulty.js";
 import { HeldPiece } from "./held-piece.js";
 import { Inventory } from "./inventory.js";
 import { Lives } from "./lives.js";
@@ -68,14 +69,17 @@ export class Game {
 
   /**
    * @param {object} config  siehe menu/config.js
-   * @param {{seed?: number}} [opts]  Seed → gleiche Reihenfolge für alle Spieler einer Lobby-Runde
+   * @param {{seed?: number}} [opts]  Seed → reproduzierbare Reihenfolge (Tests)
    */
   async newRound(config, { seed } = {}) {
     await this.ready; // UIDs vom Server, damit schon das erste "spawned" gezählt wird
+    this.ready = this.tracker.load(); // Schwierigkeit für die nächste Runde auffrischen
     this.resetRound(config);
     const features = poolFor(config, this.map.features);
     const random = Number.isInteger(seed) ? seededRandom(seed) : Math.random;
-    this.pool = sample(features, features.length, random).map((f) => this._piece(f));
+    // Reihenfolge nach dem Schwierigkeitsregler und der Item-Schwierigkeit aus der Statistik
+    this.pool = orderByDifficulty(features, config.difficulty ?? 50, (f) => this.tracker.difficulty(f.kind, f.id), random)
+      .map((f) => this._piece(f));
     this.total = this.pool.length;
     this.sinceRefill = 0;
     this._deal(config.startItems);

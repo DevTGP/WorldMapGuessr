@@ -5,6 +5,7 @@ import os
 from flask import Flask
 from flask_sock import Sock
 
+from .difficulty import difficulty_map
 from .item_events import ItemEventRecorder
 from .item_store import seed_from_topojson
 from .lobbies import LobbyHub, LobbyStore
@@ -42,7 +43,7 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     # Lobby-Runden: Item-Statistik zählt der Server (Browser zählen nur im Einzelspiel)
     lobby_store = LobbyStore(lobby_persistence, catalog=load_catalog(world_path),
-                             on_stat=ItemEventRecorder(store))
+                             on_stat=ItemEventRecorder(store), difficulty=lambda: difficulty_map(store))
     lobby_hub = LobbyHub(lobby_store)
     if app.config["LOBBY_EXPIRY_THREAD"]:
         lobby_hub.start_expiry()

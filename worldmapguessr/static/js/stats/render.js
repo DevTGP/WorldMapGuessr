@@ -26,6 +26,21 @@ function rateCell(r) {
   return cell(wrap, "num");
 }
 
+const dec = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+/** Schwierigkeit 0…10: Zahl + Balken (grün → rot) */
+function difficultyCell(d) {
+  if (d == null) return cell("—", "num muted");
+  const wrap = document.createElement("span");
+  wrap.className = "rate difficulty";
+  const bar = document.createElement("span");
+  bar.className = "bar";
+  const hue = Math.round(130 - d * 13); // 130° grün … 0° rot
+  bar.innerHTML = `<i style="width:${d * 10}%;background:hsl(${hue} 55% 45%)"></i>`;
+  wrap.append(dec.format(d), bar);
+  return cell(wrap, "num");
+}
+
 export function renderRows(tbody, items) {
   tbody.replaceChildren(...items.map((it) => {
     const tr = document.createElement("tr");
@@ -40,6 +55,7 @@ export function renderRows(tbody, items) {
       cell(it.name),
       cell(kind),
       cell(it.code, "mono"),
+      difficultyCell(it.difficulty),
       cell(int.format(it.spawned), "num"),
       cell(int.format(it.correct), "num"),
       cell(int.format(it.incorrect), "num"),
@@ -75,6 +91,9 @@ export function renderTotals(items) {
   $("t-place-rate").textContent = place === null ? "—" : pct.format(place);
   $("t-place-bar").style.width = `${place === null ? 0 : Math.min(100, Math.round(place * 100))}%`;
   $("t-hit-rate").textContent = hit === null ? "—" : pct.format(hit);
+  const withD = items.filter((i) => typeof i.difficulty === "number");
+  $("t-difficulty").textContent = withD.length
+    ? dec.format(withD.reduce((s, i) => s + i.difficulty, 0) / withD.length) : "—";
 }
 
 /** Summenzeile unter der Tabelle */
@@ -83,8 +102,10 @@ export function renderFoot(tfoot, items) {
   const tr = document.createElement("tr");
   const label = cell(`Summe (${int.format(items.length)} Items)`);
   label.colSpan = 3;
+  const withD = items.filter((i) => typeof i.difficulty === "number");
   tr.append(
     label,
+    difficultyCell(withD.length ? Math.round(10 * withD.reduce((s, i) => s + i.difficulty, 0) / withD.length) / 10 : null),
     cell(int.format(t.spawned), "num"),
     cell(int.format(t.correct), "num"),
     cell(int.format(t.incorrect), "num"),

@@ -6,6 +6,7 @@ export const LIMITS = {
   startItems: { min: 1, max: 60 },
   refillCount: { min: 1, max: 20 },
   refillEvery: { min: 1, max: 20 },
+  difficulty: { min: 0, max: 100 },
 };
 
 /** Item-Gruppen im Menü (je eine Karte zum An-/Abwählen); config.kinds enthält Gruppen-IDs */
@@ -26,6 +27,7 @@ export function defaultConfig(kinds) {
     startItems: 5,
     refillCount: 4,   // neue Teile pro Nachschub
     refillEvery: 3,   // Nachschub nach so vielen Treffern
+    difficulty: 50,   // Schwierigkeitsregler in % (Reihenfolge der Items, siehe game/difficulty.js)
     kinds: new Set(kinds),
     excluded: new Set(), // Feature-Keys, z. B. "country:VAT"
   };
@@ -46,6 +48,7 @@ export function poolFor(config, features) {
 export function toWire(c) {
   return {
     lives: c.lives, startItems: c.startItems, refillCount: c.refillCount, refillEvery: c.refillEvery,
+    difficulty: c.difficulty,
     kinds: [...c.kinds], excluded: [...c.excluded].sort(),
   };
 }

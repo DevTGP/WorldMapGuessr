@@ -334,3 +334,62 @@
 .mp-rules summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 10px; }
 .mp-rules ul { margin: 0; padding: 0 12px 10px 28px; display: flex; flex-direction: column; gap: 5px; color: var(--ink-soft); }
 .mp-rules li b { color: var(--ink); font-weight: 600; }
+
+/* ---------- Schwierigkeitsregler ---------- */
+.field.difficulty {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px 8px;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  --diff: var(--good);
+}
+.field.difficulty[data-level="normal"] { --diff: #c7a12b; }
+.field.difficulty[data-level="schwierig"] { --diff: var(--piece); }
+.field.difficulty[data-level="sehr-schwierig"],
+.field.difficulty[data-level="unmöglich"] { --diff: var(--bad); }
+.difficulty-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.difficulty-head label { display: flex; flex-direction: column; font-weight: 600; font-size: 14px; }
+.difficulty-head label small { font-weight: 400; font-size: 12px; color: var(--ink-soft); }
+.difficulty-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1.5px solid var(--diff);
+  color: var(--ink);
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+.difficulty-value b { font: 600 13px "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; color: var(--diff); }
+.field.difficulty input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  margin: 6px 0 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--good), #c7a12b 50%, var(--bad));
+  cursor: pointer;
+}
+.field.difficulty input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 3px solid var(--diff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+.field.difficulty input[type="range"]::-moz-range-thumb {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 3px solid var(--diff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+.field.difficulty input[type="range"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+.field.difficulty input[type="range"]:disabled { cursor: default; opacity: 0.7; }
+.difficulty-explain { margin: 0; font-size: 12.5px; color: var(--ink-soft); }
