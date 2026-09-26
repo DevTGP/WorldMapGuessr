@@ -16,13 +16,12 @@ import { LoadingScreen, yielder } from "./ui/loading-screen.js";
 
 const WMG = window.WMG ?? {};
 
-// Ladephasen mit Gewicht ≈ typischem Zeitanteil (Download hängt von der Leitung ab)
+// Ladephasen mit Gewicht ≈ typischem Zeitanteil (Download hängt von der Leitung ab). Geladen wird nur
+// die grobe Stufe; feinere Kacheln und Items kommen beim Hineinzoomen nach.
 const loading = new LoadingScreen(document.getElementById("loading"), [
-  { id: "download", label: "Kartendaten herunterladen", weight: 30 },
-  { id: "parse", label: "Kartendaten lesen", weight: 4 },
-  { id: "simplify", label: "Detailstufen berechnen", weight: 14 },
-  { id: "shapes", label: "Umrisse vorbereiten", weight: 30 },
-  { id: "icons", label: "Items vorbereiten", weight: 17 },
+  { id: "download", label: "Kartendaten herunterladen", weight: 55 },
+  { id: "shapes", label: "Umrisse vorbereiten", weight: 10 },
+  { id: "icons", label: "Items vorbereiten", weight: 30 },
   { id: "start", label: "Karte zeichnen", weight: 5 },
 ]);
 
@@ -38,8 +37,8 @@ async function prepareIcons(features) {
 
 createMap({
   canvas: document.getElementById("map"),
-  dataUrl: WMG.dataUrl ?? "data/world.topo.json",
-  dataSize: WMG.dataSize,
+  base: WMG.mapBase,
+  startBytes: WMG.dataSize,
   loading,
 })
   .then(async (map) => {

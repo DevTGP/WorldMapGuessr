@@ -7,10 +7,10 @@ from flask_sock import Sock
 
 from .difficulty import difficulty_map
 from .item_events import ItemEventRecorder
-from .item_store import seed_from_topojson
+from .item_store import seed_items
+from .map_data import catalog, load_index, start_bytes
 from .lobbies import LobbyHub, LobbyStore
 from .storage import create_stores
-from .lobbies.catalog import load_catalog
 from .lobbies.codes import LobbyCodeConverter
 
 # Windows liest MIME-Typen aus der Registry; .js kommt dort teils als text/plain,
@@ -36,13 +36,15 @@ def create_app(test_config: dict | None = None) -> Flask:
         app.config.update(test_config)
 
     store, lobby_persistence, storage = create_stores(app.config, app.instance_path)
-    world_path = os.path.join(app.static_folder, "data", "world.topo.json")
-    seed_from_topojson(store, world_path)
+    map_index = load_index(app.static_folder)
+    app.extensions["map_index"] = map_index
+    app.extensions["map_start_bytes"] = start_bytes(app.static_folder, map_index)
+    seed_items(store, map_index["items"])
     app.extensions["item_store"] = store
     app.extensions["storage"] = storage
 
     # Lobby-Runden: Item-Statistik zählt der Server (Browser zählen nur im Einzelspiel)
-    lobby_store = LobbyStore(lobby_persistence, catalog=load_catalog(world_path),
+    lobby_store = LobbyStore(lobby_persistence, catalog=catalog(map_index),
                              on_stat=ItemEventRecorder(store), difficulty=lambda: difficulty_map(store))
     lobby_hub = LobbyHub(lobby_store)
     if app.config["LOBBY_EXPIRY_THREAD"]:

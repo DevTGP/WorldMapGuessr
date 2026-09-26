@@ -120,9 +120,16 @@ export class HeldPiece {
   /** Pfad für die aktuelle Kartenansicht neu berechnen */
   _redraw() {
     if (!this.g || this._flying) return;
-    this.pathEl.attr("d", this.map.svgPath(this.piece.feature));
+    // passende Detailstufe für den aktuellen Zoom nachladen (zeichnet danach von selbst neu)
+    this.map.items.ensure(this.piece.feature, this.map.itemLevel(this.piece.feature));
+    // Das Teil hängt mit seinem Anker am Mauszeiger, der im Kartenbereich bleibt: Sichtbar sein kann
+    // daher höchstens ein Bereich von einer Kartenbreite/-höhe um den Anker. Nur der wird gezeichnet –
+    // große Staaten bleiben so auch bei starkem Zoom flüssig.
     const r = this.map.canvas.getBoundingClientRect();
     const [ax, ay] = this.map.toScreen(this.piece.geom.anchor);
+    const px = ax - r.left, py = ay - r.top, m = 20; // Anker in Kartenkoordinaten
+    this.pathEl.attr("d", this.map.svgPath(this.piece.feature,
+      [[px - r.width - m, py - r.height - m], [px + r.width + m, py + r.height + m]]));
     this.ringEl
       .attr("cx", ax - r.left)
       .attr("cy", ay - r.top)

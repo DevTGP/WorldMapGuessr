@@ -224,11 +224,10 @@
 </dialog>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/topojson@3.0.2/dist/topojson.min.js"></script>
 <script>
   window.WMG = {
-    dataUrl: "{{ url_for('static', filename='data/world.topo.json') }}",
-    dataSize: {{ data_size | tojson }}, // unkomprimierte Größe für den Download-Fortschritt
+    mapBase: "{{ map_base }}",            // Kartendaten (Kacheln, Items) mit Versionsstand im Pfad
+    dataSize: {{ data_size | tojson }},   // Startdateien in Bytes (für den Download-Fortschritt)
     apiBase: "{{ request.script_root }}/api",
     lobbyCode: {{ (lobby_code or none) | tojson }},
   };

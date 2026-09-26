@@ -1,15 +1,15 @@
 {
   "name": "worldmapguessr-build",
   "private": true,
-  "description": "Erzeugt die Kartendaten für WorldMapGuessr",
+  "description": "Erzeugt die Kartendaten für WorldMapGuessr (Kacheln mit Detailstufen, Item-Umrisse)",
   "scripts": {
-    "build": "node 1-export-countries.js && python 2-merge-continents.py && node 3-topologize.js"
+    "build": "python 1-cells.py && node 2-tiles.mjs"
   },
   "dependencies": {
-    "world-atlas": "^2.0.2",
-    "world-countries": "^5.1.0",
+    "d3-geo": "^3.1.1",
     "topojson-client": "^3.1.0",
     "topojson-server": "^3.0.1",
-    "topojson-simplify": "^3.0.3"
+    "topojson-simplify": "^3.0.3",
+    "world-countries": "^5.1.0"
   }
 }

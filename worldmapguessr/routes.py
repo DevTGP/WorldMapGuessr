@@ -1,25 +1,31 @@
 """Seiten-Routen."""
-import os
 import re
 
-from flask import Blueprint, abort, current_app, redirect, render_template, url_for
+from flask import Blueprint, abort, current_app, redirect, render_template, request, send_from_directory, url_for
 
 from .lobbies.codes import PATTERN, normalize
+from .map_data import CACHE_SECONDS, map_dir
 
 bp = Blueprint("main", __name__)
 
 
-def _data_size() -> int:
-    """Unkomprimierte Größe der Kartendaten – für einen genauen Download-Fortschritt im Browser."""
-    try:
-        return os.path.getsize(os.path.join(current_app.static_folder, "data", "world.topo.json"))
-    except OSError:
-        return 0
+def _game_page(**kwargs):
+    """Spielseite mit Kartendaten-URL (inkl. Version) und Startgröße für den Ladebalken."""
+    version = current_app.extensions["map_index"]["version"]
+    return render_template("index.html", map_base=f"{request.script_root}/data/{version}",
+                           data_size=current_app.extensions["map_start_bytes"], **kwargs)
 
 
 @bp.get("/")
 def index():
-    return render_template("index.html", data_size=_data_size())
+    return _game_page()
+
+
+@bp.get("/data/<version>/<path:filename>")
+def map_data(version, filename):
+    """Kartendaten (Kacheln, Items, Index). Die Version im Pfad ändert sich mit jedem Build, daher darf
+    der Browser alles ein Jahr lang zwischenspeichern."""
+    return send_from_directory(map_dir(current_app.static_folder), filename, max_age=CACHE_SECONDS)
 
 
 @bp.get("/stats")
@@ -33,7 +39,7 @@ def lobby(code):
     """Lobby-Link, so kurz wie möglich: /K7Q2M (klein geschrieben → Weiterleitung)"""
     if code != code.upper():
         return redirect(url_for("main.lobby", code=code.upper()))
-    return render_template("index.html", lobby_code=code, data_size=_data_size())
+    return _game_page(lobby_code=code)
 
 
 @bp.get("/l/<code>")

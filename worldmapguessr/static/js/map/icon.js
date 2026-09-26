@@ -4,8 +4,6 @@
 // Inselstaaten aus weit verstreuten Atollen (Kiribati, Tuvalu, Marshallinseln …) wären eingepasst nur
 // noch Staub: Ist schon die größte Insel winzig, bekommt jede zu kleine Insel einen Punkt.
 
-import { lodPath, LOD_ICON_PX2 } from "./lod.js";
-
 /** Größte Insel kleiner als so viele Pixel → Streuinsel-Darstellung mit Punkten */
 const SCATTERED_MAX_PX = 6;
 /** Inseln unter dieser Größe werden als Punkt gezeichnet */
@@ -24,7 +22,7 @@ export function iconPath(feature, w, h, pad = 3) {
     const projection = d3.geoNaturalEarth1()
       .rotate([-feature.geom.centerLon, 0])
       .fitExtent([[pad, pad], [w - pad, h - pad]], feature);
-    cache.set(key, (lodPath(projection, LOD_ICON_PX2)(feature) ?? "") + scatteredDots(feature, projection));
+    cache.set(key, (d3.geoPath(projection)(feature) ?? "") + scatteredDots(feature, projection));
   }
   return cache.get(key);
 }

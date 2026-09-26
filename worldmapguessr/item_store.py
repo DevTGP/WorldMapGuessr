@@ -106,13 +106,7 @@ class ItemStore:
 
 
 # TopoJSON-Objekt → Item-Art
-SEED_LAYERS = {"continents": "continent", "countries": "country"}
-
-
-def seed_from_topojson(store: ItemStore, topojson_path: str | os.PathLike) -> None:
-    """Registriert alle Kontinente und Staaten aus den Kartendaten als Items."""
-    with open(topojson_path, encoding="utf-8") as f:
-        topo = json.load(f)
-    for obj, kind in SEED_LAYERS.items():
-        for g in topo["objects"].get(obj, {}).get("geometries", []):
-            store.ensure(kind, g["id"], g["properties"]["name"])
+def seed_items(store: ItemStore, items: list[dict]) -> None:
+    """Registriert alle Items der Kartendaten (index.json: kind, id, name)."""
+    for it in items:
+        store.ensure(it["kind"], it["id"], it["name"])

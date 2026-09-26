@@ -1,16 +1,16 @@
 // Weltkarte: Daten, Projektion und Ansicht (Drehung um die Längsachse, Zoom, vertikale Verschiebung).
-// Globale Abhängigkeiten (CDN): d3, topojson (inkl. presimplify).
+// Globale Abhängigkeit (CDN): d3. Kartendaten: Kacheln + Items mit Detailstufen (tiles.js, items.js).
 
 import { Renderer } from "./renderer.js";
 import { Gestures } from "./gestures.js";
-import { lodPath, LOD_PIECE_PX2 } from "./lod.js";
 import { yielder } from "../ui/loading-screen.js";
-import { featureGeometry, partsOf, pointCount } from "./geometry.js";
+import { TileStore } from "./tiles.js";
+import { ItemStore } from "./items.js";
+import { boxTest } from "./project.js";
 
 export const MIN_ZOOM = 1;
-export const MAX_ZOOM = 40; // Europa liegt in 1:10m vor; für Kleinststaaten weit hineinzoomen
+export const MAX_ZOOM = 40; // feinste Kachelstufe: Natural Earth 1:10m in voller Genauigkeit
 const IDLE_AFTER_MS = 140;   // so lange nach der letzten Bewegung wird in voller Qualität gezeichnet
-const VIEW_RADIUS_SAFETY = 1.8;
 const PAN_MARGIN = 0.22;     // vertikaler Spielraum beim Zoomen (Anteil der Fensterhöhe), z. B. für Antarktika über dem Inventar
 const PAN_MARGIN_RAMP = 0.5; // Spielraum wächst von Zoom 1 bis 1 + RAMP stetig an (kein Sprung beim Herauszoomen)
 export const ROTATE_STEP_DEG = 45; // Dreh-Pfeile: π/4
@@ -18,85 +18,60 @@ export const ROTATE_STEP_DEG = 45; // Dreh-Pfeile: π/4
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
- * Lädt die Kartendaten und liefert die fertige Karte.
- * @param {{canvas: HTMLCanvasElement, dataUrl: string, dataSize?: number,
+ * Lädt die Kartendaten (Index, grobe Items, Kacheln der Stufe 0) und liefert die fertige Karte.
+ * Feinere Kacheln und Item-Stufen kommen später bei Bedarf (siehe tiles.js, items.js).
+ * @param {{canvas: HTMLCanvasElement, base: string, startBytes?: number,
  *          loading?: import("../ui/loading-screen.js").LoadingScreen}} opts
- *   dataSize: unkomprimierte Dateigröße (vom Server) – für einen genauen Download-Fortschritt
- *   loading:  Ladebildschirm mit den Phasen "download", "parse", "simplify", "shapes"
+ *   base:       URL-Präfix der Kartendaten (…/data/<version>)
+ *   startBytes: Summe der Startdateien (vom Server) – für einen genauen Download-Fortschritt
+ *   loading:    Ladebildschirm mit den Phasen "download" und "shapes"
  * @returns {Promise<WorldMap>}
  */
-export async function createMap({ canvas, dataUrl, dataSize = 0, loading = null }) {
-  const phase = (id, detail) => loading?.enter(id, detail);
+export async function createMap({ canvas, base, startBytes = 0, loading = null }) {
   const report = (f, detail) => loading?.report(f, detail);
-  const tick = yielder();
-
-  phase("download");
-  const text = await download(dataUrl, dataSize, report);
-
-  phase("parse");
-  await tick(true);
-  const raw = JSON.parse(text);
-
-  phase("simplify");
-  await tick(true); // Beschriftung zeigen, bevor der Browser eine Weile rechnet
-  const topo = topojson.presimplify(raw, topojson.sphericalTriangleArea);
-
-  const layers = {
-    continents: topojson.feature(topo, topo.objects.continents).features.map((f) => prepare(f, "continent")),
-    countries: topojson.feature(topo, topo.objects.countries).features.map((f) => prepare(f, "country")),
+  loading?.enter("download");
+  let got = 0;
+  const onBytes = (n) => {
+    got += n;
+    report(startBytes ? Math.min(1, got / startBytes) : null,
+      startBytes ? `${mb(Math.min(got, startBytes))} / ${mb(startBytes)} MB` : `${mb(got)} MB`);
   };
-  // Fortschritt nach Rechenaufwand (Punkte), nicht nach Anzahl: Kontinente sind viel größer als Staaten
-  const all = [...layers.continents, ...layers.countries];
-  const total = all.reduce((n, f) => n + pointCount(f.geometry), 0);
-  let done = 0;
-  const status = (i) => `${i} / ${all.length} Umrisse`;
-  phase("shapes", status(0));
-  for (let i = 0; i < all.length; i++) {
-    const f = all[i];
-    f.geom = featureGeometry(f); // Anker, Fläche, Mittel-Länge
-    f.parts = [];                // Einzelteile, um Unsichtbares beim Zeichnen zu überspringen
-    for (const part of partsOf(f.geometry)) {
-      f.parts.push(part);
-      done += part.points;
-      if (await tick()) report(done / total, status(i));
-    }
-  }
-  report(1, status(all.length));
-  return new WorldMap(canvas, layers);
+  const index = await fetchJson(`${base}/index.json`, onBytes);
+  const tiles = new TileStore(base, index, () => {});
+  const items = new ItemStore(base, index);
+  const [start] = await Promise.all([fetchJson(`${base}/items/i0.json`, onBytes), tiles.loadLevel(0, onBytes)]);
+
+  loading?.enter("shapes", `0 / ${items.features.length} Umrisse`);
+  const tick = yielder();
+  items.setStart(start);
+  await tick(true);
+  report(1, `${items.features.length} / ${items.features.length} Umrisse`);
+  return new WorldMap(canvas, { index, tiles, items });
 }
 
-function prepare(f, kind) {
-  f.kind = kind;
-  f.key = `${kind}:${f.id}`;
-  // Item-Gruppe im Menü: Kontinente, Staaten Europas, Staaten Nordamerikas …
-  f.group = kind === "country" ? `country-${(f.properties.region ?? "EU").toLowerCase()}` : kind;
-  return f;
-}
-
-/** Datei als Text laden und dabei den Fortschritt melden (Stream, falls der Browser ihn anbietet) */
-async function download(url, expected, report) {
+/** JSON laden und dabei die Bytes melden (Stream, falls der Browser ihn anbietet) */
+async function fetchJson(url, onBytes) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  // Content-Length ist bei komprimierter Übertragung die komprimierte Größe → Servergröße bevorzugen
-  const total = expected || Number(res.headers.get("Content-Length")) || 0;
-  if (!res.body?.getReader || !total) {
-    report(null, "wird geladen …");
-    return res.text();
+  if (!res.body?.getReader) {
+    const text = await res.text();
+    onBytes(text.length);
+    return JSON.parse(text);
   }
   const reader = res.body.getReader();
   const chunks = [];
-  let got = 0;
+  let size = 0;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     chunks.push(value);
-    got += value.length;
-    report(Math.min(1, got / total), `${mb(Math.min(got, total))} / ${mb(total)} MB`);
+    size += value.length;
+    onBytes(value.length);
   }
-  const bytes = new Uint8Array(got);
+  const bytes = new Uint8Array(size);
   let offset = 0;
   for (const c of chunks) { bytes.set(c, offset); offset += c.length; }
-  return new TextDecoder().decode(bytes);
+  return JSON.parse(new TextDecoder().decode(bytes));
 }
 
 const mbFmt = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -105,24 +80,25 @@ const mb = (bytes) => mbFmt.format(bytes / 1e6);
 export class WorldMap {
   /**
    * @param {HTMLCanvasElement} canvas
-   * @param {{continents: object[], countries: object[]}} layers
+   * @param {{index: object, tiles: TileStore, items: ItemStore}} data
    */
-  constructor(canvas, layers) {
+  constructor(canvas, { index, tiles, items }) {
     this.canvas = canvas;
-    this.layers = layers;
-    /** Alle Features, die als Spielteil taugen (Kontinente + Staaten) */
-    this.features = [...layers.continents, ...layers.countries];
-    this.byKey = new Map(this.features.map((f) => [f.key, f]));
-    // Vollständige Projektion: Schnitt an der Datumsgrenze, Nachverdichtung langer Kanten (Kartenrand)
+    this.tiles = tiles;
+    this.items = items;
+    /** Alle Items (Kontinente + Staaten) als GeoJSON-Features mit Metadaten */
+    this.features = items.features;
+    this.byKey = items.byKey;
+    // d3-Projektion: Umrechnungen (Klick, gehaltenes Item, Meer, Gradnetz); das Land zeichnet der
+    // Kachel-Renderer mit derselben Formel selbst
     this.projection = d3.geoNaturalEarth1().precision(0.5);
-    // Schnelle Variante ohne Schnitt und ohne Nachverdichtung – für alle Teile, die die Schnittlinie
-    // nicht berühren. Spart die teure Polygon-Klippung von d3 für den Großteil der Daten.
-    this.fastProjection = d3.geoNaturalEarth1().precision(0).preclip((stream) => stream);
     this.view = { lambda: 0, k: 1, ty: 0 }; // lambda: Drehung in Grad (positiv = Karte nach rechts)
     this.size = { w: 0, h: 0 };
-    this.renderer = new Renderer(canvas);
-    this.renderer.levels = Object.keys(layers).length; // Kontinente + Staaten = 2 Stufen bis fast weiß
+    this.renderer = new Renderer(canvas, index, (key) => this.byKey.get(key));
+    this.renderer.levels = 2; // Kontinente + Staaten = 2 Stufen bis fast weiß
     this.renderer.onColorsChanged = () => this.requestRender();
+    tiles.onLoad = () => this.requestRender();
+    items.onUpgrade = () => this.requestRender();
     this._listeners = { view: [], click: [], contextmenu: [] };
     this._moving = false;
     this._frame = 0;
@@ -175,7 +151,6 @@ export class WorldMap {
   setView(v) {
     this.view = this.clamp(v);
     this._apply(this.view);
-    this._apply(this.view, this.fastProjection);
     this.requestRender();
   }
 
@@ -293,27 +268,39 @@ export class WorldMap {
     if (this._frame) return;
     this._frame = requestAnimationFrame(() => {
       this._frame = 0;
-      this.renderer.draw(this.projection, this.fastProjection, this.layers, this._moving, this.visibleTest());
+      const z = this.tiles.levelFor(this.projection.scale());
+      this.renderer.draw(this.projection, this.tiles.select(z, this.projection, this.size), this._moving);
       this._emit("view", this.view);
       if (this.renderer.animating) this.requestRender();
     });
   }
 
   /**
-   * Schneller Test, ob ein Teil (Mittelpunkt + Radius) im Bild liegen kann.
-   * Großzügig gerechnet: Natural Earth verzerrt lokal höchstens um etwa Faktor 1,6.
+   * SVG-Pfad eines Features in der aktuellen Ansicht (für das gehaltene Teil)
+   * @param {[[number, number], [number, number]]|null} clip  nur dieses Bildschirmrechteck (+ Rand)
    */
-  visibleTest() {
-    const { w, h } = this.size;
-    const center = this.projection.invert([w / 2, h / 2]);
-    const viewRadius = (Math.hypot(w, h) / 2 / this.projection.scale()) * VIEW_RADIUS_SAFETY;
-    if (!center || viewRadius >= Math.PI / 2) return () => true;
-    return (part) => part.center === null || d3.geoDistance(center, part.center) - part.radius < viewRadius;
+  svgPath(feature, clip = null) {
+    const ctx = new ThinPath(PIECE_STEP_PX);
+    let shape = feature;
+    if (clip && feature.boxes) {
+      // Polygone außerhalb gar nicht erst projizieren (z. B. Kanadas Inseln bei starkem Zoom)
+      const inClip = boxTest(this.projection, clip);
+      const polys = feature.geometry.coordinates.filter((_, i) => inClip(...feature.boxes[i]));
+      shape = { type: "MultiPolygon", coordinates: polys };
+    }
+    this.projection.clipExtent(clip);
+    try {
+      d3.geoPath(this.projection, ctx)(shape);
+    } finally {
+      this.projection.clipExtent(null);
+    }
+    return ctx.toString();
   }
 
-  /** SVG-Pfad eines Features in der aktuellen Ansicht (für das gehaltene Teil) */
-  svgPath(feature) {
-    return lodPath(this.projection, LOD_PIECE_PX2)(feature);
+  /** Detailstufe, die für ein Item bei der aktuellen Skala passt (Kontinente höchstens Stufe 3) */
+  itemLevel(feature) {
+    const z = this.items.levelFor(this.projection.scale());
+    return feature.kind === "continent" ? Math.min(z, 3) : z;
   }
 
   // ---------- Spielzustand ----------
@@ -336,4 +323,22 @@ export class WorldMap {
   }
 
   setDblClickZoom(enabled) { this.gestures.dblClickZoom = enabled; }
+}
+
+/** Punkte, die näher als so viele Pixel am vorigen liegen, lässt das gehaltene Teil aus */
+const PIECE_STEP_PX = 0.5;
+
+/** Pfad-Kontext für d3.geoPath, der einen SVG-Pfad baut und zu dichte Punkte überspringt */
+class ThinPath {
+  constructor(step) { this.step = step; this.parts = []; this.x = NaN; this.y = NaN; this.pending = null; }
+  moveTo(x, y) { this._flush(); this.parts.push(`M${x.toFixed(1)},${y.toFixed(1)}`); this.x = x; this.y = y; }
+  lineTo(x, y) {
+    if (Math.abs(x - this.x) < this.step && Math.abs(y - this.y) < this.step) { this.pending = [x, y]; return; }
+    this.pending = null;
+    this.parts.push(`L${x.toFixed(1)},${y.toFixed(1)}`); this.x = x; this.y = y;
+  }
+  closePath() { this.pending = null; this.parts.push("Z"); }
+  arc() {}
+  _flush() { if (this.pending) this.parts.push(`L${this.pending[0].toFixed(1)},${this.pending[1].toFixed(1)}`); this.pending = null; }
+  toString() { this._flush(); return this.parts.join(""); }
 }

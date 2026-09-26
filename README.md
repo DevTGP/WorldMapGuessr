@@ -8,7 +8,7 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
 
 - Die Karte lässt sich wie ein Globus um die Längsachse drehen: seitlich ziehen oder die Pfeile oben (bzw. `←`/`→`), die in 45°-Schritten (π/4) auf 0°, 45°, 90° … weiterdrehen. Was in der Mitte liegt, ist am wenigsten verzerrt.
 - Bei 100 % ist die Y-Achse fest (Ziehen dreht nur). Erst nach dem Hineinzoomen lässt sich die Karte auch senkrecht verschieben.
-- Beim Start zeigt ein Ladebildschirm den Fortschritt: Kartendaten herunterladen (in MB, der Server gibt die unkomprimierte Dateigröße mit), lesen, Detailstufen berechnen, Umrisse vorbereiten, Items (Icons) vorbereiten, Karte zeichnen. Der Balken läuft nie rückwärts; ein Schimmer zeigt auch während längerer Rechenschritte, dass noch etwas passiert. Schlägt das Laden fehl, gibt es eine Meldung mit „Neu laden“.
+- Beim Start zeigt ein Ladebildschirm den Fortschritt: Kartendaten herunterladen (in MB, der Server gibt die Größe des Startpakets mit), Umrisse vorbereiten, Items (Icons) vorbereiten, Karte zeichnen. Der Balken läuft nie rückwärts; ein Schimmer zeigt auch während längerer Rechenschritte, dass noch etwas passiert. Schlägt das Laden fehl, gibt es eine Meldung mit „Neu laden“.
 - Vor jeder Runde öffnet sich das Menü (auch über „Neue Runde“ oben rechts und nach Rundenende über „Einstellungen“):
   - **Item-Arten:** sieben Karten zum An-/Abwählen – 7 Kontinente, 45 Staaten Europas (klassisches Europa inkl. Russland und Kosovo, ohne Türkei, Zypern und Kaukasus), 23 Staaten Nordamerikas (USA, Kanada, Mexiko, 7 Staaten Mittelamerikas, 13 Karibikstaaten; ohne abhängige Gebiete wie Grönland oder Puerto Rico), 12 Staaten Südamerikas (ohne Französisch-Guayana und Falklandinseln), 54 Staaten Afrikas (ohne Westsahara, Réunion, Mayotte, St. Helena), 49 Staaten Asiens (46 unabhängige Staaten inkl. Türkei, Kaukasus und Kasachstan, dazu Zypern, Taiwan und Palästina; Russland zählt als Ganzes zu Europa), 14 Staaten Ozeaniens (ohne abhängige Gebiete wie Neukaledonien, Französisch-Polynesien, Cookinseln, Niue, Guam).
   - **Einzelne Items:** ausschließen (Suche, „Alle“/„Keine“ je Gruppe).
@@ -142,10 +142,10 @@ worldmapguessr/
   lobbies/round.py            Mehrspieler-Runde: Vorrat, Inventare, gemeinsame Leben, Nachschub
   difficulty.py               Item-Schwierigkeit (0–10) und Reihenfolge nach dem Schwierigkeitsregler
   item_events.py              Item-Statistik aus Lobby-Runden in den Item-Store schreiben
-  lobbies/catalog.py          Item-Katalog je Gruppe aus world.topo.json
   lobbies/ws.py               WebSocket-Endpunkt
   lobbies/api.py              HTTP-API /api/lobbies
   item_store.py               Items als JSON-Datei (Fallback)
+  map_data.py                 Kartendaten: index.json lesen, Startgröße, Item-Katalog je Gruppe
   storage/factory.py          Backend-Wahl: MongoDB oder JSON
   storage/mongo.py            Verbindung, Ping
   storage/mongo_items.py      Items in MongoDB, Übernahme aus items.json
@@ -161,11 +161,13 @@ worldmapguessr/
   static/css/lobby.css        Lobby (HUD, Menü-Bereich, Beitritt)
   static/js/main.js           Einstiegspunkt (ES-Module)
   static/js/ui/loading-screen.js  Ladebildschirm: Phasen mit Gewicht, Fortschritt, Fehlerzustand
-  static/js/map/map.js        Daten laden, Projektion, Ansicht (Drehung, Zoom, vertikal verschieben)
-  static/js/map/renderer.js   Canvas-Zeichnung (Kontinente, eingesetzte Teile, Kleinststaat-Ringe)
+  static/js/map/map.js        Startdaten laden, Projektion, Ansicht (Drehung, Zoom, vertikal verschieben)
+  static/js/map/tiles.js      Kacheln: Detailstufe je Zoom, sichtbare laden, Ersatz aus gröberer Stufe, Speichergrenze
+  static/js/map/items.js      Item-Umrisse: Startstufe für alle, feinere Stufe je Item bei Bedarf
+  static/js/map/project.js    Schnelle Natural-Earth-Projektion, Sichtbarkeitstest für Längen/Breiten-Boxen
+  static/js/map/renderer.js   Canvas-Zeichnung aus Kacheln (Zellfarben, Küsten, Grenzen, Kleinststaat-Ringe)
   static/js/map/geometry.js   Anker, Fläche, Zerlegung in Teile (Sichtbarkeit, Datumsgrenze)
   static/js/map/gestures.js   Ziehen, Mausrad, Pinch, Doppelklick
-  static/js/map/lod.js        Detailstufe je nach Zoom (presimplify-Gewichte)
   static/js/map/controls.js   Buttons, Tastatur, Koordinatenanzeige
   static/js/api/items-api.js  Tracking-Client für /api/items, Laden der Statistik
   static/js/stats/stats.js    Statistik-Seite: laden, filtern, sortieren
@@ -193,7 +195,7 @@ worldmapguessr/
   static/js/game/inventory.js   Inventar-Slots
   static/js/game/lives.js     Lebensanzeige
   static/js/game/toast.js     Kurzmeldungen
-  static/data/world.topo.json 7 Kontinente + 45 Staaten in einer Topologie (generiert)
+  static/data/map/            Kartendaten mit Detailstufen (generiert, siehe „Kartendaten neu erzeugen“)
 tests/                        pytest: Item-Store, API, Lobbys, Mehrspieler-Runde – jeweils mit JSON und MongoDB (mongomock)
 build/                        Erzeugung der Kartendaten (siehe unten)
 .run/                         PyCharm-Startkonfigurationen (Server, Tests)
@@ -235,18 +237,34 @@ pip install -r requirements.txt
 npm run build
 ```
 
+`npm run build` führt zwei Schritte aus (Dauer: wenige Sekunden plus einmalig der Download der Quelle, ~25 MB):
+
+1. `python 1-cells.py` – lädt Natural Earth 1:10m Admin-0 (nach `build/tmp/src`), ordnet jedes Landstück einem Kontinent und höchstens einem Staat-Item zu („Zelle“, z. B. Europa × Russland) und wendet die Sonderfälle unten an. Ausgabe in `build/tmp/`.
+2. `node 2-tiles.mjs` – baut daraus `worldmapguessr/static/data/map/`:
+   - `tiles/z0…z4/{x}_{y}.json` – Karte in 5 Detailstufen, je Stufe ein Längen-/Breitengrad-Raster (90°, 45°, 22,5°, 11,25°, 5,625°). Inhalt je Kachel: Landflächen je Zelle und Linien (Küsten, Kontinent- und Staatsgrenzen), ganzzahlig und als Differenzen kodiert.
+   - `items/i0.json` – alle Items in der Startstufe; `items/i1…i4/{kind}-{id}.json` – feinere Umrisse je Item.
+   - `index.json` – Stufen, Zellen, Items (Name, Gruppe, Anker, Fläche), Kachelliste, Version (Hash über die Daten).
+
+Der Server liefert die Dateien unter `/data/<version>/…` mit einem Jahr Cache aus; nach einem neuen Build ändert sich die Version und der Browser lädt neu.
+
+### Detailstufen (LOD)
+
+- Vereinfachung nach Visvalingam mit sphärischer Dreiecksfläche auf einer gemeinsamen Topologie: Grenzen zweier Zellen werden überall gleich vereinfacht, es entstehen keine Lücken – das gilt auch für spätere Bundesländer/Regionen, deren Außengrenzen genau auf den Staatsgrenzen liegen.
+- Stufe z wird bis zur Kartenskala `sMax` benutzt (Pixel je Bogenmaß: 450, 1100, 2800, 7000, ∞; bei 1280 px Breite ≈ Zoom 200 %, 500 %, 1250 %, 3100 %). Ein Punkt bleibt, wenn sein Dreieck bei `sMax` mindestens `PX2` = 4 px² groß wäre; Inseln unter 1 px fallen weg. Die feinste Stufe enthält jeden Punkt der Quelle.
+- Beim Zeichnen: nur Kacheln im Ausschnitt; fehlt eine, wird die nächstgröbere geladene gezeichnet, bis sie da ist. Punkte näher als 0,75 px am vorigen werden übersprungen. Höchstens 2,5 Mio. Punkte bleiben im Speicher (älteste Kacheln fallen raus).
+- Kacheln überlappen um 1/512 ihrer Seite, und Kanten entlang eines Meridians (Kachelrand, ±180°) sind fein unterteilt – so bleiben keine Haarlinien an Kachelrändern. Unsichtbare Grenzen zwischen gleichfarbigen Zellen werden in der Flächenfarbe nachgezogen.
+- Items: Die Startstufe ist je Item so fein, wie sein Inventar-Icon oder die Weltansicht es braucht. Ein aufgenommenes Item lädt die zum Zoom passende Stufe nach (Kontinente höchstens Stufe 3); gezeichnet wird nur der Teil, der beim Verschieben sichtbar werden kann.
+- Startpaket: `index.json` + `i0.json` + Stufe 0 ≈ 0,4 MB; alles Weitere nach Bedarf.
+
 ## Datenentscheidungen
 
-- Quelle: Natural Earth 1:10m (`world-atlas`, dort auf ~400 m quantisiert), Regionen und deutsche Namen aus `world-countries`.
-- Detailgrad: Europa (-32…62° O, 27…83° N) volle 1:10m-Auflösung, Nordamerika inkl. Grönland, Mittelamerika und Karibik (-180…-10° O, 5…84° N) sowie Südamerika inkl. Galápagos und Osterinsel (-110…-25° O, 60° S…13° N) Afrika inkl. Kap Verde, Madagaskar, Mauritius und Seychellen (-26…64° O, 48° S…38° N) Asien bis Japan und Indonesien (25…150° O, 11° S…56° N; Sibirien bleibt gröber) und Ozeanien (110…180° O sowie 150…180° W südlich 5° N) praktisch volle 1:10m-Auflösung, übrige Welt etwa 1:50m; Kleinstinseln (< ~30 km²) außerhalb Europas entfallen. Beim Zeichnen filtert eine Detailstufe je nach Zoom (bis 4000 %). Einstellbar in `build/3-topologize.js` (`REGIONS`).
+- Quelle: Natural Earth 1:10m Admin-0 in voller Genauigkeit (GeoJSON aus dem Natural-Earth-Repository, nicht quantisiert), Regionen und deutsche Namen aus `world-countries`. Weltweit gleicher Detailgrad, alle Inseln; die Detailstufen sorgen dafür, dass beim Herauszoomen nur so viel gezeichnet wird, wie sichtbar ist. Volle Genauigkeit ist auch die Grundlage für Bundesländer/Regionen (Natural Earth Admin-1), deren Grenzen exakt auf die Staatsgrenzen passen müssen.
 - Europäische Staaten nur mit ihren europäischen Landesteilen; Russland ganz. Überseegebiete (Französisch-Guayana, Guadeloupe, Martinique, Réunion, Karibische Niederlande …) gehören zum Kontinent, auf dem sie liegen – nicht mehr zu Europa.
 - Staaten Nord- und Südamerikas mit allen Landesteilen: USA inkl. Alaska, Aleuten (über die Datumsgrenze ohne Naht) und Hawaii; Ecuador inkl. Galápagos, Chile inkl. Osterinsel.
-- Afrika: Somaliland (in den Quelldaten eigene Fläche, international nicht anerkannt) gehört zum Item Somalia. Marokko ist in den Quelldaten samt dem von ihm kontrollierten Teil der Westsahara eingezeichnet; als Item gilt es wie bei den Vereinten Nationen ohne Westsahara (Grenze 27°40′ N, `CUT_TO` in `build/2-merge-continents.py`) – die Westsahara ist nur Kontinentfläche. Namen: Eswatini (statt Swasiland), Demokratische Republik Kongo / Republik Kongo, Elfenbeinküste.
-- Asien: Zypern gehört (samt Nordzypern, UN-Pufferzone und den britischen Basen Akrotiri/Dhekelia) als ein Item zu den Staaten Asiens und auch zur Kontinentfläche Asien. Taiwan und Palästina (Westjordanland + Gaza) sind eigene Items, obwohl sie nicht als unabhängig geführt werden (wie Kosovo). Hongkong und Macao zählen zu China, Baikonur zu Kasachstan; der Siachen-Gletscher ist nur Kontinentfläche. - Kleine Inselstaaten (größte Insel < ~600 km²: Malediven, Tuvalu, Kiribati, Marshallinseln, Grenada, Seychellen …) behalten alle Inseln, auch unter ~30 km² – für Kontinent und Staat gleichermaßen (`SMALL_STATE_DEG2` in `build/2-merge-continents.py`). Im Inventar und Menü zeigen ihre Icons zu kleine Inseln als Punkte, damit weit verstreute Atolle sichtbar bleiben.
-- Ozeanien: alle Staaten werden im Rahmen 0…360° aufbereitet, damit Fidschi, Kiribati, Tuvalu und Neuseeland (Chatham-Inseln) an der Datumsgrenze ohne Naht bleiben.
-- Item-Gruppen: Staaten tragen im TopoJSON `properties.region` (`EU`/`NA`/`SA`/`AF`/`AS`/`OC`); daraus entstehen die Gruppen `continent`, `country-eu`, `country-na`, `country-sa`, `country-af`, `country-as`, `country-oc` (Menü-Karten, `config.kinds`). Item-Keys bleiben `country:USA` usw., die Statistik ist davon unberührt. Ältere Lobbys mit `kinds: ["country"]` werden beim Laden zu `country-eu`.
-- Vatikan: in den Quelldaten zu einer Linie zusammengefallen, daher ein vereinfachter, von Hand nachgezogener Umriss.
+- Afrika: Somaliland (in den Quelldaten eigene Fläche, international nicht anerkannt) gehört zum Item Somalia. Marokko ist in den Quelldaten samt dem von ihm kontrollierten Teil der Westsahara eingezeichnet; als Item gilt es wie bei den Vereinten Nationen ohne Westsahara (Grenze 27°40′ N, `CUT_TO` in `build/1-cells.py`) – die Westsahara ist nur Kontinentfläche. Namen: Eswatini (statt Swasiland), Demokratische Republik Kongo / Republik Kongo, Elfenbeinküste.
+- Asien: Zypern gehört (samt Nordzypern, UN-Pufferzone und den britischen Basen Akrotiri/Dhekelia) als ein Item zu den Staaten Asiens und auch zur Kontinentfläche Asien. Taiwan und Palästina (Westjordanland + Gaza) sind eigene Items, obwohl sie nicht als unabhängig geführt werden (wie Kosovo). Hongkong und Macao zählen zu China, Baikonur zu Kasachstan; der Siachen-Gletscher ist nur Kontinentfläche. - Inselstaaten aus weit verstreuten Atollen (Tuvalu, Kiribati, Marshallinseln …): Im Inventar und Menü zeigen ihre Icons zu kleine Inseln als Punkte, damit sie sichtbar bleiben.
+- Item-Gruppen: Staaten tragen in `index.json` `region` (`EU`/`NA`/`SA`/`AF`/`AS`/`OC`); daraus entstehen die Gruppen `continent`, `country-eu`, `country-na`, `country-sa`, `country-af`, `country-as`, `country-oc` (Menü-Karten, `config.kinds`). Item-Keys bleiben `country:USA` usw., die Statistik ist davon unberührt. Ältere Lobbys mit `kinds: ["country"]` werden beim Laden zu `country-eu`.
 - Projektion: Natural Earth 1.
 - Europa/Asien: Ural-Kamm → Ural-Fluss → Kaspisches Meer → Kaukasus; Türkei, Georgien, Armenien, Aserbaidschan, Kasachstan = Asien.
 - Afrika/Asien: Grenze Ägypten/Israel (Sinai zählt zu Afrika). Nord-/Südamerika: Grenze Panama/Kolumbien.
-- Kontinente über ±180° (Asien, Nordamerika, Ozeanien) werden im Rahmen 0…360° vereinigt, damit an der Datumsgrenze keine Nahtlinien entstehen – wichtig für die drehbare Karte. Antarktika bleibt unverändert.
+- Datumsgrenze: Die Quelle ist bei ±180° geteilt. Diese Schnittkanten gelten nicht als Küste (keine Linie), und die Flächen daran ragen wie an Kachelrändern minimal über die Kante – beim Drehen bleibt an der Datumsgrenze keine Naht.

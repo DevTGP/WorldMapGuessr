@@ -71,8 +71,20 @@ def test_stats_page(client):
     assert b"stats/stats.js" in r.data
 
 
-def test_index_passes_map_size_for_loading_bar(app, client):
-    import os
-    size = os.path.getsize(os.path.join(app.static_folder, "data", "world.topo.json"))
+def test_index_passes_map_base_and_start_size(app, client):
+    index = app.extensions["map_index"]
     html = client.get("/").get_data(as_text=True)
-    assert f"dataSize: {size}," in html and 'class="loading"' in html
+    assert f'mapBase: "/data/{index["version"]}"' in html
+    assert f'dataSize: {app.extensions["map_start_bytes"]},' in html and 'class="loading"' in html
+    assert app.extensions["map_start_bytes"] < 2_000_000       # Start lädt nur die grobe Stufe
+
+
+def test_map_data_is_served_with_long_cache(app, client):
+    index = app.extensions["map_index"]
+    r = client.get(f"/data/{index['version']}/index.json")
+    assert r.status_code == 200 and r.get_json()["version"] == index["version"]
+    assert "max-age=31536000" in r.headers["Cache-Control"]
+    key = index["tiles"]["4"][0]
+    assert client.get(f"/data/{index['version']}/tiles/z4/{key}.json").status_code == 200
+    assert client.get(f"/data/{index['version']}/items/i2/country-DEU.json").status_code == 200
+    assert client.get(f"/data/{index['version']}/../../app.py").status_code == 404
