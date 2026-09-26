@@ -14,6 +14,7 @@ export class LobbyClient extends EventTarget {
     this.me = null;          // {id, name}
     this.state = null;       // letzter Lobby-Zustand vom Server
     this.hand = [];          // eigenes Inventar in der Lobby-Runde (Feature-Keys)
+    this.sends = null;       // eigenes Sendelimit {every, left, next} (left null = ohne Limit)
     this.ws = null;
     this.retry = 0;
     this.closedForGood = false;
@@ -36,6 +37,8 @@ export class LobbyClient extends EventTarget {
   place(key, correct) { this._send({ type: "place", key, correct }); }
   /** Teil aus dem eigenen Inventar an einen Mitspieler senden */
   give(key, to) { this._send({ type: "give", key, to }); }
+  /** Chat-Nachricht an alle in der Lobby */
+  chat(text) { this._send({ type: "chat", text }); }
   /** Lobby endgültig verlassen (alle Tabs dieses Spielers) */
   leave() { this._send({ type: "leave" }); }
   /** Nur Host: Lobby für alle beenden */
@@ -80,6 +83,7 @@ export class LobbyClient extends EventTarget {
       case "state":
         this.state = msg.lobby;
         this.hand = msg.hand ?? [];
+        this.sends = msg.sends ?? null;
         this._emit("state", msg.lobby);
         break;
       case "left":

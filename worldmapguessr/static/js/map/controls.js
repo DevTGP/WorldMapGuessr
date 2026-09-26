@@ -46,6 +46,7 @@ export function bindMapControls(map) {
   addEventListener("keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (document.querySelector("dialog[open]")) return;
+    if (e.target.closest?.("input, textarea, [contenteditable]")) return; // z. B. Chat-Eingabe
     switch (e.key) {
       case "+": case "=": map.zoomBy(1.6); break;
       case "-": case "_": map.zoomBy(1 / 1.6); break;

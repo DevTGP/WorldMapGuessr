@@ -1,0 +1,159 @@
+/* WorldMapGuessr – Nachrichtenleiste unten rechts: Meldungen aller Spieler, Timer, Chat */
+
+:root { --feed-w: 320px; --inv-h: 112px; }
+
+.hud-feed {
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  width: var(--feed-w);
+  max-height: min(340px, calc(50vh - 56px));
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  box-sizing: border-box;
+  z-index: 12;
+}
+.feed-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 6px 2px 12px;
+}
+.feed-head h2 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.feed-toggle {
+  position: relative;
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  border: 0; border-radius: 6px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.feed-toggle:hover { background: var(--panel-line); color: var(--ink); }
+.feed-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.feed-toggle svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; transition: transform 0.2s ease; }
+.hud-feed.collapsed .feed-toggle svg { transform: rotate(180deg); }
+.feed-toggle[data-unread]:not([data-unread=""])::after {
+  content: attr(data-unread);
+  position: absolute;
+  top: -4px; right: -4px;
+  min-width: 16px; height: 16px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: var(--piece);
+  color: #fff;
+  font: 600 10px/16px "IBM Plex Mono", ui-monospace, monospace;
+  text-align: center;
+}
+
+.feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 2px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-line) transparent;
+}
+.msg {
+  display: grid;
+  grid-template-columns: 4px minmax(0, 1fr);
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  animation: msg-in 0.9s ease;
+  transition: opacity 0.4s ease;
+}
+.msg-icon { border-radius: 2px; background: var(--c, var(--panel-line)); }
+.msg.good { --c: var(--good); }
+.msg.bad { --c: var(--bad); }
+.msg.take { --c: var(--warn); }
+.msg.gift, .msg.refill { --c: var(--piece); }
+.msg.hint { --c: var(--ink-soft); color: var(--ink-soft); }
+.msg.info { --c: var(--focus); }
+.msg.chat { --c: transparent; }
+.msg.chat.mine { background: var(--panel-line); }
+.msg .item { font-weight: 600; }
+.msg .who { font-weight: 600; color: hsl(var(--hue, 210) 60% var(--who-l)); }
+.msg.good .item { color: var(--good); }
+.msg.bad .item { color: var(--bad); }
+.msg.old { opacity: 0.62; }
+.hud-feed:hover .msg.old, .hud-feed:focus-within .msg.old { opacity: 1; }
+@keyframes msg-in {
+  0% { background: color-mix(in srgb, var(--c, var(--piece)) 22%, transparent); transform: translateY(6px); opacity: 0; }
+  20% { transform: none; opacity: 1; }
+  100% { background: transparent; }
+}
+.msg.chat.mine { animation: none; }
+
+.feed-chat {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--panel-line);
+}
+.feed-chat[hidden] { display: none; }
+.feed-chat input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--panel-line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+.feed-chat input:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; }
+.feed-chat .btn { padding: 0 10px; display: grid; place-items: center; }
+.feed-chat svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+
+/* Eingeklappt: nur die neueste Meldung */
+.hud-feed.collapsed .feed-list { overflow: hidden; padding-bottom: 6px; }
+.hud-feed.collapsed .feed-list > :not(:last-child) { display: none; }
+.hud-feed.collapsed .feed-chat { display: none; }
+.hud-feed.collapsed .msg { opacity: 1; }
+
+/* Koordinaten/Zoom über dem Inventar statt daneben */
+.hud-readout { bottom: calc(24px + var(--inv-h) + env(safe-area-inset-bottom, 0px)); }
+
+/* Mittel: schmalere Leiste */
+@media (max-width: 1100px) { :root { --feed-w: 280px; } }
+
+/* Schmal: Leiste über dem Inventar, volle Breite, Inventar über die ganze Breite */
+@media (max-width: 640px) {
+  :root { --inv-h: 94px; }
+  .hud-feed {
+    left: 16px;
+    right: 16px;
+    width: auto;
+    bottom: calc(40px + var(--inv-h) + env(safe-area-inset-bottom, 0px)); /* Platz für die Anzeigen am Inventar */
+    max-height: 40vh;
+  }
+  .hud-feed.collapsed .feed-head { position: absolute; top: 2px; right: 2px; padding: 0; }
+  .hud-feed.collapsed .feed-head h2 { display: none; }
+  .hud-feed.collapsed .feed-list { padding: 4px 36px 4px 6px; }
+  .msg { font-size: 13px; }
+  .hud-inventory { right: 16px; max-width: calc(100% - 32px); }
+  .hud-readout { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg { animation: none; transition: none; }
+  .feed-toggle svg { transition: none; }
+}

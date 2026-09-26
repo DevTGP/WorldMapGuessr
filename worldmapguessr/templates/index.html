@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/game.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/menu.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/lobby.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/feed.css') }}">
 </head>
 <body>
 
@@ -59,19 +60,40 @@
 </div>
 
 <section class="hud hud-inventory" aria-label="Inventar">
-  <div class="refill-meter" id="refill-meter" role="status" hidden><span class="pips" aria-hidden="true"></span><span class="refill-text"></span></div>
+  <div class="inv-meters">
+    <div class="refill-meter" id="refill-meter" role="status" hidden><span class="pips" aria-hidden="true"></span><span class="refill-text"></span></div>
+    <div class="timer-meter" id="timer-meter" role="timer" hidden>
+      <svg class="timer-ring" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8"/><circle class="v" cx="10" cy="10" r="8" pathLength="1"/></svg>
+      <span class="timer-text"></span>
+    </div>
+  </div>
   <span class="label" aria-hidden="true">Inventar</span>
-  <div class="slots" id="slots"></div>
+  <div class="slots" id="slots" tabindex="-1"></div>
 </section>
 
 <nav class="hud hud-players" id="players-rail" aria-label="Mitspieler – Items senden" hidden>
   <h2>Items senden</h2>
   <ul></ul>
+  <p class="rail-quota" hidden></p>
   <p class="rail-hint">Item aus dem Inventar aufnehmen, dann Mitspieler anklicken</p>
 </nav>
 
 <svg class="held-layer" id="held-layer" aria-hidden="true"></svg>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<aside class="hud hud-feed" id="feed" aria-label="Meldungen">
+  <header class="feed-head">
+    <h2>Meldungen</h2>
+    <button type="button" class="feed-toggle" aria-controls="feed-list" aria-expanded="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+  </header>
+  <ol class="feed-list" id="feed-list" aria-live="polite"></ol>
+  <form class="feed-chat" hidden>
+    <input type="text" maxlength="200" placeholder="Nachricht an die Lobby" aria-label="Chat-Nachricht" autocomplete="off" enterkeyhint="send">
+    <button type="submit" class="btn" aria-label="Nachricht senden" title="Senden (Enter)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 16-2.5-6.5z"/></svg>
+    </button>
+  </form>
+</aside>
 
 <dialog class="round-dialog" id="round-dialog">
   <h2 id="dlg-title"></h2>
@@ -139,6 +161,8 @@
               <li><b>Leben sind gemeinsam:</b> jeder Fehlwurf kostet allen ein Leben. Bei 0 endet die Runde für alle.</li>
               <li><b>Verteilen reihum:</b> Start-Items und neue Items sind Gesamtzahlen für die Lobby und werden reihum an alle verteilt. Die Treffer aller Spieler zählen für den Nachschub.</li>
               <li id="mp-rule-send"><b>Items senden:</b> Item aufnehmen und links einen Mitspieler anklicken.</li>
+              <li><b>Timer (falls an):</b> Nach der Schonfrist gehen in festem Takt Items zurück in den Vorrat – reihum, bei jedem das älteste. Wer keins hat, wird übersprungen.</li>
+              <li><b>Meldungen und Chat</b> stehen unten rechts.</li>
               <li><b>Später dazugekommen?</b> Du reihst dich ein und bekommst beim nächsten Verteilen Items.</li>
             </ul>
           </details>

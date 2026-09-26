@@ -13,10 +13,12 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from . import round as rounds
 from .codes import new_code, normalize
 from .persistence import JsonLobbyPersistence
-from .settings import (DEFAULT_ALLOW_SEND, DEFAULT_CONFIG, clean_bool, clean_config, clean_max_players,
-                       clean_name)
+from .settings import (DEFAULT_ALLOW_SEND, DEFAULT_CONFIG, DEFAULT_SEND_EVERY, clean_bool, clean_config,
+                       clean_max_players, clean_name, clean_send_every)
 
 LOBBY_TTL = 24 * 3600  # Sekunden ohne Aktivität, danach wird die Lobby gelöscht
+CHAT_KEEP = 50         # so viele Chat-Nachrichten je Lobby bleiben erhalten
+CHAT_MAX_LEN = 200
 
 
 class LobbyError(Exception):
@@ -85,6 +87,7 @@ class LobbyStore:
                     "maxPlayers": clean_max_players(max_players),
                     "passwordHash": generate_password_hash(password) if password else "",
                     "allowSend": DEFAULT_ALLOW_SEND,
+                    "sendEvery": DEFAULT_SEND_EVERY,
                 },
                 "players": {player["id"]: player},
                 "round": None,
@@ -135,6 +138,8 @@ class LobbyStore:
                 s["maxPlayers"] = clean_max_players(settings["maxPlayers"])
             if "allowSend" in settings:
                 s["allowSend"] = clean_bool(settings["allowSend"], s.get("allowSend", DEFAULT_ALLOW_SEND))
+            if "sendEvery" in settings:
+                s["sendEvery"] = clean_send_every(settings["sendEvery"], s.get("sendEvery", DEFAULT_SEND_EVERY))
             if "password" in settings:  # "" entfernt das Passwort
                 pw = str(settings["password"] or "")[:64]
                 s["passwordHash"] = generate_password_hash(pw) if pw else ""
@@ -193,10 +198,46 @@ class LobbyStore:
             if to not in online or to not in lobby["players"]:
                 raise LobbyError("bad_target", "Dieser Spieler ist gerade nicht da.")
             try:
-                rounds.give(lobby["round"], player_id, str(to), str(key))
+                rounds.give(lobby["round"], player_id, str(to), str(key), self.send_every(lobby))
             except rounds.RoundError as err:
                 raise LobbyError(err.code, err.message) from None
             self.touch(code)
+
+    @staticmethod
+    def send_every(lobby) -> int:
+        """Sendelimit der Lobby (1 Senden je N erhaltene Items, 0 = ohne); ältere Lobbys: Standard."""
+        return lobby["settings"].get("sendEvery", DEFAULT_SEND_EVERY)
+
+    def tick(self, code, online=()) -> bool:
+        """Timer der laufenden Runde weiterzählen (Hub ruft das regelmäßig). True bei Änderung."""
+        with self.lock:
+            lobby = self.get(code)
+            if not lobby or not lobby["round"]:
+                return False
+            changed = rounds.tick(lobby["round"], self.clock(), list(online))
+            if changed:
+                self.touch(code)
+            return changed
+
+    # ---------- Chat ----------
+    def chat(self, code, player_id, text) -> dict | None:
+        """Chat-Nachricht eines Spielers (gekürzt, ohne Steuerzeichen). Leere Nachrichten → None."""
+        text = " ".join(str(text or "").split())[:CHAT_MAX_LEN]
+        if not text:
+            return None
+        with self.lock:
+            lobby = self._require(code)
+            player = lobby["players"].get(player_id)
+            if not player:
+                raise LobbyError("not_member", "Du bist nicht in dieser Lobby.")
+            seq = lobby.get("chatSeq", 0) + 1
+            lobby["chatSeq"] = seq
+            msg = {"seq": seq, "player": player_id, "name": player["name"], "text": text, "t": self.clock()}
+            chat = lobby.setdefault("chat", [])
+            chat.append(msg)
+            del chat[:-CHAT_KEEP]
+            self.touch(code)
+            return msg
 
     def return_hand(self, code, player_id, online=()) -> int:
         """Teile eines Spielers zurück in den Vorrat (Verlassen, lange getrennt)."""

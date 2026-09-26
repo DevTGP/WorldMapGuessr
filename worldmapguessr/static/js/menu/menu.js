@@ -8,7 +8,16 @@ import { createStepper } from "./stepper.js";
 import { createDifficultySlider } from "./difficulty-slider.js";
 import { difficultyLabel } from "../game/difficulty.js";
 import { ItemPicker } from "./item-picker.js";
-import { GROUPS, LIMITS, cloneConfig, defaultConfig, poolFor } from "./config.js";
+import { createToggle } from "./toggle.js";
+import { GROUPS, LIMITS, cloneConfig, defaultConfig, poolFor, timerRule } from "./config.js";
+
+/** Hinweise unter den Zeitdruck-Reglern (Einzelspiel; die Lobby ersetzt sie, siehe lobby/rules-text.js) */
+export const TIMER_HINTS = {
+  timer: "alle … Sekunden Items weg (0 = aus)",
+  grace: "ab Rundenbeginn bis zum ersten Takt",
+  timerTake: "Items je Takt zurück in den Vorrat",
+  noReturn: "Ein aufgenommenes Item muss eingesetzt werden",
+};
 
 const KIND_ICON_W = 44;
 const KIND_ICON_H = 30;
@@ -40,7 +49,8 @@ export class Menu {
     this.summaryRules = (c, start) =>
       `<b>${difficultyLabel(c.difficulty)}</b> (${c.difficulty} %) · <b>${c.lives}</b> Leben · ` +
       `Start mit <b>${start}</b>${start < c.startItems ? " (alle)" : ""} · ` +
-      `je <b>${c.refillEvery}</b> Treffer → <b>${c.refillCount}</b> neue`;
+      `je <b>${c.refillEvery}</b> Treffer → <b>${c.refillCount}</b> neue` +
+      (c.timer ? ` · ${timerRule(c)}` : "") + (c.noReturn ? " · <b>kein Zurücklegen</b>" : "");
     /** Hinweis über den Rundeneinstellungen (null = keiner); im Lobby-Modus ersetzt */
     this.roundNote = () => (this.canCancel ? "Es läuft eine Runde. Änderungen gelten ab der nächsten Runde." : null);
     /** Läuft eine Runde? (Kennzeichnung „gilt ab der nächsten Runde“); im Lobby-Modus ersetzt */
@@ -145,8 +155,8 @@ export class Menu {
 
   _buildRules() {
     const c = this.config;
-    const make = (key, label, hint) => createStepper({
-      id: `cfg-${key}`, label, hint, value: c[key], ...LIMITS[key],
+    const make = (key, label, hint, extra = {}) => createStepper({
+      id: `cfg-${key}`, label, hint, value: c[key], ...LIMITS[key], ...extra,
       onChange: (v) => { this.config[key] = v; this._edited(); },
     });
     this.steppers = {
@@ -158,21 +168,39 @@ export class Menu {
         value: c.difficulty,
         onChange: (v) => { this.config.difficulty = v; this._edited(); },
       }),
+      timer: make("timer", "Timer", TIMER_HINTS.timer, { unit: "s" }),
+      grace: make("grace", "Schonfrist", TIMER_HINTS.grace, { unit: "s" }),
+      timerTake: make("timerTake", "Wegnahme", TIMER_HINTS.timerTake),
+      noReturn: createToggle({
+        id: "cfg-noReturn", label: "Kein Zurücklegen", hint: TIMER_HINTS.noReturn, value: c.noReturn,
+        onChange: (v) => { this.config.noReturn = v; this._edited(); },
+      }),
     };
     const fields = document.getElementById("rule-fields");
-    const refill = document.createElement("div");
-    refill.className = "field-pair";
-    refill.append(this.steppers.refillCount.el, this.steppers.refillEvery.el);
-    fields.append(this.steppers.difficulty.el, this.steppers.lives.el, this.steppers.startItems.el, refill);
+    const pair = (a, b) => {
+      const el = document.createElement("div");
+      el.className = "field-pair";
+      el.append(a.el, b.el);
+      return el;
+    };
+    const sub = document.createElement("p");
+    sub.className = "fields-sub";
+    sub.textContent = "Zeitdruck";
+    const s = this.steppers;
+    fields.append(s.difficulty.el, s.lives.el, s.startItems.el, pair(s.refillCount, s.refillEvery),
+      sub, pair(s.timer, s.grace), s.timerTake.el, s.noReturn.el);
   }
 
   _syncControls() {
     for (const [kind, btn] of this.kindButtons) btn.setAttribute("aria-checked", String(this.config.kinds.has(kind)));
     for (const [key, s] of Object.entries(this.steppers)) s.value = this.config[key];
+    // Schonfrist und Wegnahme wirken nur mit Timer
+    for (const key of ["grace", "timerTake"]) this.steppers[key].el.classList.toggle("muted", !this.config.timer);
   }
 
   _update() {
     const c = this.config;
+    for (const key of ["grace", "timerTake"]) this.steppers[key].el.classList.toggle("muted", !c.timer);
     const pool = this._pool().length;
     const total = this.groups.filter((g) => c.kinds.has(g.kind)).reduce((n, g) => n + g.features.length, 0);
     const start = Math.min(c.startItems, pool);

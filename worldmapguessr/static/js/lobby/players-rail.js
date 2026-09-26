@@ -11,6 +11,7 @@ export class PlayersRail {
   constructor(el, client, game) {
     this.el = el;
     this.list = el.querySelector("ul");
+    this.quota = el.querySelector(".rail-quota");
     this.client = client;
     this.game = game;
   }
@@ -24,6 +25,7 @@ export class PlayersRail {
     this.el.hidden = !show;
     if (!show) return;
 
+    this._renderQuota();
     const counts = round.handCounts ?? {};
     this.list.replaceChildren(...others.map((p) => {
       const n = counts[p.id] ?? 0;
@@ -46,10 +48,26 @@ export class PlayersRail {
     }));
   }
 
+  /** Sendelimit: wie viele Items man noch senden darf bzw. wann wieder */
+  _renderQuota() {
+    const q = this.client.sends;
+    this.quota.hidden = !q || q.left === null;
+    if (this.quota.hidden) return;
+    this.quota.innerHTML = q.left > 0
+      ? `Du kannst <b>${q.left}</b> ${q.left === 1 ? "Item" : "Items"} senden`
+      : `Senden wieder nach <b>${q.next}</b> ${q.next === 1 ? "Item" : "Items"}`;
+    this.quota.classList.toggle("empty", q.left === 0);
+    this.quota.title = `Je ${q.every} vom Server erhaltene Items darfst du 1 Item senden`;
+  }
+
   _send(player, btn) {
     const g = this.game;
     if (g.busy) return;
-    if (!g.held.active) return g.toast("Erst ein Item aus dem Inventar aufnehmen");
+    if (!g.held.active) return g.toast("Erst ein Item aus dem Inventar aufnehmen", "hint");
+    const q = this.client.sends;
+    if (q && q.left === 0) {
+      return g.toast(`Senden wieder möglich nach ${q.next} weiteren ${q.next === 1 ? "Item" : "Items"} vom Server`, "hint");
+    }
     g.giveHeld(player.id, player.name, btn.querySelector(".avatar"));
   }
 }

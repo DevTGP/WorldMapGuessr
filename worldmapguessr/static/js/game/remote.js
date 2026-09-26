@@ -5,7 +5,9 @@
 import { fromWire } from "../menu/config.js";
 
 /** Fehler, nach denen der eigene (optimistische) Stand verworfen wird */
-const RESYNC_ERRORS = new Set(["not_in_hand", "round_over", "no_round", "bad_target", "send_disabled"]);
+const RESYNC_ERRORS = new Set(["not_in_hand", "round_over", "no_round", "bad_target", "send_disabled", "send_limit"]);
+/** So viele ältere Chat-Nachrichten zeigt die Leiste beim Beitreten */
+const CHAT_HISTORY = 10;
 
 export class RemoteRound {
   /**
@@ -21,10 +23,13 @@ export class RemoteRound {
     this.gifting = new Set(); // von mir gesendet, vom Server noch nicht bestätigt
     this.finished = false;
     this.queued = null;     // {lobby, hand}, während einer Animation zurückgestellt
+    this.chatSeq = null;    // zuletzt angezeigte Chat-Nachricht (null = noch keine Nachricht gesehen)
     game.remote = this;
     game.lives.setTitle("Gemeinsame Leben der Lobby");
+    game.feed.enableChat((text) => client.chat(text));
 
     client.addEventListener("error", ({ detail: err }) => {
+      if (err.code === "send_limit" || err.code === "send_disabled") game.toast(err.message, "hint");
       if (!RESYNC_ERRORS.has(err.code)) return;
       this.sent.clear();
       this.gifting.clear();
@@ -46,6 +51,10 @@ export class RemoteRound {
 
   /** Neuer Zustand vom Server; während Animationen zurückgestellt (Game ruft flush) */
   apply(lobby, hand) {
+    this._chat(lobby);
+    const t = lobby.round?.status === "running" ? lobby.round.timer : null;
+    this.timer = t ? { ...t, at: performance.now() } : null;
+    this._showTimer();
     this.queued = { lobby, hand: hand ?? [] };
     if (!this.game.busy) this.flush();
   }
@@ -61,7 +70,7 @@ export class RemoteRound {
     const fresh = round.number !== this.number;
     if (fresh) {
       this.number = round.number;
-      this.seq = round.last?.seq ?? 0;
+      this.seq = round.events ?? round.last?.seq ?? 0; // ältere Ereignisse nicht nachspielen
       this.finished = false;
       this.sent.clear();
       this.gifting.clear();
@@ -87,15 +96,15 @@ export class RemoteRound {
       if (stale) g.removePiece(id);
     }
     const added = hand.filter((key) => !g.inventory.pieces.has(key)).map((key) => g.pieceFor(key)).filter(Boolean);
-    const ev = round.last;
-    const gift = ev?.type === "gift" && ev.to === this.client.me?.id && ev.seq > this.seq ? ev.key : null;
     if (added.length) g.addPieces(added);
 
     g.lives.set(round.lives);
     g.setProgress(round.placed.length, round.total);
     g.setRefill(round.sinceRefill ?? 0, round.poolCount);
 
-    this._announce(lobby, round, fresh ? 0 : added.filter((p) => p.id !== gift).length);
+    if (fresh) this._roundStart(lobby, round, hand.length);
+    else this._announce(lobby, round);
+    this._showTimer(); // resetRound blendet die Anzeige aus
 
     if (round.status !== "running" && !this.finished) {
       this.finished = true;
@@ -103,31 +112,85 @@ export class RemoteRound {
     }
   }
 
-  /** Ereignisse der anderen (und Nachschub) als kurze Meldung */
-  _announce(lobby, round, refilled) {
-    const ev = round.last;
-    const isNew = ev && ev.seq > this.seq;
-    if (ev) this.seq = Math.max(this.seq, ev.seq);
+  /** Timer-Anzeige aus dem zuletzt empfangenen Server-Timer (um die seitdem vergangene Zeit korrigiert) */
+  _showTimer() {
+    const t = this.timer;
+    if (!t) return this.game.timerMeter.hide();
+    const gone = (performance.now() - t.at) / 1000;
+    this.game.timerMeter.set({ ...t, nextIn: Math.max(0, t.nextIn - gone), graceLeft: Math.max(0, t.graceLeft - gone) });
+  }
+
+  /** Neue (oder beim Beitreten laufende) Runde in der Nachrichtenleiste */
+  _roundStart(lobby, round, mine) {
+    const running = round.status === "running";
+    this.game.feed.push({
+      kind: "info",
+      parts: [running ? `Runde ${round.number}: ` : `Runde ${round.number} ist vorbei · `,
+        { b: `${round.placed.length} / ${round.total}` }, " eingesetzt",
+        ...(running ? [" · du hast ", { b: String(mine) }, mine === 1 ? " Item" : " Items"] : [])],
+    });
+  }
+
+  /** Alle noch nicht gezeigten Ereignisse der Runde (Einsetzen, Fehlwurf, Senden, Nachschub, Timer) */
+  _announce(lobby, round) {
+    const log = round.log ?? (round.last ? [round.last] : []);
+    for (const ev of log) {
+      if (ev.seq <= this.seq) continue;
+      this.seq = ev.seq;
+      const msg = this._message(lobby, round, ev);
+      if (msg) this.game.feed.push(msg);
+    }
+  }
+
+  _message(lobby, round, ev) {
     const me = this.client.me?.id;
     const g = this.game;
+    const item = (key) => ({ item: g.pieceFor(key)?.name ?? "ein Item" });
+    const who = (id, du = "Du") => (id === me ? { who: du, id } : { who: this._name(lobby, id), id });
+    switch (ev.type) {
+      case "placed":
+        return ev.player === me
+          ? { kind: "good", parts: [item(ev.key), " sitzt"] }
+          : { kind: "good", parts: [who(ev.player), " hat ", item(ev.key), " eingesetzt"] };
+      case "miss":
+        return {
+          kind: "bad",
+          parts: [...(ev.player === me ? ["Daneben – "] : [who(ev.player), " lag daneben – "]), item(ev.key),
+            round.lives > 0 ? ` · noch ${round.lives} Leben` : ""],
+        };
+      case "gift":
+        if (ev.to === me) return { kind: "gift", parts: [who(ev.player), " hat dir ", item(ev.key), " geschickt"] };
+        if (ev.player === me) return { kind: "gift", parts: ["Du hast ", item(ev.key), " an ", who(ev.to), " gesendet"] };
+        return { kind: "gift", parts: [who(ev.player), " hat ", item(ev.key), " an ", who(ev.to), " gesendet"] };
+      case "refill": {
+        const to = Object.entries(ev.to ?? {});
+        const parts = [{ b: `+${ev.count}` }, ` neue ${ev.count === 1 ? "Item" : "Items"}`];
+        if (to.length) {
+          parts.push(": ");
+          to.forEach(([id, n], i) => parts.push(...(i ? [", "] : []), who(id, i ? "du" : "Du"), ` ${n}`));
+        }
+        return { kind: "refill", parts };
+      }
+      case "take": {
+        const parts = ["Zeit abgelaufen – "];
+        (ev.items ?? []).forEach(({ player, key }, i) => parts.push(...(i ? [", "] : []), item(key), " (", who(player, "du"), ")"));
+        parts.push(" zurück in den Vorrat");
+        return { kind: "take", parts };
+      }
+      default:
+        return null;
+    }
+  }
 
-    const more = refilled ? `${refilled} neue Items` : "";
-    if (isNew && ev.type === "miss") {
-      const who = ev.player === me ? "Daneben" : `${this._name(lobby, ev.player)} lag daneben`;
-      return g.toast(round.lives > 0 ? `${who} – noch ${round.lives} Leben` : who, "bad");
-    }
-    if (isNew && ev.type === "gift" && ev.to === me) {
-      const piece = g.pieceFor(ev.key)?.name ?? "ein Item";
-      return g.toast([`${this._name(lobby, ev.player)} hat dir ${piece} geschickt`, more].filter(Boolean).join(" · "), "good");
-    }
-    if (isNew && ev.type === "placed") {
-      const piece = g.pieceFor(ev.key)?.name ?? "Ein Item";
-      const what = ev.player === me ? `${piece} sitzt` : `${this._name(lobby, ev.player)} hat ${piece} eingesetzt`;
-      // eigener Treffer ohne Nachschub wurde schon beim Einsetzen gemeldet
-      if (ev.player !== me || more) g.toast([what, more].filter(Boolean).join(" · "), "good");
-      return;
-    }
-    if (more) g.toast(more, "good");
+  /** Neue Chat-Nachrichten (beim ersten Zustand nur die letzten CHAT_HISTORY) */
+  _chat(lobby) {
+    const chat = lobby.chat ?? [];
+    const me = this.client.me?.id;
+    let list = chat;
+    if (this.chatSeq === null) list = chat.slice(-CHAT_HISTORY);
+    else list = chat.filter((m) => m.seq > this.chatSeq);
+    for (const m of list) this.game.feed.chat({ id: m.player, name: m.name, text: m.text, mine: m.player === me });
+    this.chatSeq = chat.length ? chat[chat.length - 1].seq : (this.chatSeq ?? 0);
   }
 
   _name(lobby, id) {

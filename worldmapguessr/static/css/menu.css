@@ -133,6 +133,51 @@
 /* ---------- Regeln (Stepper) ---------- */
 .fields { display: flex; flex-direction: column; gap: 12px; }
 .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.stepper-control .unit { margin-left: -4px; font-size: 12px; color: var(--ink-soft); }
+.fields-sub { margin: 6px 0 -4px; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); }
+.field.muted .stepper-control { opacity: 0.45; }
+
+/* Schalter (Lobby: Items senden; Regeln: Kein Zurücklegen) */
+.field.toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.field.toggle span { display: flex; flex-direction: column; font-weight: 600; font-size: 14px; }
+.field.toggle small { font-weight: 400; font-size: 12px; color: var(--ink-soft); }
+.field.toggle input {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  position: relative;
+  width: 40px; height: 22px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--panel-line);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.field.toggle input::after {
+  content: "";
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease;
+}
+.field.toggle input:checked { background: var(--piece); }
+.field.toggle input:checked::after { transform: translateX(18px); }
+.field.toggle input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.field.toggle input:disabled { cursor: default; opacity: 0.6; }
+.readonly .field.toggle { cursor: default; }
+
 .stepper {
   display: flex;
   justify-content: space-between;

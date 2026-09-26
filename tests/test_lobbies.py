@@ -223,6 +223,7 @@ def test_give_item_to_online_player_and_host_can_disable(store):
     hub, code, h, g = two_players(store)
     key = hand_of(h)[0]
     assert h.ws.sent[-1]["lobby"]["settings"]["allowSend"] is True   # Standard: an
+    hub.handle(code, h, {"type": "settings", "settings": {"sendEvery": 0}})  # ohne Sendelimit
     hub.handle(code, h, {"type": "give", "key": key, "to": g.player_id})
     assert key in hand_of(g) and key not in hand_of(h)
     assert round_of(h)["handCounts"] == {h.player_id: 2, g.player_id: 4}
@@ -251,6 +252,7 @@ def test_stats_counted_by_server_only_for_deals_and_accepted_placements(tmp_path
     spawned = [k for k, e in events if e == "spawned"]
     assert len(spawned) == 6 and set(spawned) == set(hand_of(h)) | set(hand_of(g))
     events.clear()
+    hub.handle(code, h, {"type": "settings", "settings": {"sendEvery": 0}})  # ohne Sendelimit
     # Senden an Mitspieler, Wiederverbinden, abgelehnter Versuch: nichts zählt
     hub.handle(code, h, {"type": "give", "key": hand_of(h)[0], "to": g.player_id})
     connect(hub, code, playerId=g.player_id, token=g.ws.sent[0]["player"]["token"])
@@ -343,3 +345,45 @@ def test_close_only_host_and_notifies_everyone(store):
     assert store.get(code) is None
     assert g.ws.sent[-1]["type"] == "closed" and h.ws.sent[-1]["type"] == "closed"
     assert hub.online_count(code) == 0
+
+
+# ---------- Timer, Sendelimit, Chat über den Hub ----------
+def test_timer_ticks_through_hub_and_state_shows_countdown(tmp_path):
+    clock = Clock()
+    store = LobbyStore(tmp_path / "l.json", catalog=CATALOG, clock=clock)
+    hub, code, h, g = two_players(store, timer=20, grace=30, timerTake=2)
+    t = round_of(h)["timer"]
+    assert t == {"nextIn": 50, "every": 20, "take": 2, "graceLeft": 30}
+    clock.t += 49
+    assert hub.tick() == []
+    clock.t += 1
+    assert hub.tick() == [code]
+    r = round_of(g)
+    assert r["last"]["type"] == "take" and len(r["last"]["items"]) == 2
+    assert r["handCounts"] == {h.player_id: 2, g.player_id: 2} and r["timer"]["nextIn"] == 20
+
+
+def test_send_limit_setting_and_quota_in_state(store):
+    hub, code, h, g = two_players(store)  # je 3 ausgeteilt, Standard: 1 Senden je 5
+    last = [m for m in h.ws.sent if m["type"] == "state"][-1]
+    assert last["lobby"]["settings"]["sendEvery"] == 5 and last["sends"] == {"every": 5, "left": 0, "next": 2}
+    with pytest.raises(LobbyError) as e:
+        hub.handle(code, h, {"type": "give", "key": hand_of(h)[0], "to": g.player_id})
+    assert e.value.code == "send_limit" and "2 weiteren Items" in e.value.message
+    hub.handle(code, h, {"type": "settings", "settings": {"sendEvery": 3}})
+    hub.handle(code, h, {"type": "give", "key": hand_of(h)[0], "to": g.player_id})
+    assert [m for m in h.ws.sent if m["type"] == "state"][-1]["sends"]["left"] == 0
+
+
+def test_chat_is_broadcast_trimmed_and_kept(store):
+    hub = LobbyHub(store, clock=Clock())
+    lobby, host = store.create(player_name="Host")
+    code = lobby["code"]
+    h = connect(hub, code, playerId=host["id"], token=host["token"])
+    g = connect(hub, code, name="Gast")
+    hub.handle(code, g, {"type": "chat", "text": "  Hallo\n  zusammen  " + "x" * 300})
+    hub.handle(code, g, {"type": "chat", "text": "   "})  # leer: ignoriert
+    chat = h.ws.sent[-1]["lobby"]["chat"]
+    assert len(chat) == 1 and chat[0]["name"] == "Gast" and chat[0]["text"].startswith("Hallo zusammen x")
+    assert len(chat[0]["text"]) == 200 and chat[0]["seq"] == 1
+    assert LobbyStore(store.persistence).get(code)["chat"][0]["seq"] == 1  # gespeichert

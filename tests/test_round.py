@@ -137,3 +137,60 @@ def test_give_moves_item_between_hands():
         with pytest.raises(rounds.RoundError) as e:
             rounds.give(rnd, *bad)
         assert e.value.code == code
+
+
+# ---------- Timer: fester Takt ab Start, Wegnahme reihum ----------
+def test_timer_waits_for_grace_then_takes_round_robin_oldest_first():
+    rnd = new(timer=30, grace=60, timerTake=3)  # a, b je 2 Items
+    assert rnd["timer"] == {"nextAt": 90}
+    oldest_a, oldest_b = rnd["hands"]["a"][0], rnd["hands"]["b"][0]
+    assert not rounds.tick(rnd, 89.9, ["a", "b"])
+    assert rounds.timer_view(rnd, 50)["graceLeft"] == 10 and rounds.timer_view(rnd, 50)["nextIn"] == 40
+    assert rounds.tick(rnd, 90, ["a", "b"], random.Random(1))
+    taken = rnd["last"]["items"]
+    assert rnd["last"]["type"] == "take" and [t["player"] for t in taken] == ["a", "b", "a"]
+    assert taken[0]["key"] == oldest_a and taken[1]["key"] == oldest_b
+    assert len(rnd["hands"]["a"]) == 0 and len(rnd["hands"]["b"]) == 1
+    assert all(t["key"] in rnd["pool"] for t in taken)
+    assert_unique(rnd)
+    # nächster Takt 30 s später, ohne Schonfrist
+    assert rnd["timer"]["nextAt"] == 120 and rounds.timer_view(rnd, 100)["graceLeft"] == 0
+
+
+def test_timer_skips_empty_and_offline_players_and_unsticks():
+    rnd = new(online=("a", "b", "c"), startItems=2, timer=10, grace=0, timerTake=5)  # a, b je 1; c keins
+    assert rounds.tick(rnd, 10, ["a", "c"])  # b getrennt → übersprungen; c hat nichts
+    assert [t["player"] for t in rnd["log"][-2]["items"]] == ["a"]
+    # a hatte sein letztes Item verloren, b ist offline → Keiner online hat etwas → sofort Nachschub
+    assert rnd["last"]["type"] == "refill" and rnd["last"]["to"] == {"a": 2, "c": 2}
+    assert_unique(rnd)
+
+
+def test_timer_off_and_missed_ticks_are_not_replayed():
+    assert new()["timer"] is None and not rounds.tick(new(), 1e9, ["a"])
+    rnd = new(timer=10, grace=0)
+    assert not rounds.tick(rnd, 500, ["a", "b"])  # Server war aus: nur neu ansetzen
+    assert rnd["timer"]["nextAt"] == 510 and rnd["events"] == 0
+
+
+# ---------- Sendelimit ----------
+def test_send_quota_counts_only_items_dealt_by_server():
+    rnd = new(startItems=6)  # je 3
+    assert rounds.send_quota(rnd, "a", 3) == {"every": 3, "left": 1, "next": 3}
+    rounds.give(rnd, "a", "b", rnd["hands"]["a"][0], every=3)
+    assert rounds.send_quota(rnd, "a", 3)["left"] == 0
+    with pytest.raises(rounds.RoundError) as e:
+        rounds.give(rnd, "a", "b", rnd["hands"]["a"][0], every=3)
+    assert e.value.code == "send_limit"
+    # b hat ein geschenktes Item mehr – zählt nicht: weiter 1 Sendung aus 3 ausgeteilten
+    assert rounds.send_quota(rnd, "b", 3)["left"] == 1 and rounds.send_quota(rnd, "b", 2) == {"every": 2, "left": 1, "next": 1}
+    assert rounds.send_quota(rnd, "a", 0)["left"] is None  # ohne Limit
+
+
+def test_log_keeps_recent_events_and_refill_names_receivers():
+    rnd = new()
+    for key in list(rnd["hands"]["a"]):
+        rounds.place(rnd, "a", key, True, ["a", "b"])
+    kinds = [e["type"] for e in rnd["log"]]
+    assert kinds[:3] == ["placed", "placed", "refill"] and rnd["log"][2]["to"] == {"a": 2, "b": 2}
+    assert [e["seq"] for e in rnd["log"]] == list(range(1, len(kinds) + 1))

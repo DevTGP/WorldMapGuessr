@@ -47,8 +47,9 @@ def create_app(test_config: dict | None = None) -> Flask:
     lobby_store = LobbyStore(lobby_persistence, catalog=catalog(map_index),
                              on_stat=ItemEventRecorder(store), difficulty=lambda: difficulty_map(store))
     lobby_hub = LobbyHub(lobby_store)
-    if app.config["LOBBY_EXPIRY_THREAD"]:
+    if app.config["LOBBY_EXPIRY_THREAD"]:  # in Tests aus: dort wird hub.tick() direkt aufgerufen
         lobby_hub.start_expiry()
+        lobby_hub.start_ticker()
     app.extensions["lobby_store"] = lobby_store
     app.extensions["lobby_hub"] = lobby_hub
 

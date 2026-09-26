@@ -1,6 +1,7 @@
 // Texte, die erklären, was die Rundeneinstellungen in einer Lobby bewirken.
 
 import { difficultyLabel } from "../game/difficulty.js";
+import { timerRule } from "../menu/config.js";
 
 /**
  * Wie viele Items bekommt jeder, wenn `total` reihum an `players` Spieler geht?
@@ -24,6 +25,12 @@ export function ruleHints(config, players) {
     refillCount: "insgesamt, reihum weiterverteilt",
     refillEvery: "… Treffer der ganzen Lobby",
     difficulty: "Reihenfolge, in der der Server austeilt",
+    timer: "gemeinsamer Takt ab Rundenbeginn (0 = aus)",
+    grace: "ab Rundenbeginn bis zum ersten Takt",
+    timerTake: players > 1
+      ? "insgesamt, reihum aus den Inventaren – je das älteste"
+      : "Items je Takt zurück in den Vorrat – das älteste zuerst",
+    noReturn: "Aufgenommenes muss eingesetzt (oder gesendet) werden",
   };
 }
 
@@ -32,7 +39,17 @@ export function ruleSummary(config, start, players) {
   const split = players > 1 ? ` reihum (${splitText(start, players)})` : "";
   return `<b>${difficultyLabel(config.difficulty ?? 50)}</b> (${config.difficulty ?? 50} %) · ` +
     `<b>${config.lives}</b> gemeinsame Leben · Start: <b>${start}</b>${split} · ` +
-    `alle <b>${config.refillEvery}</b> Treffer der Lobby → <b>${config.refillCount}</b> neue`;
+    `alle <b>${config.refillEvery}</b> Treffer der Lobby → <b>${config.refillCount}</b> neue` +
+    (config.timer ? ` · ${timerRule(config, { shared: players > 1 })}` : "") +
+    (config.noReturn ? " · <b>kein Zurücklegen</b>" : "");
+}
+
+/** Regeltext zum Senden (Menü „So läuft eine Lobby-Runde“) */
+export function sendRule(settings) {
+  if (settings.allowSend === false) return "<b>Items senden</b> ist in dieser Lobby ausgeschaltet.";
+  const n = settings.sendEvery ?? 0;
+  const limit = n ? ` Je <b>${n}</b> vom Server erhaltene Items darfst du <b>1</b> Item senden.` : "";
+  return `<b>Items senden:</b> Item aufnehmen und links einen Mitspieler anklicken.${limit}`;
 }
 
 /** Hinweis über den Rundeneinstellungen: was gilt wann, wer stellt ein */

@@ -37,7 +37,7 @@ export class RefillMeter {
         return pip;
       })
       : []));
-    this.text.innerHTML = `Noch <b></b> Treffer${shared ? " der Lobby" : ""} bis <b></b> Items`;
+    this.text.innerHTML = `Noch <b></b> Treffer${shared ? '<span class="long"> der Lobby</span>' : ""} bis <b></b><span class="long"> Items</span>`;
     const [a, b] = this.text.querySelectorAll("b");
     a.textContent = left;
     b.textContent = `+${next}`;

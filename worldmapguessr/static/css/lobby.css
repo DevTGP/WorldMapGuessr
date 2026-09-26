@@ -177,6 +177,9 @@
 .rail-count { font: 12px "IBM Plex Mono", ui-monospace, monospace; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 .rail-count b { font-weight: 500; color: var(--ink); }
 .rail-hint { margin: 0; font-size: 11.5px; color: var(--ink-soft); }
+.rail-quota { margin: 0; font-size: 12px; color: var(--ink-soft); }
+.rail-quota b { color: var(--piece); font-variant-numeric: tabular-nums; }
+.rail-quota.empty b { color: var(--ink); }
 
 /* Umriss in der Hand: Felder werden zu Zielen */
 body.is-holding .rail-player { border-style: dashed; border-color: var(--piece); }
@@ -184,50 +187,12 @@ body.is-holding .rail-player:hover { background: var(--piece-fill); border-style
 body.is-holding .rail-hint { color: var(--piece); }
 
 /* Lobby-Einstellung als Schalter */
-.field.toggle {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--panel-line);
-  border-radius: 10px;
-  cursor: pointer;
-}
-.field.toggle span { display: flex; flex-direction: column; font-weight: 600; font-size: 14px; }
-.field.toggle small { font-weight: 400; font-size: 12px; color: var(--ink-soft); }
-.field.toggle input {
-  appearance: none;
-  -webkit-appearance: none;
-  flex: none;
-  position: relative;
-  width: 40px; height: 22px;
-  margin: 0;
-  border-radius: 999px;
-  background: var(--panel-line);
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-.field.toggle input::after {
-  content: "";
-  position: absolute;
-  top: 3px; left: 3px;
-  width: 16px; height: 16px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  transition: transform 0.15s ease;
-}
-.field.toggle input:checked { background: var(--piece); }
-.field.toggle input:checked::after { transform: translateX(18px); }
-.field.toggle input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.field.toggle input:disabled { cursor: default; opacity: 0.6; }
 .lobby-section.readonly .field.toggle { cursor: default; }
 
 /* Schmal: nur Kürzel + Anzahl */
 @media (max-width: 720px) {
   .hud-players { width: auto; top: calc(128px + env(safe-area-inset-top, 0px)); transform: none; max-height: calc(100% - 290px); padding: 6px; }
-  .hud-players h2, .rail-hint, .rail-name, .rail-count span { display: none; }
+  .hud-players h2, .rail-hint, .rail-quota, .rail-name, .rail-count span { display: none; }
   .rail-player { grid-template-columns: 32px; grid-template-rows: auto auto; justify-items: center; padding: 4px; row-gap: 2px; }
   .rail-player .avatar { grid-row: auto; }
   .rail-count { font-size: 10.5px; }

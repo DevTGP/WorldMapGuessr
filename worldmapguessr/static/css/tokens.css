@@ -17,6 +17,8 @@
   --heart: #d2453b;
   --good: #2f8a4c;
   --bad: #c2372e;
+  --warn: #b8660b;       /* Timer: Items werden weggenommen */
+  --who-l: 40%;          /* Helligkeit der Spielerfarben (Namen in Meldungen/Chat) */
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -38,6 +40,8 @@
     --heart: #f06a5f;
     --good: #6cc488;
     --bad: #f07a70;
+    --warn: #f0a940;
+    --who-l: 70%;
   }
 }
 :root[data-theme="dark"] {
@@ -59,4 +63,6 @@
   --heart: #f06a5f;
   --good: #6cc488;
   --bad: #f07a70;
+  --warn: #f0a940;
+  --who-l: 70%;
 }

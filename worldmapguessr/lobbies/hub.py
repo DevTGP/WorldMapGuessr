@@ -15,6 +15,8 @@ from .store import LobbyError, LobbyStore
 HOST_GRACE = 10.0         # s: so lange darf der Host weg sein (z. B. Seite neu laden), bevor die Rolle wechselt
 HAND_GRACE = 60.0         # s: so lange behält ein getrennter Spieler sein Inventar, danach zurück in den Vorrat
 EXPIRE_INTERVAL = 600.0   # s: Abstand der Aufräumläufe für verfallene Lobbys
+TICK_INTERVAL = 0.5       # s: Takt, in dem die Rundentimer geprüft werden
+CHAT_IN_STATE = 30        # letzte Chat-Nachrichten im Lobby-Zustand
 
 
 class Connection:
@@ -125,6 +127,9 @@ class LobbyHub:
                              online=self._online_ids(code))
         elif kind == "rename":
             self.store.rename(code, pid, msg.get("name"))
+        elif kind == "chat":
+            if not self.store.chat(code, pid, msg.get("text")):
+                return
         else:
             raise LobbyError("protocol", f"Unbekannte Nachricht: {kind}")
         self.broadcast(code)
@@ -175,8 +180,10 @@ class LobbyHub:
             "settings": {
                 "config": s["config"], "maxPlayers": s["maxPlayers"], "private": bool(s["passwordHash"]),
                 "allowSend": s.get("allowSend", DEFAULT_ALLOW_SEND),
+                "sendEvery": self.store.send_every(lobby),
             },
-            "round": rounds.public_view(lobby["round"]),
+            "round": rounds.public_view(lobby["round"], now=self.store.clock()),
+            "chat": lobby.get("chat", [])[-CHAT_IN_STATE:],
         }
 
     def broadcast(self, code: str):
@@ -185,14 +192,16 @@ class LobbyHub:
             state = self.state(code)
             if state is None:
                 return
-            rnd = self.store.get(code)["round"]
+            lobby = self.store.get(code)
+            rnd = lobby["round"]
             hands = rnd["hands"] if rnd else {}
+            every = self.store.send_every(lobby)
             targets = [
-                (c, list(hands.get(pid, [])))
+                (c, list(hands.get(pid, [])), rounds.send_quota(rnd, pid, every) if rnd else None)
                 for pid, cs in self.online.get(state["code"], {}).items() for c in cs
             ]
-        for c, hand in targets:
-            c.send({"type": "state", "lobby": state, "hand": hand})
+        for c, hand, sends in targets:
+            c.send({"type": "state", "lobby": state, "hand": hand, "sends": sends})
 
     def _online_ids(self, code: str) -> list[str]:
         return list(self.online.get(code, {}))
@@ -236,6 +245,26 @@ class LobbyHub:
         successor = min(online, key=lambda pid: lobby["players"][pid]["joined"])
         self.store.set_host(code, successor)
         return True
+
+    # ---------- Rundentimer ----------
+    def tick(self) -> list[str]:
+        """Alle Lobbys mit verbundenen Spielern: fällige Timer-Takte ausführen, Änderungen senden."""
+        with self.lock:
+            codes = [code for code in list(self.online) if self.store.tick(code, self._online_ids(code))]
+        for code in codes:
+            self.broadcast(code)
+        return codes
+
+    def start_ticker(self, interval: float = TICK_INTERVAL):
+        def loop():
+            while True:
+                time.sleep(interval)
+                try:
+                    self.tick()
+                except Exception:  # ein Fehler darf den Takt nicht beenden
+                    import logging
+                    logging.getLogger(__name__).exception("Lobby-Timer")
+        threading.Thread(target=loop, name="lobby-timer", daemon=True).start()
 
     # ---------- Aufräumen ----------
     def start_expiry(self, interval: float = EXPIRE_INTERVAL):

@@ -14,6 +14,8 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
   - **Einzelne Items:** ausschließen (Suche, „Alle“/„Keine“ je Gruppe).
   - **Schwierigkeit:** Regler 0–100 % (Standard 50 %) mit Stufen Sehr einfach (≤ 15 %), Einfach (≤ 35 %), Normal (≤ 60 %), Schwierig (≤ 80 %), Sehr schwierig (≤ 95 %), Unmöglich. Er bestimmt die Reihenfolge, in der die Items kommen: Je Item Wert = (1 − z) · Item-Schwierigkeit/10 + z · Zufall mit Zufallsanteil z = min(Regler, 100 % − Regler). Bis 50 % kommt das Item mit dem kleinsten Wert zuerst (0 % = streng von leicht nach schwer, 20 % = 80 % Schwierigkeit + 20 % Zufall …), ab 51 % das mit dem größten (100 % = streng von schwer nach leicht). In Lobbys rechnet der Server genauso (`worldmapguessr/difficulty.py`, Browser: `static/js/game/difficulty.js`).
   - **Regeln:** Leben (Standard 10), Start-Items (Standard 5), Nachschub: neue Items (Standard 4) nach je … Treffern (Standard 3).
+  - **Zeitdruck:** Timer in 10-s-Schritten (0 = aus, bis 600 s), Schonfrist in 10-s-Schritten (Standard 30 s), Wegnahme (Items je Takt, Standard 1). Fester Takt ab Rundenbeginn: Nach der Schonfrist gehen alle *Timer* Sekunden *Wegnahme* Items aus dem Inventar zurück in den Vorrat (an zufällige Stellen) – immer die ältesten, auch ein gerade gehaltenes. Ist das Inventar danach leer, kommt sofort Nachschub. Über dem Inventar zählt eine Anzeige herunter (letzte 5 s rot). Im Einzelspiel steht der Timer, solange ein Dialog offen ist.
+  - **Kein Zurücklegen:** Ein aufgenommenes Item kann nicht zurück ins Inventar (Slot, `Esc`, Rechtsklick und Wechsel zu einem anderen Item sind gesperrt) – es muss eingesetzt (in der Lobby auch: gesendet) werden. Ein Fehlwurf bringt es wie gewohnt zurück.
   - Die Einstellungen gelten nur für die gestartete Runde und werden nicht gespeichert; solange die Seite offen ist, merkt sich das Menü die letzte Auswahl. „Nochmal“ im Rundenende-Dialog startet mit denselben Einstellungen neu gemischt.
   - Während einer laufenden Runde schließt `Esc` bzw. × das Menü wieder, ohne die Runde zu verlieren; ein Hinweis sagt, dass Änderungen erst ab der nächsten Runde gelten.
 - Statusleiste oben rechts: Fortschrittsbalken mit „eingesetzt/gesamt“ und Leben als Herz mit „9/10“ (bei wenigen Leben rot).
@@ -25,7 +27,9 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
 - Helligkeitsstufen: Das Land startet fast schwarz. Jedes eingesetzte Item hellt seine Fläche um eine Stufe auf (additiv, Reihenfolge egal). Sind alle Ebenen an einer Stelle eingesetzt – derzeit Kontinent und Staat –, ist sie fast weiß. Kommen später Ebenen hinzu (Bundesländer, Regionen), werden die Stufen automatisch feiner.
 - Daneben: Das Item fliegt zurück ins Inventar, ein Leben weniger. Bei 0 Leben endet die Runde.
 - Nachschub: Nach der eingestellten Zahl richtiger Treffer kommen neue Items ins Inventar, bis der Vorrat leer ist.
-- Zurücklegen ohne Strafe: Klick auf den Slot, `Esc` oder Rechtsklick.
+- Zurücklegen ohne Strafe: Klick auf den Slot, `Esc` oder Rechtsklick (außer bei „Kein Zurücklegen“).
+- Inventar: scrollt horizontal, wenn es voll wird (Mausrad, Wischen); an den Rändern zeigt eine Ausblendung, dass es weitergeht, die Beschriftung zeigt die Anzahl. Nachschub scrollt ans Ende, damit die neuen Items zu sehen sind.
+- **Nachrichtenleiste** unten rechts: alle Meldungen gut lesbar an einem Ort – Einsetzen und Fehlwürfe (in der Lobby aller Spieler, mit Namen in Spielerfarbe), Nachschub (wer wie viele bekommt), Senden, Wegnahme durch den Timer, Hinweise und in der Lobby der Chat. Neue Meldungen erscheinen unten mit kurzem Aufleuchten; ältere werden nach 12 s blasser. Einklappbar (dann nur die neueste Meldung, Zähler für ungelesene); auf schmalen Bildschirmen standardmäßig eingeklappt über dem Inventar.
 
 ## Lobbys
 
@@ -33,25 +37,28 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
 - **Link:** so kurz wie möglich, `http://127.0.0.1:5000/K7Q2M` – 5 Zeichen aus `23456789ABCDEFGHJKMNPQRSTUVWXYZ` (ohne 0/O, 1/I/L), ≈ 28,6 Mio. Codes. Klein geschrieben wird weitergeleitet.
 - **Beitreten:** Link öffnen → Name (und ggf. Passwort). Jederzeit möglich, auch während einer Runde: Wer später kommt, steigt direkt in die laufende Runde ein.
 - **Wiedererkennung:** Spieler-ID und Token liegen im Browser (localStorage). Neu laden oder später zurückkommen führt ohne erneuten Beitritt in dieselbe Rolle – auch als Host.
-- **Einstellungen (nur Host):** Spielkonfiguration wie im Einzelspiel, max. Spielerzahl (Standard 8), Passwort (setzen/entfernen), „Items senden“ (Standard an, wirkt sofort). Gäste sehen alles live, aber gesperrt.
+- **Einstellungen (nur Host):** Spielkonfiguration wie im Einzelspiel, max. Spielerzahl (Standard 8), Passwort (setzen/entfernen), „Items senden“ (Standard an, wirkt sofort), Sendelimit (Standard 5, 0 = ohne). Gäste sehen alles live, aber gesperrt.
 - **Host-Wechsel:** Ist der Host länger als 10 s getrennt, übernimmt der am längsten anwesende Spieler.
 - **Verlassen (alle):** „Lobby verlassen“ im Lobby-Bereich des Menüs → Bestätigung → zurück zum Einzelspiel. Der Spieler wird aus der Lobby entfernt, seine gespeicherte Identität gelöscht; über den Link kann er später als neuer Spieler wieder beitreten. Verlässt der Host, geht die Rolle sofort an den am längsten anwesenden Online-Spieler. Verlässt der letzte Spieler, wird die Lobby gelöscht.
 - **Beenden (nur Host):** „Lobby beenden“ → Bestätigung → die Lobby wird für alle gelöscht. Alle anderen sehen „Lobby beendet“ mit dem Weg zum Einzelspiel; der Link funktioniert danach nicht mehr.
 - **Runde starten:** Der Host startet für alle („Neue Runde für alle“ im Menü oder im Rundenende-Dialog). Ablauf siehe *Mehrspieler-Runde*.
 - **Speicherung:** MongoDB-Collection `lobbies` bzw. Fallback `instance/lobbies.json` (Passwörter nur als Hash, Spieler-Tokens als SHA-256). Lobbys ohne Aktivität verfallen nach 24 Stunden.
-- **Technik:** WebSocket `/ws/lobby/<code>` über `flask-sock`. Protokoll (JSON): Client → `join`, `settings`, `start`, `place {key, correct}`, `give {key, to}`, `rename`, `leave`, `close`, `ping`; Server → `welcome`, `state {lobby, hand}`, `error`, `left`, `closed`, `pong`. HTTP: `POST /api/lobbies`, `GET /api/lobbies/<code>`.
+- **Chat:** Eingabefeld unten in der Nachrichtenleiste (Enter sendet, max. 200 Zeichen). Die letzten 50 Nachrichten werden mit der Lobby gespeichert; wer beitritt, sieht die letzten 10.
+- **Technik:** WebSocket `/ws/lobby/<code>` über `flask-sock`. Protokoll (JSON): Client → `join`, `settings`, `start`, `place {key, correct}`, `give {key, to}`, `chat {text}`, `rename`, `leave`, `close`, `ping`; Server → `welcome`, `state {lobby, hand, sends}`, `error`, `left`, `closed`, `pong`. Der Rundenzustand enthält ein Ereignisprotokoll (`log`, letzte 40 Ereignisse mit `seq`), aus dem jeder Browser die Meldungen genau einmal erzeugt. HTTP: `POST /api/lobbies`, `GET /api/lobbies/<code>`.
 
 ## Mehrspieler-Runde
 
 Der Server führt die Runde (`lobbies/round.py`); der Browser prüft nur, ob ein Item passt, und meldet das Ergebnis.
 
 - **Jedes Item nur einmal:** Ein gemeinsamer, gemischter Vorrat. Jedes Item liegt entweder im Vorrat, im Inventar genau eines Spielers oder ist eingesetzt. Fremde Inventare sieht niemand (nur deren Größe); Items anderer Spieler kann man nicht einsetzen.
-- **Eingesetzte Items synchron:** Jedes richtig eingesetzte Item erscheint sofort bei allen auf der Karte (mit Helligkeitsstufe und Grenze), dazu eine kurze Meldung „Name hat Frankreich eingesetzt“. Fortschritt `eingesetzt / gesamt` gilt für die Lobby.
+- **Eingesetzte Items synchron:** Jedes richtig eingesetzte Item erscheint sofort bei allen auf der Karte (mit Helligkeitsstufe und Grenze), dazu eine Meldung „Name hat Frankreich eingesetzt“ in der Nachrichtenleiste. Fortschritt `eingesetzt / gesamt` gilt für die Lobby.
 - **Gemeinsame Leben:** Jeder Fehlwurf kostet der ganzen Lobby ein Leben. Bei 0 endet die Runde für alle.
 - **Start und Nachschub reihum:** `Start-Items` und `Neue Items` sind in der Lobby Gesamtzahlen. Der Server geht in fester Reihenfolge (wer am längsten in der Lobby ist, zuerst) durch die Spieler und merkt sich, wer als Nächstes dran ist – über alle Verteilungen der Runde hinweg. Beispiel mit 3 Spielern: 2 Start-Items → Spieler 1, Spieler 2; nach dem Nachschub 2 neue → Spieler 3, Spieler 1. So bekommt jeder am Ende gleich viele Items vom Server (höchstens eins Unterschied). Nachschub gibt es nach je `Nachschub alle` Treffern der *ganzen Lobby*; getrennte Spieler werden übersprungen. Hat niemand mehr ein Item, der Vorrat aber schon, wird sofort nachgelegt. Über dem Inventar zeigt eine Leiste, wie viele Treffer (der Lobby) noch bis zum nächsten Nachschub fehlen – auch im Einzelspiel.
 - **Später beitreten:** Wer in eine laufende Runde kommt, sieht alle bisher eingesetzten Items, bekommt aber nicht sofort Items: Er reiht sich hinten in die Reihenfolge ein und bekommt Items, sobald die Schleife beim Verteilen bei ihm ankommt (Mitspieler können ihm vorher Items senden).
 - **Verlassen / Verbindung weg:** Wer die Lobby verlässt, gibt seine Items sofort zurück in den Vorrat und verlässt die Reihenfolge. Bei einem Verbindungsabbruch bleiben sie 60 s reserviert (Neu laden behält das Inventar), danach gehen sie ebenfalls zurück; beim Wiederkommen reiht sich der Spieler hinten neu ein.
-- **Items senden:** Links am Rand steht ein Feld je Online-Mitspieler (Name, Anzahl seiner Items). Item aufnehmen, dann ein Feld anklicken → das Item fliegt hinüber und liegt danach im Inventar des Mitspielers, der eine Meldung bekommt. Keine Einschränkung (Anzahl, Abklingzeit); nur an verbundene Spieler. Ist „Items senden“ aus, verschwindet die Spalte und der Server lehnt Senden ab.
+- **Items senden:** Links am Rand steht ein Feld je Online-Mitspieler (Name, Anzahl seiner Items). Item aufnehmen, dann ein Feld anklicken → das Item fliegt hinüber und liegt danach im Inventar des Mitspielers; alle sehen eine Meldung. Nur an verbundene Spieler. Ist „Items senden“ aus, verschwindet die Spalte und der Server lehnt Senden ab.
+- **Sendelimit:** Je N vom Server erhaltene Items (Start, Nachschub) darf ein Spieler 1 Item senden (Lobbyeinstellung, Standard 5, 0 = ohne Limit). Geschenkte Items zählen nicht mit – so entsteht kein Hin-und-Her. Die Spalte zeigt „Du kannst 1 Item senden“ bzw. „Senden wieder nach 3 Items“; der Server prüft (`send_limit`).
+- **Timer in der Lobby:** Der Server führt ihn (`round.tick`, Prüfung alle 0,5 s): gemeinsamer fester Takt ab Rundenbeginn, nach der Schonfrist je Takt *Wegnahme* Items insgesamt – wie beim Verteilen reihum in fester Reihenfolge (eigener Zeiger), bei jedem Spieler sein ältestes Item. Wer keins hat oder getrennt ist, wird übersprungen. Verpasste Takte (Server war aus, niemand verbunden) werden nicht nachgeholt.
 - **Menü in der Lobby:** zwei Blöcke – *Lobby* („wirkt sofort“: Spielerzahl, Passwort, Items senden) und *Runde* (Item-Arten, Regeln; läuft eine Runde, gilt „ab der nächsten Runde“). Ein Hinweis zeigt, was gerade gilt und wer einstellt; „So läuft eine Lobby-Runde“ erklärt die Regeln aufklappbar. Die Regler zeigen, was sie in der Lobby bewirken (z. B. „für alle zusammen, reihum (jetzt 3 + 2)“), der Fuß fasst alles zusammen. Startet der Host neu, während eine Runde läuft, fragt ein Dialog nach („bricht die Runde für alle ab“).
 - **Rundenende:** Gewonnen (alles eingesetzt) oder verloren (keine Leben) – der Dialog erscheint bei allen. Nur der Host sieht „Neue Runde für alle“. Eine Rangliste gibt es noch nicht.
 - Der Rundenzustand wird mit der Lobby gespeichert und übersteht einen Server-Neustart.
@@ -177,6 +184,10 @@ worldmapguessr/
   static/js/game/difficulty.js    Reihenfolge nach Schwierigkeitsregler, Stufen-Texte
   static/js/menu/difficulty-slider.js  Schwierigkeitsregler im Menü
   static/js/game/refill-meter.js  Anzeige „Noch n Treffer bis +k neue“ am Inventar
+  static/js/game/timer-meter.js   Countdown bis zur nächsten Wegnahme (bzw. Schonfrist) am Inventar
+  static/js/game/round-timer.js   Timer im Einzelspiel (fester Takt, Pause bei offenen Dialogen)
+  static/js/ui/feed.js        Nachrichtenleiste unten rechts (Meldungen, Chat, einklappbar)
+  static/css/feed.css         Nachrichtenleiste
   static/js/game/remote.js    Lobby-Runde: Server-Zustand auf Karte, Inventar, Leben abbilden
   static/js/menu/menu.js      Menü vor der Runde (Einzelspiel und Lobby)
   static/js/lobby/client.js   WebSocket-Client mit automatischem Wiederverbinden
@@ -187,14 +198,14 @@ worldmapguessr/
   static/js/lobby/players-rail.js  Mitspieler-Spalte links: Umrisse an Mitspieler senden
   static/js/lobby/confirm.js  Bestätigungsdialog (Verlassen, Beenden)
   static/js/menu/config.js    Standardwerte, Grenzen, Teile-Pool einer Konfiguration
-  static/js/menu/stepper.js   Zahlen-Stepper
+  static/js/menu/stepper.js   Zahlen-Stepper (Schrittweite, Einheit)
+  static/js/menu/toggle.js    Schalter-Feld (Kein Zurücklegen)
   static/js/menu/item-picker.js  Einzelauswahl der Teile
   static/js/map/icon.js       Umriss-Icons (Inventar, Menü)
   static/js/game/random.js    Zufallsauswahl
   static/js/game/held-piece.js  Teil in der Hand, Einrast-Toleranz, Animationen
   static/js/game/inventory.js   Inventar-Slots
   static/js/game/lives.js     Lebensanzeige
-  static/js/game/toast.js     Kurzmeldungen
   static/data/map/            Kartendaten mit Detailstufen (generiert, siehe „Kartendaten neu erzeugen“)
 tests/                        pytest: Item-Store, API, Lobbys, Mehrspieler-Runde – jeweils mit JSON und MongoDB (mongomock)
 build/                        Erzeugung der Kartendaten (siehe unten)

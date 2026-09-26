@@ -5,7 +5,7 @@
 import { createStepper } from "../menu/stepper.js";
 import { fromWire, toWire } from "../menu/config.js";
 import { confirmDialog } from "./confirm.js";
-import { roundNote, ruleHints, ruleSummary } from "./rules-text.js";
+import { roundNote, ruleHints, ruleSummary, sendRule } from "./rules-text.js";
 
 const SEND_DELAY_MS = 250;
 const CROWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></svg>';
@@ -47,6 +47,13 @@ export class LobbyMenu {
     document.getElementById("lobby-password-clear").addEventListener("click", () => client.sendSettings({ password: "" }));
     this.allowSend = document.getElementById("lobby-allow-send");
     this.allowSend.addEventListener("change", () => client.sendSettings({ allowSend: this.allowSend.checked }));
+    this.sendEvery = createStepper({
+      id: "lobby-send-every", label: "Sendelimit", hint: "1 Senden je … erhaltene Items (0 = ohne Limit)",
+      value: 5, min: 0, max: 20,
+      onChange: (v) => client.sendSettings({ sendEvery: v }),
+    });
+    this.sendEvery.el.classList.add("host-only");
+    this.allowSend.closest(".field").after(this.sendEvery.el);
 
     // Verlassen (alle) und Beenden (nur Host)
     document.getElementById("lobby-leave").addEventListener("click", () => this._leave());
@@ -98,7 +105,11 @@ export class LobbyMenu {
     this.maxPlayers.value = state.settings.maxPlayers;
     this.section.classList.toggle("readonly", !host);
     this.section.querySelectorAll(".host-only input, .host-only button").forEach((el) => { el.disabled = !host; });
-    this.maxPlayers.el.querySelectorAll("input, button").forEach((el) => { if (!host) el.disabled = true; });
+    for (const st of [this.maxPlayers, this.sendEvery]) {
+      st.el.querySelectorAll("input, button").forEach((el) => { if (!host) el.disabled = true; });
+    }
+    this.sendEvery.value = state.settings.sendEvery ?? 0;
+    this.sendEvery.el.classList.toggle("muted", state.settings.allowSend === false);
     if (host) this.maxPlayers.value = state.settings.maxPlayers; // Grenzen neu anwenden
 
     document.getElementById("lobby-privacy").textContent = state.settings.private
@@ -106,9 +117,7 @@ export class LobbyMenu {
     document.getElementById("lobby-password-clear").hidden = !state.settings.private;
     document.getElementById("lobby-close").hidden = !host;
     this.allowSend.checked = state.settings.allowSend !== false;
-    document.getElementById("mp-rule-send").innerHTML = state.settings.allowSend !== false
-      ? "<b>Items senden:</b> Item aufnehmen und links einen Mitspieler anklicken."
-      : "<b>Items senden</b> ist in dieser Lobby ausgeschaltet.";
+    document.getElementById("mp-rule-send").innerHTML = sendRule(state.settings);
     const online = state.players.filter((p) => p.online).length;
     for (const [key, text] of Object.entries(ruleHints(this.menu.config, online))) this.menu.steppers[key].setHint(text);
 

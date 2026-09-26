@@ -3,11 +3,13 @@
 Protokoll (JSON):
   Client → Server  join {playerId?, token?, name, password?} · settings {settings} · start · rename {name}
                    · place {key, correct} (Einsetzversuch eines Teils aus dem eigenen Inventar)
-                   · give {key, to} (Teil an einen Online-Mitspieler senden, wenn settings.allowSend)
+                   · give {key, to} (Teil an einen Online-Mitspieler senden, wenn settings.allowSend;
+                     Sendelimit settings.sendEvery) · chat {text} (Nachricht an alle, max. 200 Zeichen)
                    · leave (Lobby verlassen) · close (nur Host: Lobby beenden) · ping
-  Server → Client  welcome {player} · state {lobby, hand} · error {code, message} · left · closed {message}
+  Server → Client  welcome {player} · state {lobby, hand, sends} · error {code, message} · left · closed {message}
                    · pong
-  lobby.round: öffentliche Rundenansicht (round.public_view), hand: eigenes Inventar (Feature-Keys)
+  lobby.round: öffentliche Rundenansicht (round.public_view: log der letzten Ereignisse, timer), lobby.chat:
+  letzte Chat-Nachrichten, hand: eigenes Inventar (Feature-Keys), sends: eigenes Sendelimit (round.send_quota)
 """
 import json
 
