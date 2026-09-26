@@ -7,9 +7,9 @@ import { yielder } from "../ui/loading-screen.js";
 import { TileStore } from "./tiles.js";
 import { ItemStore } from "./items.js";
 import { boxTest } from "./project.js";
+import { quality } from "./quality.js";
 
 export const MIN_ZOOM = 1;
-export const MAX_ZOOM = 40; // feinste Kachelstufe: Natural Earth 1:10m in voller Genauigkeit
 const IDLE_AFTER_MS = 140;   // so lange nach der letzten Bewegung wird in voller Qualität gezeichnet
 const PAN_MARGIN = 0.22;     // vertikaler Spielraum beim Zoomen (Anteil der Fensterhöhe), z. B. für Antarktika über dem Inventar
 const PAN_MARGIN_RAMP = 0.5; // Spielraum wächst von Zoom 1 bis 1 + RAMP stetig an (kein Sprung beim Herauszoomen)
@@ -100,6 +100,11 @@ export class WorldMap {
     tiles.onLoad = () => this.requestRender();
     items.onUpgrade = () => this.requestRender();
     this._listeners = { view: [], click: [], contextmenu: [] };
+    this._applyQuality(quality.value);
+    quality.onChange((q) => {
+      this._applyQuality(q);
+      this.setView(this.view); // Zoomgrenze kann sich geändert haben
+    });
     this._moving = false;
     this._frame = 0;
 
@@ -140,7 +145,7 @@ export class WorldMap {
 
   /** Ansicht auf gültige Werte begrenzen */
   clamp(v) {
-    const k = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, v.k));
+    const k = Math.max(MIN_ZOOM, Math.min(this.maxZoom ?? quality.value.maxZoom, v.k));
     // Bei 100 % ist die Y-Achse fest; erst beim Hineinzoomen darf senkrecht verschoben werden
     const ramp = Math.min(1, (k - MIN_ZOOM) / PAN_MARGIN_RAMP);
     const maxTy = (Math.max(0, (this.baseHeight * k - this.size.h) / 2) + this.size.h * PAN_MARGIN) * ramp;
@@ -268,7 +273,8 @@ export class WorldMap {
     if (this._frame) return;
     this._frame = requestAnimationFrame(() => {
       this._frame = 0;
-      const z = this.tiles.levelFor(this.projection.scale());
+      const z = this.tileLevel();
+      this.renderer.step = this._moving ? this.quality.moveStep : this.quality.step;
       this.renderer.draw(this.projection, this.tiles.select(z, this.projection, this.size), this._moving);
       this._emit("view", this.view);
       if (this.renderer.animating) this.requestRender();
@@ -280,7 +286,7 @@ export class WorldMap {
    * @param {[[number, number], [number, number]]|null} clip  nur dieses Bildschirmrechteck (+ Rand)
    */
   svgPath(feature, clip = null) {
-    const ctx = new ThinPath(PIECE_STEP_PX);
+    const ctx = new ThinPath(this.pieceStep ?? PIECE_STEP_PX);
     let shape = feature;
     if (clip && feature.boxes) {
       // Polygone außerhalb gar nicht erst projizieren (z. B. Kanadas Inseln bei starkem Zoom)
@@ -295,6 +301,25 @@ export class WorldMap {
       this.projection.clipExtent(null);
     }
     return ctx.toString();
+  }
+
+  /** Kartenqualität übernehmen (map/quality.js) */
+  _applyQuality(q) {
+    this.maxZoom = q.maxZoom;
+    this.pieceStep = q.pieceStep;
+    this.tiles.detail = q.detail;
+    this.tiles.maxPoints = q.maxPoints;
+    this.items.detail = q.detail;
+    this.renderer.step = q.step;
+    this.renderer.shelfStep = q.shelfStep;
+    this.quality = q;
+  }
+
+  /** Kachelstufe für die aktuelle Ansicht (in Bewegung ggf. gröber, siehe map/quality.js) */
+  tileLevel(moving = this._moving) {
+    const q = this.quality;
+    const s = this.projection.scale() * (moving ? q.moveDetail / q.detail : 1);
+    return this.tiles.levelFor(s);
   }
 
   /** Detailstufe, die für ein Item bei der aktuellen Skala passt (Kontinente höchstens Stufe 3) */

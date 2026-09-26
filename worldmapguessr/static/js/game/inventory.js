@@ -3,8 +3,8 @@
 
 import { iconPath } from "../map/icon.js";
 
-const ICON_W = 136;
-const ICON_H = 76;
+export const ICON_W = 136;
+export const ICON_H = 76;
 const REMOVE_AFTER_MS = 1300;
 const CHECK = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg>';
 
@@ -79,6 +79,12 @@ export class Inventory {
     const c = this.container;
     c.classList.toggle("more-left", c.scrollLeft > 2);
     c.classList.toggle("more-right", c.scrollLeft + c.clientWidth < c.scrollWidth - 2);
+  }
+
+  /** Icon neu zeichnen (feinere Umrisse geladen) */
+  redrawIcon(id) {
+    const p = this.pieces.get(id);
+    if (p && this.slot(id)) this._drawIcon(p);
   }
 
   _drawIcon(p) {

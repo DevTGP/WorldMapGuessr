@@ -43,8 +43,9 @@ export class ItemStore {
   }
 
   /** Stufe für eine Kartenskala (wie bei den Kacheln) */
-  levelFor(scale) {
-    const i = this.levels.findIndex((l) => l.sMax === null || scale <= l.sMax);
+  levelFor(scale, detail = this.detail ?? 1) {
+    const s = scale * detail; // Standard: Kartenqualität (map/quality.js)
+    const i = this.levels.findIndex((l) => l.sMax === null || s <= l.sMax);
     return i < 0 ? this.levels.length - 1 : i;
   }
 
@@ -86,6 +87,9 @@ export class ItemStore {
     });
     f.parts = [...partsOf(f.geometry)];
     f.level = level;
+    // Startstufe bleibt für die Icon-Einpassung (map/icon.js): feinere Stufen bringen winzige, weit entfernte
+    // Inseln mit (Clipperton, Cocos, Prinz-Edward-Inseln …), die das Hauptland sonst im Icon schrumpfen ließen
+    if (level === -1) { f.fitGeometry = f.geometry; f.fitParts = f.parts; }
   }
 }
 

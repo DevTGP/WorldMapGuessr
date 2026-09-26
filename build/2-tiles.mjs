@@ -180,16 +180,32 @@ function encode(pts, ox, oy, size, Q) {
   }
   return out;
 }
-function encodeItem(pts, q) {
+/** Ring auf 1/q Grad runden, doppelte Punkte weg */
+function roundRing(pts, q) {
   const out = [];
-  let px = 0, py = 0;
   for (const [x, y] of pts) {
-    const qx = Math.round(x * q), qy = Math.round(y * q);
-    if (out.length && qx === px && qy === py) continue;
-    out.push(qx - px, qy - py);
-    px = qx; py = qy;
+    const p = [Math.round(x * q), Math.round(y * q)];
+    const last = out[out.length - 1];
+    if (!last || last[0] !== p[0] || last[1] !== p[1]) out.push(p);
   }
   return out;
+}
+/** Gerundeter Ring → Differenzen */
+function deltas(ring) {
+  const out = [];
+  let px = 0, py = 0;
+  for (const [x, y] of ring) { out.push(x - px, y - py); px = x; py = y; }
+  return out;
+}
+
+/** Polygone, die d3 als „fast die ganze Kugel“ läse (falscher Umlaufsinn, z. B. winzige, beim Vereinfachen
+ *  oder Runden umgeklappte Atoll-Ringe), umdrehen – sonst füllen Icons, gehaltene Teile und der Treffertest
+ *  die Welt. q: Koordinaten sind ganze Zahlen in 1/q Grad */
+function rewind(polys, q = 1) {
+  return polys.map((poly) => {
+    const deg = q === 1 ? poly : poly.map((r) => r.map(([x, y]) => [x / q, y / q]));
+    return geoArea({ type: "Polygon", coordinates: deg }) > 2 * Math.PI ? poly.map((r) => r.slice().reverse()) : poly;
+  });
 }
 
 function writeJson(file, data) {
@@ -289,9 +305,9 @@ for (const level of LEVELS) {
   const levelTopo = { ...topo, arcs: arcs, transform: undefined };
   for (const key of itemKeys) {
     const g = merge(levelTopo, itemPieces[key]);
-    const polys = (g.coordinates || [])
+    const polys = rewind((g.coordinates || [])
       .map((poly) => poly.filter((r) => r.length >= 4))
-      .filter((poly) => poly.length);
+      .filter((poly) => poly.length));
     (itemGeoms[key] ??= [])[level.z] = polys;
   }
   stats.push({ z: level.z, tiles: tiles.size, fillPts, linePts, kB: Math.round(bytes / 1024) });
@@ -317,12 +333,13 @@ const itemList = itemKeys.map((key) => {
  *  wird für dieses Item feiner gerundet. */
 function encPolys(polys, q) {
   for (const qq of [q, 1e4, 1e5]) {
-    const out = polys
+    const rounded = polys
       .map((poly) => {
-        const rings = poly.map((r) => encodeItem(r, qq));
-        return rings[0].length >= 8 ? rings.filter((r) => r.length >= 8) : null;
+        const rings = poly.map((r) => roundRing(r, qq));
+        return rings[0].length >= 4 ? rings.filter((r) => r.length >= 4) : null;
       })
       .filter(Boolean);
+    const out = rewind(rounded, qq).map((poly) => poly.map(deltas));
     if (out.length || qq === 1e5) return [qq, out];
   }
 }
@@ -354,8 +371,8 @@ function mergeItem(key, minW) {
       arcs[i] = arc.filter((p, j) => j === 0 || j === arc.length - 1 || p[2] >= minW).map((p) => [p[0], p[1]]);
     }
   }
-  return (merge({ ...topo, arcs, transform: undefined }, itemPieces[key]).coordinates || [])
-    .map((poly) => poly.filter((r) => r.length >= 4)).filter((poly) => poly.length);
+  return rewind((merge({ ...topo, arcs, transform: undefined }, itemPieces[key]).coordinates || [])
+    .map((poly) => poly.filter((r) => r.length >= 4)).filter((poly) => poly.length));
 }
 /** Erste Geometrie der Liste, die nach dem Kodieren noch Fläche hat (sonst die feinere nächste Stufe) */
 function encodeFirst(candidates, q) {

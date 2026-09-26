@@ -5,13 +5,19 @@
 // Zustand hier ab (resetRound/addPieces/…). Der Browser prüft nur, ob ein Teil passt, und meldet das Ergebnis.
 
 import { HeldPiece } from "./held-piece.js";
-import { Inventory } from "./inventory.js";
+import { ICON_H, ICON_W, Inventory } from "./inventory.js";
+import { iconScale } from "../map/icon.js";
 import { Lives } from "./lives.js";
 import { RefillMeter } from "./refill-meter.js";
 import { TimerMeter } from "./timer-meter.js";
 import { Feed } from "../ui/feed.js";
 
 const DBLCLICK_REARM_MS = 400;
+/**
+ * Detail der Inventar-Icons, unabhängig von der Kartenqualität: Stufe so wählen, als wäre das Icon
+ * ICON_DETAIL-mal so groß (je Bildschirm-Pixeldichte) – Punkte fallen erst unter ≈ 0,25 Geräte-px² weg.
+ */
+const ICON_DETAIL = 4;
 
 export class Game {
   constructor(map) {
@@ -100,6 +106,21 @@ export class Game {
   addPieces(pieces) {
     for (const p of pieces) this.pieces.set(p.id, p);
     this.inventory.add(pieces);
+    this._refineIcons(pieces);
+  }
+
+  /**
+   * Inventar-Icons: die Detailstufe nachladen, die zur Icon-Größe passt (die Startstufe ist nur grob),
+   * und das Icon danach neu zeichnen. Gilt bei jeder Kartenqualität.
+   */
+  _refineIcons(pieces) {
+    const detail = ICON_DETAIL * Math.max(1, devicePixelRatio || 1);
+    for (const p of pieces) {
+      const f = p.feature;
+      let z = this.map.items.levelFor(iconScale(f, ICON_W, ICON_H), detail);
+      if (f.kind === "continent") z = Math.min(z, 3);
+      if (z > f.level) this.map.items.ensure(f, z).then(() => this.inventory.redrawIcon(p.id));
+    }
   }
 
   /** Teil ohne Animation aus dem Inventar nehmen (Server hat es zurück in den Vorrat gelegt) */

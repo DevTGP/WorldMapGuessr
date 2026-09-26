@@ -25,12 +25,18 @@ export function yOf(phi) {
 export function prepare(lonlat) {
   const n = lonlat.length / 2;
   const out = new Float64Array(n * 3);
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
   for (let i = 0; i < n; i++) {
     const lam = lonlat[2 * i] * RAD, phi = lonlat[2 * i + 1] * RAD;
+    const fx = fxOf(phi), y = yOf(phi);
     out[3 * i] = lam;
-    out[3 * i + 1] = fxOf(phi);
-    out[3 * i + 2] = yOf(phi);
+    out[3 * i + 1] = fx;
+    out[3 * i + 2] = y;
+    const x = lam * fx;
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
   }
+  // Ausdehnung in Karteneinheiten (× Skala = Pixel): winzige Ringe lässt der Renderer weg
+  out.ext = n ? Math.max(x1 - x0, y1 - y0) : 0;
   return out;
 }
 

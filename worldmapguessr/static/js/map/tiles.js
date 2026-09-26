@@ -8,7 +8,6 @@
 import { RAD, boxTest, prepare } from "./project.js";
 
 const MAX_PARALLEL = 6;
-const MAX_POINTS = 2_500_000; // entpackte Punkte im Speicher, darüber werden alte Kacheln verworfen
 
 export class TileStore {
   /**
@@ -28,13 +27,16 @@ export class TileStore {
     this.active = 0;
     this.points = 0;
     this.stamp = 0;
+    this.detail = 1;               // Kartenqualität: Stufe für Skala × detail (map/quality.js)
+    this.maxPoints = 2_500_000;    // entpackte Punkte im Speicher, darüber werden alte Kacheln verworfen
     // Mittelpunkt und Radius je vorhandener Kachel (für den Sichtbarkeitstest)
     this.geo = this.levels.map((l) => new Map([...this.exists[l.z]].map((k) => [k, tileBounds(l, k)])));
   }
 
-  /** Stufe für eine Kartenskala (Pixel pro Bogenmaß) */
+  /** Stufe für eine Kartenskala (Pixel pro Bogenmaß) – bei höherer Qualität entsprechend feiner */
   levelFor(scale) {
-    const i = this.levels.findIndex((l) => l.sMax === null || scale <= l.sMax);
+    const s = scale * this.detail;
+    const i = this.levels.findIndex((l) => l.sMax === null || s <= l.sMax);
     return i < 0 ? this.levels.length - 1 : i;
   }
 
@@ -135,10 +137,10 @@ export class TileStore {
   }
 
   _evict() {
-    if (this.points <= MAX_POINTS) return;
+    if (this.points <= this.maxPoints) return;
     const old = [...this.tiles.entries()].filter(([, t]) => t.z > 0).sort((a, b) => a[1].used - b[1].used);
     for (const [id, t] of old) {
-      if (this.points <= MAX_POINTS * 0.8) break;
+      if (this.points <= this.maxPoints * 0.8) break;
       this.tiles.delete(id);
       this.points -= t.points;
     }

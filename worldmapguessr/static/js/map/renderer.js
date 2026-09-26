@@ -19,7 +19,9 @@ const TOKENS = ["outside", "sea", "sea-shelf", "land", "land-top", "coast", "bor
 const TINY_PX = 5;
 const TINY_RING_R = 3.5;
 /** Mindestabstand zweier gezeichneter Punkte (Pixel) */
-const MIN_STEP_PX = 0.75;
+/** Kleinere Ringe (Inseln) und Linienstücke werden nicht gezeichnet */
+const MIN_SIZE_PX = 0.5;
+const MIN_STEP_PX = 0.75; // Standard (Qualität „Niedrig“); setQuality ändert step/shelfStep
 /** Für den breiten Schelf-Saum reicht ein gröberer Pfad */
 const SHELF_STEP_PX = 2.5;
 /** Strichbreite gegen Haarlinien zwischen Zellen */
@@ -39,6 +41,8 @@ export class Renderer {
     this.placed = new Map(); // Item-Key → Startzeit der Aufhell-Animation
     this.levels = 2;         // Ebenen (Kontinente, Staaten …) → Schrittweite der Aufhellung
     this.showGraticule = false;
+    this.step = MIN_STEP_PX;
+    this.shelfStep = SHELF_STEP_PX;
     this.graticule = d3.geoGraticule10();
     this.itemOf = itemOf;
     // Zelle → Keys der Ebenen, die sie enthalten
@@ -123,7 +127,10 @@ export class Renderer {
 
     // Pfade sammeln: Flächen je Farbe, Linien je Art
     const colors = this._cellColors(now);
-    const fills = new Map();
+    // Flächen je Kachel und Farbe getrennt füllen: ein Pfad über den ganzen Bildschirm mit Tausenden
+    // Teilpfaden ist beim Rastern deutlich teurer als viele kleine (jeder nur so groß wie seine Kachel).
+    // Kacheln überlappen leicht (build/2-tiles.mjs), daher keine Nahtlinien.
+    const fills = []; // [Farbe, Pfad]
     const coast = new Path2D();
     const shelf = moving ? null : new Path2D();
     const borders = new Path2D();
@@ -132,12 +139,14 @@ export class Renderer {
     for (const t of tiles) {
       const off = wrapOffset(t.lon0, v.rot);
       const cut = t.lon1 + v.rot + off > Math.PI + 1e-9; // Kachel liegt über der Schnittlinie
+      const byColor = new Map();
       for (const f of t.fills) {
         const color = colors[f.cell];
-        let p = fills.get(color);
-        if (!p) fills.set(color, (p = new Path2D()));
-        for (const ring of f.rings) addRing(p, ring, v, off, cut, true, MIN_STEP_PX);
+        let p = byColor.get(color);
+        if (!p) byColor.set(color, (p = new Path2D()));
+        for (const ring of f.rings) addRing(p, ring, v, off, cut, true, this.step);
       }
+      for (const entry of byColor) fills.push(entry);
       for (const l of t.lines) {
         let target;
         if (l.b < 0 || this.cells[l.a].continent !== this.cells[l.b].continent) target = coast;
@@ -146,8 +155,8 @@ export class Renderer {
           target = seams.get(colors[l.a]);
           if (!target) seams.set(colors[l.a], (target = new Path2D()));
         } else continue;
-        addRing(target, l.pts, v, off, cut, false, MIN_STEP_PX);
-        if (shelf && target === coast) addRing(shelf, l.pts, v, off, cut, false, SHELF_STEP_PX);
+        addRing(target, l.pts, v, off, cut, false, this.step);
+        if (shelf && target === coast) addRing(shelf, l.pts, v, off, cut, false, this.shelfStep);
       }
     }
 
@@ -210,6 +219,8 @@ export class Renderer {
 function addRing(path, pts, { s, tx, ty, rot }, off, cut, closed, step) {
   const n = pts.length / 3;
   if (n < 2) return;
+  // Ringe/Linien kleiner als ein halber Pixel sind unsichtbar – ihre Canvas-Aufrufe kosten aber trotzdem
+  if (pts.ext !== undefined && pts.ext * s < MIN_SIZE_PX) return;
   const shift = rot + off;
   if (!cut) {
     // Punkte, die weniger als MIN_STEP_PX vom zuletzt gezeichneten entfernt liegen, überspringen:

@@ -13,6 +13,7 @@ import { ItemPicker } from "./item-picker.js";
 import { createToggle } from "./toggle.js";
 import { createTtlField } from "./ttl-field.js";
 import { ModePicker } from "./mode-picker.js";
+import { createQualityField } from "./quality-field.js";
 import { DEFAULT_LEVEL, DEFAULT_MODE, LEVELS, MODE, applyPreset, metrics, mmss, perMinute, valuesLine } from "./presets.js";
 import { GROUPS, LIMITS, SCOPES, cloneConfig, defaultConfig, enforceBalance, poolFor } from "./config.js";
 
@@ -86,6 +87,7 @@ export class Menu {
     this._buildKinds();
     this._buildRules();
     this._bindAdvanced();
+    createQualityField(document.getElementById("quality-field"));
     this.picker = new ItemPicker(document.getElementById("picker-list"), this.groups, () => this._edited());
     document.getElementById("picker-search").addEventListener("input", (e) => this.picker.filter(e.target.value));
 

@@ -8,6 +8,7 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
 
 - Die Karte lässt sich wie ein Globus um die Längsachse drehen: seitlich ziehen oder die Pfeile oben (bzw. `←`/`→`), die in 45°-Schritten (π/4) auf 0°, 45°, 90° … weiterdrehen. Was in der Mitte liegt, ist am wenigsten verzerrt.
 - Bei 100 % ist die Y-Achse fest (Ziehen dreht nur). Erst nach dem Hineinzoomen lässt sich die Karte auch senkrecht verschieben.
+- **Kartenqualität** (Menü, gilt sofort und nur auf diesem Gerät, der Browser merkt sie sich): Niedrig / Mittel (Standard) / Hoch. Sie bestimmt, wie fein Karte und gehaltenes Item gezeichnet werden und wie weit man hineinzoomen kann (4000 / 8000 / 16000 %). Details: „Detailstufen (LOD)“.
 - Beim Start zeigt ein Ladebildschirm den Fortschritt: Kartendaten herunterladen (in MB, der Server gibt die Größe des Startpakets mit), Umrisse vorbereiten, Items (Icons) vorbereiten, Karte zeichnen. Der Balken läuft nie rückwärts; ein Schimmer zeigt auch während längerer Rechenschritte, dass noch etwas passiert. Schlägt das Laden fehl, gibt es eine Meldung mit „Neu laden“.
 - Vor jeder Runde öffnet sich das Menü (auch über „Neue Runde“ oben rechts und nach Rundenende über „Einstellungen“):
   - **Item-Arten:** sieben Karten zum An-/Abwählen – 7 Kontinente, 45 Staaten Europas (klassisches Europa inkl. Russland und Kosovo, ohne Türkei, Zypern und Kaukasus), 23 Staaten Nordamerikas (USA, Kanada, Mexiko, 7 Staaten Mittelamerikas, 13 Karibikstaaten; ohne abhängige Gebiete wie Grönland oder Puerto Rico), 12 Staaten Südamerikas (ohne Französisch-Guayana und Falklandinseln), 54 Staaten Afrikas (ohne Westsahara, Réunion, Mayotte, St. Helena), 49 Staaten Asiens (46 unabhängige Staaten inkl. Türkei, Kaukasus und Kasachstan, dazu Zypern, Taiwan und Palästina; Russland zählt als Ganzes zu Europa), 14 Staaten Ozeaniens (ohne abhängige Gebiete wie Neukaledonien, Französisch-Polynesien, Cookinseln, Niue, Guam).
@@ -185,6 +186,7 @@ worldmapguessr/
   static/js/map/items.js      Item-Umrisse: Startstufe für alle, feinere Stufe je Item bei Bedarf
   static/js/map/project.js    Schnelle Natural-Earth-Projektion, Sichtbarkeitstest für Längen/Breiten-Boxen
   static/js/map/renderer.js   Canvas-Zeichnung aus Kacheln (Zellfarben, Küsten, Grenzen, Kleinststaat-Ringe)
+  static/js/map/quality.js    Kartenqualität Niedrig/Mittel/Hoch (Detailfaktor, Schrittweiten, Max-Zoom, Speichergrenze)
   static/js/map/geometry.js   Anker, Fläche, Zerlegung in Teile (Sichtbarkeit, Datumsgrenze)
   static/js/map/gestures.js   Ziehen, Mausrad, Pinch, Doppelklick
   static/js/map/controls.js   Buttons, Tastatur, Koordinatenanzeige
@@ -214,6 +216,7 @@ worldmapguessr/
   static/js/menu/presets.js   Spielmodi und Schwierigkeitsstufen (Voreinstellungen, Kennzahlen)
   static/js/menu/mode-picker.js  Einfache Ansicht: Modus, Stufe, Kontinente/Länder/Bundesländer
   static/js/menu/ttl-field.js Auswahl „Aufbewahren“ (Verfall nach Untätigkeit)
+  static/js/menu/quality-field.js  Auswahl „Kartenqualität“
   static/js/menu/item-picker.js  Einzelauswahl der Teile
   static/js/map/icon.js       Umriss-Icons (Inventar, Menü)
   static/js/game/held-piece.js  Teil in der Hand, Einrast-Toleranz, Animationen
@@ -276,9 +279,22 @@ Der Server liefert die Dateien unter `/data/<version>/…` mit einem Jahr Cache 
 
 - Vereinfachung nach Visvalingam mit sphärischer Dreiecksfläche auf einer gemeinsamen Topologie: Grenzen zweier Zellen werden überall gleich vereinfacht, es entstehen keine Lücken – das gilt auch für spätere Bundesländer/Regionen, deren Außengrenzen genau auf den Staatsgrenzen liegen.
 - Stufe z wird bis zur Kartenskala `sMax` benutzt (Pixel je Bogenmaß: 450, 1100, 2800, 7000, ∞; bei 1280 px Breite ≈ Zoom 200 %, 500 %, 1250 %, 3100 %). Ein Punkt bleibt, wenn sein Dreieck bei `sMax` mindestens `PX2` = 4 px² groß wäre; Inseln unter 1 px fallen weg. Die feinste Stufe enthält jeden Punkt der Quelle.
-- Beim Zeichnen: nur Kacheln im Ausschnitt; fehlt eine, wird die nächstgröbere geladene gezeichnet, bis sie da ist. Punkte näher als 0,75 px am vorigen werden übersprungen. Höchstens 2,5 Mio. Punkte bleiben im Speicher (älteste Kacheln fallen raus).
+- Beim Zeichnen: nur Kacheln im Ausschnitt; fehlt eine, wird die nächstgröbere geladene gezeichnet, bis sie da ist. Punkte näher als *Schritt* px am vorigen werden übersprungen, Ringe unter 0,5 px ganz. Flächen werden je Kachel und Farbe zu einem Pfad gebündelt (ein `fill` statt eines je Zelle). Höchstens *Speicher* Punkte bleiben im Speicher (älteste Kacheln fallen raus).
+- Kartenqualität: Der Detailfaktor multipliziert die Kartenskala bei der Wahl der Stufe – bei „Hoch“ wird Stufe z also schon bei einem Sechstel ihres `sMax` durch die feinere ersetzt. Während Ziehen/Zoomen wird mit dem Bewegungsfaktor gezeichnet und nach dem Loslassen fein nachgezeichnet.
+
+  | | Niedrig | Mittel | Hoch |
+  |---|---|---|---|
+  | Detailfaktor (Ruhe / Bewegung) | 1 / 1 | 2,5 / 1 | 6 / 2,5 |
+  | Schritt (Ruhe / Bewegung, px) | 0,75 / 0,75 | 0,6 / 0,75 | 0,5 / 0,7 |
+  | Gehaltenes Item, Schritt (px) | 0,5 | 0,35 | 0,25 |
+  | Max-Zoom | 4000 % | 8000 % | 16000 % |
+  | Speicher (Punkte) | 2,5 Mio. | 4 Mio. | 6 Mio. |
+
+  „Niedrig“ entspricht dem früheren Verhalten. Die Daten sind für alle Stufen dieselben; höhere Qualität lädt nur früher die feineren Kacheln und Item-Umrisse nach.
 - Kacheln überlappen um 1/512 ihrer Seite, und Kanten entlang eines Meridians (Kachelrand, ±180°) sind fein unterteilt – so bleiben keine Haarlinien an Kachelrändern. Unsichtbare Grenzen zwischen gleichfarbigen Zellen werden in der Flächenfarbe nachgezogen.
 - Items: Die Startstufe ist je Item so fein, wie sein Inventar-Icon oder die Weltansicht es braucht. Ein aufgenommenes Item lädt die zum Zoom passende Stufe nach (Kontinente höchstens Stufe 3); gezeichnet wird nur der Teil, der beim Verschieben sichtbar werden kann.
+- Inventar-Icons (unabhängig von der Kartenqualität): Jedes Icon lädt die Stufe nach, die das Icon bei 4 × Größe × Pixeldichte braucht, und wird neu gezeichnet (Icon-Cache je Stufe). Eingepasst wird immer auf die Startstufe – feinere Stufen bringen winzige, weit entfernte Inseln mit (Clipperton, Kokosinsel, Prinz-Edward-Inseln …), die das Hauptland sonst schrumpfen ließen; was außerhalb liegt, wird abgeschnitten. Umgekehrt lassen feinere Stufen Inseln unter 1 px ihrer Skala weg (Atolle von Kiribati, Malediven …); solche Inseln der Startstufe werden im Icon ergänzt.
+- Umlaufsinn: Nach dem Runden auf ganze Zahlen kann ein winziger Ring seine Richtung umkehren; d3 liest ihn dann als „alles außer dieser Fläche“ (z. B. füllte Kiribatis Icon die ganze Box). Der Build dreht Polygone mit sphärischer Fläche > 2π nach dem Runden wieder um.
 - Startpaket: `index.json` + `i0.json` + Stufe 0 ≈ 0,4 MB; alles Weitere nach Bedarf.
 
 ## Datenentscheidungen
