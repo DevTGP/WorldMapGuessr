@@ -1,9 +1,9 @@
 {
   "name": "worldmapguessr-build",
   "private": true,
-  "description": "Erzeugt die Kartendaten für WorldMapGuessr (Kacheln mit Detailstufen, Item-Umrisse)",
+  "description": "Erzeugt die Kartendaten für WorldMapGuessr (Kacheln mit Detailstufen, Item-Umrisse, Flüsse/Seen, Relief)",
   "scripts": {
-    "build": "python 1-cells.py && node 2-tiles.mjs"
+    "build": "python 1-cells.py && node 2-tiles.mjs && python 3-water.py && python 4-relief.py"
   },
   "dependencies": {
     "d3-geo": "^3.1.1",

@@ -4,6 +4,8 @@
 // Inselstaaten aus weit verstreuten Atollen (Kiribati, Tuvalu, Marshallinseln …) wären eingepasst nur
 // noch Staub: Ist schon die größte Insel winzig, bekommt jede zu kleine Insel einen Punkt.
 
+import { makeProjection, projectionId } from "./projections.js";
+
 /** Größte Insel kleiner als so viele Pixel → Streuinsel-Darstellung mit Punkten */
 const SCATTERED_MAX_PX = 6;
 /** Inseln unter dieser Größe werden als Punkt gezeichnet */
@@ -17,7 +19,7 @@ const DOT_R = 1.4;
 export function iconPath(feature, w, h, pad = 3) {
   // je Feature, Größe und Detailstufe nur einmal berechnen (Menü, Inventar, Lobby nutzen dieselben Icons)
   const cache = (feature._icons ??= new Map());
-  const key = `${w}x${h}x${pad}@${feature.level}`;
+  const key = `${w}x${h}x${pad}@${feature.level}:${projectionId()}`;
   if (!cache.has(key)) {
     const projection = iconProjection(feature, w, h, pad);
     const path = d3.geoPath(projection);
@@ -40,9 +42,9 @@ export function iconScale(feature, w, h, pad = 3) {
  */
 function iconProjection(feature, w, h, pad) {
   const fits = (feature._iconFit ??= new Map());
-  const key = `${w}x${h}x${pad}`;
+  const key = `${w}x${h}x${pad}:${projectionId()}`;
   if (!fits.has(key)) {
-    fits.set(key, d3.geoNaturalEarth1()
+    fits.set(key, makeProjection()
       .rotate([-feature.geom.centerLon, 0])
       .fitExtent([[pad, pad], [w - pad, h - pad]], feature.fitGeometry ?? feature)
       .clipExtent([[0, 0], [w, h]]));

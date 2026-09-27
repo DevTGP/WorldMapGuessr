@@ -13,7 +13,12 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
   - Alle Spiele, die dieser Browser kennt – eigene Einzelspiele (beliebig viele) und beigetretene Lobbys –, zuletzt aktive zuerst. Je Spiel: Typ und Code, Modus und Stufe, Kartenauswahl, Runde mit Fortschritt und Leben, Spieler online, Host, Verfall.
   - **Fortsetzen/Öffnen** verbindet das Spiel (das gerade offene ohne Neuladen; ein anderes, nachdem auf der Seite schon eins lief, mit Neuladen). **Entfernen** (Mülleimer, mit Bestätigung): als Host wird die Lobby auf dem Server gelöscht und alle Verbundenen sehen „Lobby beendet“; sonst verlässt man die Lobby (Items zurück in den Vorrat). Ein Einzelspiel wird gelöscht. Verfallene Spiele verschwinden von selbst.
   - Im Hauptmenü pausiert der Timer eines offenen Einzelspiels.
-- **Einstellungen** (Popup im Hauptmenü und im Spiel über ⚙, gilt sofort und nur auf diesem Gerät): Spielername (für neue Spiele; in einer laufenden Lobby wird man sofort umbenannt), **Kartenqualität** Niedrig / Mittel (Standard) / Hoch (wie fein Karte und gehaltenes Item gezeichnet werden, Details: „Detailstufen (LOD)“), Zoom-Empfindlichkeit (Mausrad, Pinch, Zoom-Knöpfe, +/−) und Bewegungsempfindlichkeit (Ziehen, ↑/↓) je 25–200 %, „Standard wiederherstellen“. Der größte Zoom ist bei jeder Qualität 16000 %.
+- **Einstellungen** (Popup im Hauptmenü und im Spiel über ⚙, gilt sofort und nur auf diesem Gerät):
+  - **Farbschema** (`map/schemes.js`): **A Nachtatlas** (dunkles Land, Fortschritt Olivgrau → Sand → Creme), **B Papierkarte** (Standard; helles Land, Fortschritt Salbei → Grün → Tannengrün), **C Kontinentfarben** (jeder Kontinent bekommt beim Einsetzen seinen Farbton, Staaten heller im selben Ton). Jede Einsetz-Stufe (nichts, Kontinent, Staat, später Bundesland) unterscheidet sich in der Helligkeit; das Item in der Hand und im Inventar hat eine Farbe, die in keiner Stufe vorkommt, mit Rand (A Orange, B Rot-Orange, C Gelb mit dunkler Kontur).
+  - **Projektion** (`map/projections.js`): Natural Earth (Standard, Kompromiss) oder Flächentreu (Equal Earth: alle Flächen im echten Verhältnis, z. B. Afrika : Europa 3,07 statt 2,27). Beim Wechsel werden die geladenen Kacheln neu gerechnet (jeder Punkt behält seine Breite), Drehung und Zoom bleiben; Icons und gehaltenes Item folgen. Der Treffertest rechnet geografisch – in einer Lobby darf jeder seine eigene Projektion haben.
+  - **Relief** Aus / Leicht (Standard) / Stark: Geländeschummerung auf dem Land (`map/relief.js`, Daten s. u.).
+  - **Flüsse und Seen** an (Standard) / aus: große schon in der Weltansicht, kleinere beim Hineinzoomen (`map/water.js`).
+  - Spielername (für neue Spiele; in einer laufenden Lobby wird man sofort umbenannt), **Kartenqualität** Niedrig / Mittel (Standard) / Hoch (wie fein Karte und gehaltenes Item gezeichnet werden, Details: „Detailstufen (LOD)“), Zoom-Empfindlichkeit (Mausrad, Pinch, Zoom-Knöpfe, +/−) und Bewegungsempfindlichkeit (Ziehen, ↑/↓) je 25–200 %, „Standard wiederherstellen“. Der größte Zoom ist bei jeder Qualität 16000 %.
 - Beim Start zeigt ein Ladebildschirm den Fortschritt: Kartendaten herunterladen (in MB, der Server gibt die Größe des Startpakets mit), Umrisse vorbereiten, Items (Icons) vorbereiten, Karte zeichnen. Der Balken läuft nie rückwärts; ein Schimmer zeigt auch während längerer Rechenschritte, dass noch etwas passiert. Schlägt das Laden fehl, gibt es eine Meldung mit „Neu laden“.
 - **Spielmenü** („Neues Spiel“ über „Spielen“; im Spiel über das Badge oben rechts – „Einzelspiel“ bzw. der Lobby-Code – und nach Rundenende über „Anpassen“/„Lobby“). Links die Regeln, rechts die Karte:
   - **Kartenauswahl** (rechts) als Presets mit Mini-Weltkarte: **Kontinente** (7), **Länder** (197; darunter die Kontinente als Chips – „Alle“ oder einzelne, mehrere möglich), **Alles** (Kontinente und Länder, 204) und **Bundesländer** (kommt noch). Der Schalter **Mit Kleinstaaten** gilt für Länder und Alles: aus = ohne die 25 Staaten unter 1.100 km² (Vatikanstadt, Monaco, Tuvalu, Nauru, San Marino, Malediven, Liechtenstein, Marshallinseln, St. Kitts und Nevis, Malta, Grenada, St. Vincent, Seychellen, Barbados, Andorra, Antigua und Barbuda, Palau, Singapur, Tonga, St. Lucia, Mikronesien, Bahrain, Dominica, Kiribati, São Tomé und Príncipe). **Einzelne Items anpassen** klappt die Einzelauswahl auf (Suche, „Alle“/„Keine“ je Gruppe); passt das Ergebnis zu keinem Preset, heißt es „Eigene Auswahl“. Gespeichert werden weiterhin Gruppen und ausgeschlossene Items (`config.kinds`, `config.excluded`), das Preset erkennt `menu/map-presets.js`.
@@ -200,6 +205,10 @@ worldmapguessr/
   static/js/map/gestures.js   Ziehen, Mausrad, Pinch, Doppelklick
   static/js/map/controls.js   Buttons, Tasten +/−/0/G/F, Vollbild, Koordinatenanzeige
   static/js/map/keyboard.js   Bewegen (WASD/Pfeile) und Zoomen (Q/E) solange gedrückt, Shift schneller
+  static/js/map/schemes.js    Farbschemata A/B/C (Karte, Einsetz-Stufen, Item-Farben)
+  static/js/map/projections.js  Natural Earth / Equal Earth (Formeln für den Renderer, d3-Fabrik)
+  static/js/map/relief.js     Geländeschummerung: Rasterkacheln in Streifen verzerrt, Überblendung
+  static/js/map/water.js      Flüsse und Seen: Kachel-Speicher, Strichbreiten
   static/js/api/items-api.js  Laden der Statistik (/api/items)
   static/js/stats/stats.js    Statistik-Seite: laden, filtern, sortieren
   static/js/stats/sort.js     Sortierung, Trefferquote
@@ -281,13 +290,20 @@ pip install -r requirements.txt
 npm run build
 ```
 
-`npm run build` führt zwei Schritte aus (Dauer: wenige Sekunden plus einmalig der Download der Quelle, ~25 MB):
+`npm run build` führt vier Schritte aus (Dauer: unter einer Minute plus einmalig die Downloads, ~55 MB):
 
 1. `python 1-cells.py` – lädt Natural Earth 1:10m Admin-0 (nach `build/tmp/src`), ordnet jedes Landstück einem Kontinent und höchstens einem Staat-Item zu („Zelle“, z. B. Europa × Russland) und wendet die Sonderfälle unten an. Ausgabe in `build/tmp/`.
 2. `node 2-tiles.mjs` – baut daraus `worldmapguessr/static/data/map/`:
    - `tiles/z0…z4/{x}_{y}.json` – Karte in 5 Detailstufen, je Stufe ein Längen-/Breitengrad-Raster (90°, 45°, 22,5°, 11,25°, 5,625°). Inhalt je Kachel: Landflächen je Zelle und Linien (Küsten, Kontinent- und Staatsgrenzen), ganzzahlig und als Differenzen kodiert.
    - `items/i0.json` – alle Items in der Startstufe; `items/i1…i4/{kind}-{id}.json` – feinere Umrisse je Item.
    - `index.json` – Stufen, Zellen, Items (Name, Gruppe, Anker, Fläche), Kachelliste, Version (Hash über die Daten).
+
+3. `python 3-water.py` – Flüsse und Seen (Natural Earth 1:10m `rivers_lake_centerlines`, `lakes`, von GitHub) als Kacheln `water/z0…z4/{x}_{y}.json` im selben Raster: je Objekt die Kartenskala `sMin = 256 · 2^min_zoom / 2π` (aus Natural Earths `min_zoom`), ab der der Browser es zeichnet; je Stufe nur Objekte bis zu ihrem `sMax`, vereinfacht auf 0,6 px. ~5 MB, nur bei Bedarf geladen.
+4. `python 4-relief.py` – Geländeschummerung als Graustufen-JPEGs `relief/r0…r3/{x}_{y}.jpg` (512 px; Welt 1024 … 8192 px breit, reine Meereskacheln fehlen; ~3 MB). Quelle: Natural Earth „Shaded Relief“ (gemeinfrei) aus dem PyPI-Paket `basemap-data` (`shadedrelief.jpg`, 10800 × 5400 – naturalearthdata.com ist aus der Build-Umgebung nicht erreichbar). Daraus wird nur die Schummerung gewonnen: Helligkeit ÷ weichgezeichnetes Mittel über Land (σ = 6 px), 128 = neutral; Meer und ein 2-px-Küstensaum sind neutral (Landmaske aus Schritt 1). Braucht `numpy`, `scipy`, `pillow`.
+
+Schritte 3 und 4 ergänzen `index.json` (`water`, `relief`) und setzen die Version neu (`versions`: Hash je Teil). Nach Schritt 2 müssen sie erneut laufen.
+
+**Relief zeichnen:** Die Karte ist pseudozylindrisch (x = λ · fx(φ)), auf jeder Breite ist x also linear in der Länge. Jede Rasterkachel wird in waagerechten Streifen (3 px, beim Bewegen 8 px) auf eine graue Zwischenfläche gezeichnet, die dann einmal über die Landfarben geblendet wird – „hard-light“ auf hellem Land (B), „soft-light“ auf dunklem (A, C; ruhiger, kein Grieseln). Reihenfolge: Landflächen → Relief → Seen und Flüsse → Grenzen → Küsten.
 
 Der Server liefert die Dateien unter `/data/<version>/…` mit einem Jahr Cache aus; nach einem neuen Build ändert sich die Version und der Browser lädt neu.
 

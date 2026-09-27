@@ -32,6 +32,8 @@ export class Game {
     this.refillMeter = new RefillMeter(document.getElementById("refill-meter"));
     this.timerMeter = new TimerMeter(document.getElementById("timer-meter"));
     this.feed = new Feed(document.getElementById("feed"));
+    // Projektion gewechselt: Inventar-Icons in der neuen Projektion zeichnen
+    map.onProjection(() => { for (const id of this.inventory.pieces.keys()) this.inventory.redrawIcon(id); });
     this.config = null;       // Konfiguration der laufenden Runde
     this.remote = null;       // RemoteRound (Server-Runde, Einzelspiel oder Lobby)
     /** Kurze Meldung in der Nachrichtenleiste (Text; kind: good | bad | info | hint) */

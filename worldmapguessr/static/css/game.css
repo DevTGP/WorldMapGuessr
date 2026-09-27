@@ -68,9 +68,10 @@
 }
 .slot[data-state="placed"] > svg { bottom: 26px; height: calc(100% - 34px); }
 .slot .shape {
-  fill: var(--piece-fill);
-  stroke: var(--piece);
+  fill: var(--item-fill, var(--piece-fill));
+  stroke: var(--item, var(--piece));
   stroke-width: 1.2px;
+  filter: drop-shadow(0 0 0.8px var(--item-halo, transparent));
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
 }
@@ -231,15 +232,16 @@
   overflow: visible;
 }
 .held-layer path {
-  fill: var(--piece-fill);
-  stroke: var(--piece);
+  fill: var(--item-fill, var(--piece-fill));
+  stroke: var(--item, var(--piece));
   stroke-width: 1.6px;
+  filter: drop-shadow(0 0 1.2px var(--item-halo, transparent)) drop-shadow(0 0 0.6px var(--item-halo, transparent));
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
 }
 .held-layer .tiny-ring {
   fill: none;
-  stroke: var(--piece);
+  stroke: var(--item, var(--piece));
   stroke-width: 1.5px;
   stroke-dasharray: 3 3;
 }

@@ -1,22 +1,23 @@
-// Schnelle Natural-Earth-Projektion für den Kachel-Renderer.
-// Gleiche Formel wie d3.geoNaturalEarth1, aber ohne Stream-Pipeline: Die Kacheln speichern je Punkt
-// schon die breitenabhängigen Faktoren, beim Zeichnen bleiben pro Punkt zwei Multiplikationen.
+// Schnelle Projektion für den Kachel-Renderer (Natural Earth oder Equal Earth, siehe map/projections.js).
+// Gleiche Formeln wie d3, aber ohne Stream-Pipeline: Die Kacheln speichern je Punkt schon die
+// breitenabhängigen Faktoren, beim Zeichnen bleiben pro Punkt zwei Multiplikationen.
 // Die Karte dreht nur um die Längsachse (rotate([λ, 0])) – dadurch ist das möglich.
+// Jeder Punkt behält seine Breite (φ), damit ein Wechsel der Projektion die Faktoren neu rechnen kann.
+
+import { projectionDef } from "./projections.js";
 
 export const RAD = Math.PI / 180;
 export const TAU = 2 * Math.PI;
 
+let raw = projectionDef();
+/** Projektion für neue und neu gerechnete Punkte umstellen (vor reproject) */
+export function useProjection(def) { raw = def; }
+
 /** x-Faktor: x = λ · fx(φ) */
-export function fxOf(phi) {
-  const phi2 = phi * phi, phi4 = phi2 * phi2;
-  return 0.8707 - 0.131979 * phi2 + phi4 * (-0.013791 + phi4 * (0.003971 * phi2 - 0.001529 * phi4));
-}
+export function fxOf(phi) { return raw.fx(phi); }
 
 /** y = Y(φ) */
-export function yOf(phi) {
-  const phi2 = phi * phi, phi4 = phi2 * phi2;
-  return phi * (1.007226 + phi2 * (0.015085 + phi4 * (-0.044475 + 0.028874 * phi2 - 0.005916 * phi4)));
-}
+export function yOf(phi) { return raw.y(phi); }
 
 /**
  * Punkte [lon°, lat°, …] → Float64Array [λ, fx, Y, λ, fx, Y, …] (λ in Bogenmaß, noch ungedreht)
@@ -25,9 +26,11 @@ export function yOf(phi) {
 export function prepare(lonlat) {
   const n = lonlat.length / 2;
   const out = new Float64Array(n * 3);
+  out.phi = new Float32Array(n);
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
   for (let i = 0; i < n; i++) {
     const lam = lonlat[2 * i] * RAD, phi = lonlat[2 * i + 1] * RAD;
+    out.phi[i] = phi;
     const fx = fxOf(phi), y = yOf(phi);
     out[3 * i] = lam;
     out[3 * i + 1] = fx;
@@ -38,6 +41,20 @@ export function prepare(lonlat) {
   // Ausdehnung in Karteneinheiten (× Skala = Pixel): winzige Ringe lässt der Renderer weg
   out.ext = n ? Math.max(x1 - x0, y1 - y0) : 0;
   return out;
+}
+
+/** Vorbereitete Punkte (prepare) mit der aktuellen Projektion neu rechnen */
+export function reproject(pts) {
+  const n = pts.length / 3;
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (let i = 0; i < n; i++) {
+    const phi = pts.phi[i], fx = fxOf(phi), y = yOf(phi);
+    pts[3 * i + 1] = fx;
+    pts[3 * i + 2] = y;
+    const x = pts[3 * i] * fx;
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  pts.ext = n ? Math.max(x1 - x0, y1 - y0) : 0;
 }
 
 /** Aktuelle Ansicht aus der d3-Projektion übernehmen */

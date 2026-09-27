@@ -1,9 +1,9 @@
 // Canvas-Renderer auf Kachelbasis: Meer, Gradnetz, Schelf-Saum, Landflächen (je Zelle), Grenzen.
 //
 // Land ist in Zellen zerlegt (Kontinent × Staat, siehe build/1-cells.py). Jede Zelle bekommt ihre Farbe
-// aus dem Spielstand: Das Land startet fast schwarz (--land); jede eingesetzte Ebene, die die Zelle
-// enthält (Kontinent, Staat …), hellt sie um eine Stufe auf, bis fast weiß (--land-top). Zellen gleicher
-// Farbe werden in einem Pfad gefüllt – so gibt es an Kachelrändern keine Haarlinien.
+// aus dem Spielstand: Jede eingesetzte Ebene, die die Zelle enthält (Kontinent, Staat …), setzt sie eine
+// Stufe weiter; die Farben je Stufe kommen aus dem Farbschema (map/schemes.js). Zellen gleicher Farbe
+// werden in einem Pfad gefüllt – so gibt es an Kachelrändern keine Haarlinien.
 //
 // Linien: Küsten und Kontinentgrenzen immer; Staatsgrenzen erst, wenn einer der beiden Staaten
 // eingesetzt ist (Grenzen sind bis dahin unsichtbar – das macht es schwerer).
@@ -12,9 +12,11 @@
 // Schnittlinie der Karte (Längengrad gegenüber der Mitte) werden dort aufgetrennt.
 
 import { TAU, viewOf, wrapOffset } from "./project.js";
+import { scheme, stageColor, stopsFor } from "./schemes.js";
+import { riverWidth } from "./water.js";
+import { prefs } from "../settings/prefs.js";
 
 const PLACED_FADE_MS = 500;
-const TOKENS = ["outside", "sea", "sea-shelf", "land", "land-top", "coast", "border"];
 /** Eingesetzte Items, die kleiner als so viele Pixel erscheinen, bekommen einen Ring */
 const TINY_PX = 5;
 const TINY_RING_R = 3.5;
@@ -39,7 +41,6 @@ export class Renderer {
     this.dpr = 1;
     this.colors = {};
     this.placed = new Map(); // Item-Key → Startzeit der Aufhell-Animation
-    this.levels = 2;         // Ebenen (Kontinente, Staaten …) → Schrittweite der Aufhellung
     this.showGraticule = false;
     this.step = MIN_STEP_PX;
     this.shelfStep = SHELF_STEP_PX;
@@ -52,13 +53,19 @@ export class Renderer {
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => this.readColors());
     new MutationObserver(() => this.readColors())
       .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    prefs.onChange((key) => { if (key === "scheme") this.readColors(); });
   }
 
+  /** Farben aus dem Farbschema (Hintergrund außerhalb der Erde aus dem Seiten-Thema) */
   readColors() {
+    const s = scheme();
     const cs = getComputedStyle(document.documentElement);
-    for (const t of TOKENS) this.colors[t] = cs.getPropertyValue(`--${t}`).trim();
-    this.land = d3.rgb(this.colors.land);
-    this.top = d3.rgb(this.colors["land-top"]);
+    this.colors = {
+      outside: s.map.outside ?? cs.getPropertyValue("--outside").trim(),
+      sea: s.map.sea, "sea-shelf": s.map.shelf, coast: s.map.coast, border: s.map.border, water: s.map.water,
+    };
+    this.scheme = s;
+    this.cellStops = this.cells.map((c) => stopsFor(s, c.continent));
     this.onColorsChanged?.();
   }
 
@@ -88,22 +95,20 @@ export class Renderer {
     return t0 === undefined ? 0 : Math.min(1, (now - t0) / PLACED_FADE_MS);
   }
 
-  /** Farbe je Zelle für diesen Frame */
+  /** Farbe je Zelle für diesen Frame: Stufe = Summe der eingesetzten Ebenen (mit Einblend-Anteil) */
   _cellColors(now) {
-    const { land: a, top: b } = this;
-    return this.cells.map((c) => {
-      const f = (this._fraction(c.continent, now) + (c.item ? this._fraction(c.item, now) : 0)) / this.levels;
-      if (f === 0) return this.colors.land;
-      return `rgb(${Math.round(a.r + (b.r - a.r) * f)},${Math.round(a.g + (b.g - a.g) * f)},${Math.round(a.b + (b.b - a.b) * f)})`;
-    });
+    return this.cells.map((c, i) =>
+      stageColor(this.cellStops[i], this._fraction(c.continent, now) + (c.item ? this._fraction(c.item, now) : 0)));
   }
 
   /**
    * @param {d3.GeoProjection} projection  vollständige d3-Projektion der aktuellen Ansicht
    * @param {object[]} tiles  zu zeichnende Kacheln (TileStore.select)
    * @param {boolean} moving  während Interaktion: ohne Schelf-Saum
+   * @param {{water?: object[], relief?: {layer: import("./relief.js").ReliefLayer, passes: [string, number][]}}} [extras]
+   *   Flüsse/Seen-Kacheln und Relief (je nach Einstellung)
    */
-  draw(projection, tiles, moving) {
+  draw(projection, tiles, moving, extras = {}) {
     const { ctx, colors: c } = this;
     const now = performance.now();
     const v = viewOf(projection);
@@ -181,6 +186,9 @@ export class Renderer {
       ctx.strokeStyle = color;
       ctx.stroke(p);
     }
+    // Relief über die Landfarben, darüber Seen und Flüsse; Grenzen und Küsten bleiben obenauf
+    if (extras.relief) extras.relief.layer.draw(ctx, projection, { w: this.w, h: this.h }, extras.relief.passes, moving);
+    if (extras.water?.length) this._drawWater(extras.water, v);
     ctx.strokeStyle = c.border;
     ctx.lineWidth = 0.6;
     ctx.stroke(borders);
@@ -189,6 +197,37 @@ export class Renderer {
     ctx.stroke(coast);
 
     this._drawTinyMarkers(projection, now);
+  }
+
+  /** Seen füllen, Flüsse als Linien (Breite nach Bedeutung und Zoom) – in der Wasserfarbe des Schemas */
+  _drawWater(tiles, v) {
+    const { ctx } = this;
+    const lakes = new Path2D();
+    const rivers = new Map(); // Breite (auf 0,25 px gerundet) → Pfad
+    for (const t of tiles) {
+      const off = wrapOffset(t.lon0, v.rot);
+      const cut = t.lon1 + v.rot + off > Math.PI + 1e-9;
+      for (const lake of t.lakes) {
+        if (lake.sMin > v.s) continue;
+        for (const ring of lake.rings) addRing(lakes, ring, v, off, cut, true, this.step);
+      }
+      for (const r of t.rivers) {
+        if (r.sMin > v.s) continue;
+        const w = Math.round(riverWidth(r.sMin, v.s) * 4) / 4;
+        let p = rivers.get(w);
+        if (!p) rivers.set(w, (p = new Path2D()));
+        addRing(p, r.pts, v, off, cut, false, this.step);
+      }
+    }
+    ctx.fillStyle = this.colors.water;
+    ctx.fill(lakes);
+    ctx.strokeStyle = this.colors.water;
+    ctx.lineCap = "round";
+    for (const [w, p] of rivers) {
+      ctx.lineWidth = w;
+      ctx.stroke(p);
+    }
+    ctx.lineCap = "butt";
   }
 
   /** Ringe für eingesetzte Items, die in der aktuellen Ansicht kaum sichtbar wären */
@@ -201,11 +240,11 @@ export class Renderer {
       if (!item || Math.sqrt(item.geom.area) * scale >= TINY_PX) continue;
       const p = projection(item.geom.anchor);
       if (!p || p[0] < -10 || p[1] < -10 || p[0] > this.w + 10 || p[1] > this.h + 10) continue;
-      const f = this._fraction(key, now) / this.levels;
-      const a = this.land, b = this.top;
+      const cont = key.startsWith("continent:") ? key : `continent:${item.properties?.region}`;
+      const k = this._fraction(key, now) + (cont === key ? 0 : this._fraction(cont, now));
       ctx.beginPath();
       ctx.arc(p[0], p[1], TINY_RING_R, 0, 2 * Math.PI);
-      ctx.fillStyle = `rgb(${Math.round(a.r + (b.r - a.r) * f)},${Math.round(a.g + (b.g - a.g) * f)},${Math.round(a.b + (b.b - a.b) * f)})`;
+      ctx.fillStyle = stageColor(stopsFor(this.scheme, cont), k);
       ctx.fill();
       ctx.strokeStyle = c.coast;
       ctx.stroke();

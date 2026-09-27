@@ -345,14 +345,28 @@
       </button>
     </header>
     <div class="settings-body">
-      <div class="set-field">
-        <label for="set-name">Spielername<small>für neue Spiele und Lobbys; in einer laufenden Lobby sofort</small></label>
-        <input id="set-name" type="text" autocomplete="nickname" placeholder="Spieler">
+      <h3 class="set-section">Darstellung</h3>
+      <div class="set-field" id="set-scheme">
+        <span class="quality-label">Farbschema<small>Farben von Meer, Land, Einsetz-Stufen und Item</small></span>
+        <div class="scheme-options" role="radiogroup" aria-label="Farbschema"></div>
       </div>
       <div class="set-field quality-field" id="set-quality">
         <span class="quality-label">Kartenqualität<small>Detail der Karte · „Hoch“ braucht mehr Leistung</small></span>
         <div class="quality-bar" role="radiogroup" aria-label="Kartenqualität"></div>
       </div>
+      <div class="set-field" id="set-projection">
+        <span class="quality-label">Projektion<small id="set-projection-hint"></small></span>
+        <div class="quality-bar two" role="radiogroup" aria-label="Projektion"></div>
+      </div>
+      <div class="set-field" id="set-relief">
+        <span class="quality-label">Relief<small>Gebirge und Täler auf dem Land (Schummerung)</small></span>
+        <div class="quality-bar" role="radiogroup" aria-label="Relief"></div>
+      </div>
+      <label class="field toggle set-toggle" for="set-water">
+        <span>Flüsse und Seen<small>größere zuerst, beim Hineinzoomen kommen kleinere dazu</small></span>
+        <input id="set-water" type="checkbox" role="switch">
+      </label>
+      <h3 class="set-section">Steuerung</h3>
       <div class="set-field range-field">
         <label for="set-zoomSpeed">Zoom-Empfindlichkeit<small>Mausrad, Pinch, Zoom-Knöpfe und +/−</small></label>
         <div class="range-row"><input id="set-zoomSpeed" type="range"><output id="set-zoomSpeed-val"></output></div>
@@ -377,6 +391,11 @@
           <dt>Pfeile oben</dt><dd>in 45°-Schritten drehen</dd>
         </dl>
       </details>
+      <h3 class="set-section">Spieler</h3>
+      <div class="set-field">
+        <label for="set-name">Spielername<small>für neue Spiele und Lobbys; in einer laufenden Lobby sofort</small></label>
+        <input id="set-name" type="text" autocomplete="nickname" placeholder="Spieler">
+      </div>
     </div>
     <footer class="settings-foot">
       <button type="button" class="btn" id="settings-reset">Standard wiederherstellen</button>

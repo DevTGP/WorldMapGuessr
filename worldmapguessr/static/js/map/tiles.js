@@ -5,7 +5,7 @@
 // gezeichnet wird, hängt von der Kartenskala ab (index.levels[].sMax). Fehlt eine Kachel noch, wird bis
 // zum Eintreffen die nächstgröbere vorhandene gezeichnet – die Karte bleibt immer bedienbar.
 
-import { RAD, boxTest, prepare } from "./project.js";
+import { RAD, boxTest, prepare, reproject } from "./project.js";
 
 const MAX_PARALLEL = 6;
 
@@ -14,13 +14,17 @@ export class TileStore {
    * @param {string} base   URL-Präfix der Kartendaten (…/map)
    * @param {object} index  index.json
    * @param {() => void} onLoad  eine Kachel ist angekommen (neu zeichnen)
+   * @param {{dir?: string, tiles?: object, decode?: Function}} [layer]  andere Ebene im selben Raster
+   *   (z. B. Flüsse/Seen, map/water.js): Ordner, vorhandene Kacheln je Stufe, Entpacker
    */
-  constructor(base, index, onLoad) {
+  constructor(base, index, onLoad, { dir = "tiles", tiles = index.tiles, decode: decodeFn = decode } = {}) {
     this.base = base;
     this.version = index.version;
     this.levels = index.levels;
     this.onLoad = onLoad;
-    this.exists = index.levels.map((l) => new Set(index.tiles[l.z] ?? []));
+    this.dir = dir;
+    this.decode = decodeFn;
+    this.exists = index.levels.map((l) => new Set(tiles?.[l.z] ?? []));
     this.tiles = new Map();     // "z/x_y" → entpackte Kachel
     this.pending = new Map();   // "z/x_y" → Promise
     this.queue = [];
@@ -44,7 +48,7 @@ export class TileStore {
   add(z, key, raw) {
     const id = `${z}/${key}`;
     if (this.tiles.has(id)) return;
-    const t = decode(this.levels[z], key, raw);
+    const t = this.decode(this.levels[z], key, raw);
     t.used = ++this.stamp;
     this.tiles.set(id, t);
     this.points += t.points;
@@ -62,7 +66,12 @@ export class TileStore {
     }));
   }
 
-  url(z, key) { return `${this.base}/tiles/z${z}/${key}.json`; }
+  url(z, key) { return `${this.base}/${this.dir}/z${z}/${key}.json`; }
+
+  /** Nach einem Wechsel der Projektion: alle geladenen Kacheln neu rechnen (project.js useProjection) */
+  reproject() {
+    for (const t of this.tiles.values()) for (const pts of t.all()) reproject(pts);
+  }
 
   /**
    * Kacheln zum Zeichnen: die passende Stufe für den Ausschnitt; fehlende werden angefordert und bis
@@ -147,8 +156,27 @@ export class TileStore {
   }
 }
 
-/** Kachel entpacken: Differenzen → Längen/Breiten → vorbereitete Projektionswerte */
+/** Landkachel entpacken: Flächen je Zelle und Linien (Küsten, Grenzen) */
 function decode(level, key, raw) {
+  const { tile, pts, count } = tileDecoder(level, key);
+  return {
+    ...tile,
+    fills: raw.f.map(([cell, ...rings]) => ({ cell, rings: rings.map(pts) })),
+    lines: raw.l.map(([a, b, ints]) => ({ a, b, pts: pts(ints) })),
+    get points() { return count(); },
+    /** alle Punktfolgen (für reproject) */
+    *all() {
+      for (const f of this.fills) yield* f.rings;
+      for (const l of this.lines) yield l.pts;
+    },
+  };
+}
+
+/**
+ * Punktfolge einer Kachel entpacken: Differenzen in 1/q der Kachelseite → vorbereitete Projektionswerte
+ * @returns {{tile: object, pts: (ints: number[]) => Float64Array, count: () => number}}
+ */
+export function tileDecoder(level, key) {
   const [x, y] = key.split("_").map(Number);
   const size = level.tile, q = level.q, e = level.overlap ?? 0;
   const lon0 = -180 + x * size, lat0 = -90 + y * size;
@@ -165,12 +193,9 @@ function decode(level, key, raw) {
     return prepare(out);
   };
   return {
-    z: level.z, x, y, key,
-    // Kacheln überlappen um e (siehe build/2-tiles.mjs); für die Schnittlinie zählt der erweiterte Bereich
-    lon0: (lon0 - e) * RAD, lon1: (lon0 + size + e) * RAD,
-    fills: raw.f.map(([cell, ...rings]) => ({ cell, rings: rings.map(pts) })),
-    lines: raw.l.map(([a, b, ints]) => ({ a, b, pts: pts(ints) })),
-    get points() { return points; },
+    tile: { z: level.z, x, y, key, lon0: (lon0 - e) * RAD, lon1: (lon0 + size + e) * RAD },
+    pts,
+    count: () => points,
   };
 }
 

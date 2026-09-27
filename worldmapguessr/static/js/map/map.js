@@ -6,7 +6,12 @@ import { Gestures } from "./gestures.js";
 import { yielder } from "../ui/loading-screen.js";
 import { TileStore } from "./tiles.js";
 import { ItemStore } from "./items.js";
-import { boxTest } from "./project.js";
+import { createWaterStore } from "./water.js";
+import { ReliefLayer } from "./relief.js";
+import { scheme } from "./schemes.js";
+import { boxTest, useProjection } from "./project.js";
+import { makeProjection, projectionDef } from "./projections.js";
+import { prefs } from "../settings/prefs.js";
 import { quality } from "./quality.js";
 
 export const MIN_ZOOM = 1;
@@ -48,7 +53,10 @@ export async function createMap({ canvas, base, startBytes = 0, loading = null }
   items.setStart(start);
   await tick(true);
   report(1, `${items.features.length} / ${items.features.length} Umrisse`);
-  return new WorldMap(canvas, { index, tiles, items });
+  // Zusatzebenen (Flüsse/Seen, Relief): Kacheln erst bei Bedarf
+  const water = createWaterStore(base, index, () => {});
+  const relief = index.relief ? new ReliefLayer(base, index.relief, () => {}) : null;
+  return new WorldMap(canvas, { index, tiles, items, water, relief });
 }
 
 /** JSON laden und dabei die Bytes melden (Stream, falls der Browser ihn anbietet) */
@@ -82,26 +90,32 @@ const mb = (bytes) => mbFmt.format(bytes / 1e6);
 export class WorldMap {
   /**
    * @param {HTMLCanvasElement} canvas
-   * @param {{index: object, tiles: TileStore, items: ItemStore}} data
+   * @param {{index: object, tiles: TileStore, items: ItemStore, water?: TileStore|null,
+   *          relief?: ReliefLayer|null}} data
    */
-  constructor(canvas, { index, tiles, items }) {
+  constructor(canvas, { index, tiles, items, water = null, relief = null }) {
     this.canvas = canvas;
     this.tiles = tiles;
     this.items = items;
+    this.water = water;
+    this.relief = relief;
+    /** Ebenen, die beim Projektionswechsel neu gerechnet werden */
+    this.extraLayers = water ? [water] : [];
+    if (water) { water.onLoad = () => this.requestRender(); water.maxPoints = 1_000_000; }
+    if (relief) relief.onLoad = () => this.requestRender();
     /** Alle Items (Kontinente + Staaten) als GeoJSON-Features mit Metadaten */
     this.features = items.features;
     this.byKey = items.byKey;
     // d3-Projektion: Umrechnungen (Klick, gehaltenes Item, Meer, Gradnetz); das Land zeichnet der
     // Kachel-Renderer mit derselben Formel selbst
-    this.projection = d3.geoNaturalEarth1().precision(0.5);
+    this.projection = makeProjection().precision(0.5);
     this.view = { lambda: 0, k: 1, ty: 0 }; // lambda: Drehung in Grad (positiv = Karte nach rechts)
     this.size = { w: 0, h: 0 };
     this.renderer = new Renderer(canvas, index, (key) => this.byKey.get(key));
-    this.renderer.levels = 2; // Kontinente + Staaten = 2 Stufen bis fast weiß
     this.renderer.onColorsChanged = () => this.requestRender();
     tiles.onLoad = () => this.requestRender();
     items.onUpgrade = () => this.requestRender();
-    this._listeners = { view: [], click: [], contextmenu: [] };
+    this._listeners = { view: [], click: [], contextmenu: [], projection: [] };
     this._applyQuality(quality.value);
     quality.onChange((q) => {
       this._applyQuality(q);
@@ -109,6 +123,10 @@ export class WorldMap {
     });
     this._moving = false;
     this._frame = 0;
+    prefs.onChange((key) => {
+      if (key === "projection") this._switchProjection();
+      else if (key === "relief" || key === "water") this.requestRender();
+    });
 
     this.gestures = new Gestures(this);
     this.layout();
@@ -125,6 +143,8 @@ export class WorldMap {
   onView(fn) { this._listeners.view.push(fn); }
   onClick(fn) { this._listeners.click.push(fn); }
   onContextMenu(fn) { this._listeners.contextmenu.push(fn); }
+  /** Projektion gewechselt (Icons neu zeichnen) */
+  onProjection(fn) { this._listeners.projection.push(fn); }
   _emit(type, arg) { this._listeners[type].forEach((fn) => fn(arg)); }
 
   // ---------- Layout & Projektion ----------
@@ -133,7 +153,7 @@ export class WorldMap {
     this.size = { w: width, h: height };
     this.renderer.resize(width, height);
     const pad = Math.min(width, height) * 0.04;
-    const p = d3.geoNaturalEarth1().fitExtent([[pad, pad], [width - pad, height - pad]], { type: "Sphere" });
+    const p = makeProjection().fitExtent([[pad, pad], [width - pad, height - pad]], { type: "Sphere" });
     this.baseScale = p.scale();
     const [[, y0], [, y1]] = d3.geoPath(p).bounds({ type: "Sphere" });
     this.baseHeight = y1 - y0;
@@ -193,7 +213,7 @@ export class WorldMap {
 
   /** Neue Ansicht, bei der der Punkt unter (clientX, clientY) nach Zoom um factor dort bleibt */
   zoomedView(from, clientX, clientY, factor) {
-    const tmp = this._apply(from, d3.geoNaturalEarth1());
+    const tmp = this._apply(from, makeProjection());
     const r = this._rect();
     const anchor = this.invert(clientX, clientY, tmp) ?? tmp.invert([this.size.w / 2, this.size.h / 2]);
     const to = this.clamp({ ...from, k: from.k * factor });
@@ -277,10 +297,19 @@ export class WorldMap {
       this._frame = 0;
       const z = this.tileLevel();
       this.renderer.step = this._moving ? this.quality.moveStep : this.quality.step;
-      this.renderer.draw(this.projection, this.tiles.select(z, this.projection, this.size), this._moving);
+      this.renderer.draw(this.projection, this.tiles.select(z, this.projection, this.size), this._moving, this._extras(z));
       this._emit("view", this.view);
       if (this.renderer.animating) this.requestRender();
     });
+  }
+
+  /** Zusatzebenen für diesen Frame (je nach Einstellung) */
+  _extras(z) {
+    const extras = {};
+    if (this.water && prefs.get("water")) extras.water = this.water.select(z, this.projection, this.size);
+    const passes = scheme().relief?.[prefs.get("relief")];
+    if (this.relief && passes) extras.relief = { layer: this.relief, passes };
+    return extras;
   }
 
   /**
@@ -303,6 +332,16 @@ export class WorldMap {
       this.projection.clipExtent(null);
     }
     return ctx.toString();
+  }
+
+  /** Projektion gewechselt (Einstellung): Kacheln neu rechnen, Ansicht (Drehung, Zoom) beibehalten */
+  _switchProjection() {
+    useProjection(projectionDef());
+    this.tiles.reproject();
+    this.extraLayers?.forEach((l) => l.reproject?.());
+    this.projection = makeProjection().precision(0.5);
+    this.layout();
+    this._emit("projection");
   }
 
   /** Kartenqualität übernehmen (map/quality.js) */
