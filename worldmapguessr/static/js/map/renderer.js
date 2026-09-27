@@ -149,8 +149,11 @@ export class Renderer {
       for (const entry of byColor) fills.push(entry);
       for (const l of t.lines) {
         let target;
-        if (l.b < 0 || this.cells[l.a].continent !== this.cells[l.b].continent) target = coast;
-        else if (this.cells[l.a].item !== this.cells[l.b].item && (itemPlaced(l.a) || itemPlaced(l.b))) target = borders;
+        const ca = this.cells[l.a], cb = l.b < 0 ? null : this.cells[l.b];
+        if (!cb) target = coast;
+        // Grenze zwischen Kontinenten (Ural, Sinai, Panama …): erst sichtbar, wenn einer davon eingesetzt ist
+        else if (ca.continent !== cb.continent && (this.placed.has(ca.continent) || this.placed.has(cb.continent))) target = coast;
+        else if (ca.item !== cb.item && (itemPlaced(l.a) || itemPlaced(l.b))) target = borders;
         else if (colors[l.a] === colors[l.b]) {
           target = seams.get(colors[l.a]);
           if (!target) seams.set(colors[l.a], (target = new Path2D()));

@@ -6,7 +6,8 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
 
 ## Spielablauf
 
-- Die Karte lässt sich wie ein Globus um die Längsachse drehen: seitlich ziehen oder die Pfeile oben (bzw. `←`/`→`), die in 45°-Schritten (π/4) auf 0°, 45°, 90° … weiterdrehen. Was in der Mitte liegt, ist am wenigsten verzerrt.
+- Die Karte lässt sich wie ein Globus um die Längsachse drehen: seitlich ziehen, `A`/`D` bzw. `←`/`→` halten oder die Pfeile oben, die in 45°-Schritten (π/4) auf 0°, 45°, 90° … weiterdrehen. Was in der Mitte liegt, ist am wenigsten verzerrt.
+- **Tastatur** (gleichmäßig, solange gedrückt; `Shift` = 2,5× schneller; nicht in Dialogen, Eingabefeldern und im Hauptmenü): `W` `A` `S` `D` bzw. Pfeiltasten bewegen, `Q`/`E` zoomen heraus/hinein, `+`/`−` Zoomschritt, `0` ganze Welt, `G` Gradnetz, `F` Vollbild an/aus (auch Knopf rechts; `Esc` beendet es ebenfalls). Tasten nach physischer Position (auch auf AZERTY). Übersicht unter Einstellungen → Steuerung.
 - Bei 100 % ist die Y-Achse fest (Ziehen dreht nur). Erst nach dem Hineinzoomen lässt sich die Karte auch senkrecht verschieben.
 - **Hauptmenü** (Startseite `/`, im Spiel über „Menü“ oben rechts; die Karte dreht sich dahinter langsam): **Spielen** (Spielmenü, s. u.), **Lobby beitreten** (Code oder Einladungslink eingeben), **Statistik** (nur hier erreichbar), **Einstellungen** und **Laufende Spiele**:
   - Alle Spiele, die dieser Browser kennt – eigene Einzelspiele (beliebig viele) und beigetretene Lobbys –, zuletzt aktive zuerst. Je Spiel: Typ und Code, Modus und Stufe, Kartenauswahl, Runde mit Fortschritt und Leben, Spieler online, Host, Verfall.
@@ -27,7 +28,7 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
   - Während einer laufenden Runde schließt `Esc` bzw. × das Menü wieder, ohne die Runde zu verlieren; ein Hinweis sagt, dass Änderungen erst ab der nächsten Runde gelten.
 - Statusleiste oben rechts: Fortschrittsbalken mit „eingesetzt/gesamt“ und Leben als Herz mit „9/10“ (bei wenigen Leben rot).
 - Begriff in der Oberfläche: durchgängig „Items“ (Kontinente, Staaten …).
-- Staatsgrenzen sind auf der Karte unsichtbar, sichtbar sind nur Küsten und Kontinentgrenzen. Ein richtig eingesetzter Staat erscheint aufgehellt mit seinem Umriss (Kleinststaaten zusätzlich mit einem Ring, solange sie zu klein zum Erkennen sind).
+- Staats- und Kontinentgrenzen sind auf der Karte unsichtbar, sichtbar sind nur Küsten. Eine Kontinentgrenze (Ural, Sinai, Panama …) erscheint, sobald einer der angrenzenden Kontinente eingesetzt ist. Ein richtig eingesetzter Staat erscheint aufgehellt mit seinem Umriss (Kleinststaaten zusätzlich mit einem Ring, solange sie zu klein zum Erkennen sind).
 - Ein gehaltener Kleinststaat (Vatikan, Monaco, San Marino …) bekommt einen gestrichelten Ring, damit man ihn sieht.
 - Klick auf ein Item im Inventar nimmt es auf; er folgt dem Mauszeiger in der aktuellen Ansicht (gleiche Drehung, gleicher Zoom).
 - Klick auf die Karte setzt es ein. Richtig ist jeder Klick in die Fläche des Items (z. B. irgendwo in Südamerika) oder höchstens 6 Bildschirmpixel neben ihrem Rand (Touch: 12 px) – unabhängig vom Zoom immer gleich viele Pixel, hineingezoomt also geografisch genauer. Winzige Items (Vatikan, Monaco …) zählen zusätzlich, wenn der Klick nahe an ihrem Mittelpunkt liegt. Dann rastet das Item ein und die Fläche wird eine Stufe heller.
@@ -197,7 +198,8 @@ worldmapguessr/
   static/js/map/quality.js    Kartenqualität Niedrig/Mittel/Hoch (Detailfaktor, Schrittweiten, Speichergrenze)
   static/js/map/geometry.js   Anker, Fläche, Zerlegung in Teile (Sichtbarkeit, Datumsgrenze)
   static/js/map/gestures.js   Ziehen, Mausrad, Pinch, Doppelklick
-  static/js/map/controls.js   Buttons, Tastatur, Koordinatenanzeige
+  static/js/map/controls.js   Buttons, Tasten +/−/0/G/F, Vollbild, Koordinatenanzeige
+  static/js/map/keyboard.js   Bewegen (WASD/Pfeile) und Zoomen (Q/E) solange gedrückt, Shift schneller
   static/js/api/items-api.js  Laden der Statistik (/api/items)
   static/js/stats/stats.js    Statistik-Seite: laden, filtern, sortieren
   static/js/stats/sort.js     Sortierung, Trefferquote

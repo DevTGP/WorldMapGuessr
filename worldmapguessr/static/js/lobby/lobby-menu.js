@@ -119,7 +119,7 @@ export class LobbyMenu {
     document.getElementById("menu-title").textContent = solo ? "Einzelspiel" : `Lobby ${this.client.code}`;
     document.querySelector("#menu .eyebrow").textContent = solo ? "WorldMapGuessr" : "WorldMapGuessr · Lobby";
     document.getElementById("title-hint").textContent = solo ? this.titleHint
-      : "Item anklicken und auf der Karte einsetzen – oder links an einen Mitspieler senden · Karte ziehen oder Pfeile zum Drehen";
+      : "Item anklicken und auf der Karte einsetzen – oder links an einen Mitspieler senden · Karte ziehen oder WASD, Q/E zoomen";
     if (solo) this.menu.setHints(SOLO_HINTS);
   }
 

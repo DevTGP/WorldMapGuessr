@@ -33,7 +33,7 @@
 
 <header class="hud hud-title">
   <h1>WorldMapGuessr</h1>
-  <p id="title-hint">Item anklicken, dann an der richtigen Stelle auf die Karte klicken · Karte seitlich ziehen oder Pfeile oben zum Drehen</p>
+  <p id="title-hint">Item anklicken, dann an der richtigen Stelle auf die Karte klicken · Karte ziehen oder mit WASD bewegen, Q/E zoomen · F Vollbild</p>
 </header>
 
 <nav class="hud hud-rotate" aria-label="Karte drehen">
@@ -249,6 +249,9 @@
   <button id="grid" type="button" title="Gradnetz ein/aus (G)" aria-label="Gradnetz ein- oder ausblenden" aria-pressed="false">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c-3 3-3 14 0 17M12 3.5c3 3 3 14 0 17"/></svg>
   </button>
+  <button id="fullscreen" type="button" title="Vollbild ein/aus (F)" aria-label="Vollbild ein- oder ausschalten" aria-pressed="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5M4 4l5.5 5.5M20 4l-5.5 5.5M4 20l5.5-5.5M20 20l-5.5-5.5"/></svg>
+  </button>
 </nav>
 
 <dialog class="join-dialog" id="join-dialog">
@@ -355,9 +358,25 @@
         <div class="range-row"><input id="set-zoomSpeed" type="range"><output id="set-zoomSpeed-val"></output></div>
       </div>
       <div class="set-field range-field">
-        <label for="set-moveSpeed">Bewegungsempfindlichkeit<small>Ziehen zum Drehen und Verschieben, Pfeiltasten ↑/↓</small></label>
+        <label for="set-moveSpeed">Bewegungsempfindlichkeit<small>Ziehen zum Drehen und Verschieben, WASD und Pfeiltasten</small></label>
         <div class="range-row"><input id="set-moveSpeed" type="range"><output id="set-moveSpeed-val"></output></div>
       </div>
+      <details class="set-field controls-help">
+        <summary>Steuerung</summary>
+        <dl class="keys">
+          <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> oder <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></dt><dd>Karte bewegen (links/rechts dreht die Erde)</dd>
+          <dt><kbd>Q</kbd> / <kbd>E</kbd></dt><dd>heraus- / hineinzoomen</dd>
+          <dt><kbd>Shift</kbd> dazu</dt><dd>schneller bewegen und zoomen</dd>
+          <dt><kbd>+</kbd> / <kbd>−</kbd> · <kbd>0</kbd></dt><dd>Zoomschritt · ganze Welt</dd>
+          <dt><kbd>F</kbd></dt><dd>Vollbild ein/aus (auch <kbd>Esc</kbd> beendet es)</dd>
+          <dt><kbd>G</kbd></dt><dd>Gradnetz ein/aus</dd>
+          <dt>Ziehen · Mausrad · Pinch</dt><dd>drehen und verschieben · zoomen · zoomen (Touch)</dd>
+          <dt>Doppelklick</dt><dd>hineinzoomen (mit <kbd>Shift</kbd>: heraus)</dd>
+          <dt>Item im Inventar anklicken</dt><dd>aufnehmen; Klick auf die Karte setzt es ein</dd>
+          <dt>Rechtsklick · <kbd>Esc</kbd></dt><dd>Item zurücklegen (außer bei „Kein Zurücklegen“)</dd>
+          <dt>Pfeile oben</dt><dd>in 45°-Schritten drehen</dd>
+        </dl>
+      </details>
     </div>
     <footer class="settings-foot">
       <button type="button" class="btn" id="settings-reset">Standard wiederherstellen</button>

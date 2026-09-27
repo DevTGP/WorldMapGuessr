@@ -1,8 +1,9 @@
-// Kartensteuerung: Zoom-Buttons, Dreh-Pfeile (45°), Tastatur, Gradnetz, Koordinaten- und Zoomanzeige.
+// Kartensteuerung: Zoom-Buttons, Dreh-Pfeile (45°), Vollbild, Tastatur (+/−, 0, G, F; Bewegen: map/keyboard.js),
+// Gradnetz, Koordinaten- und Zoomanzeige.
 
 import { prefs } from "../settings/prefs.js";
+import { KeyboardControl } from "./keyboard.js";
 
-const KEY_STEP_PX = 80;
 const ZOOM_STEP = 1.6;
 /** Zoomschritt für Knöpfe und +/− (Zoom-Empfindlichkeit aus den Einstellungen) */
 const zoomStep = () => Math.pow(ZOOM_STEP, prefs.get("zoomSpeed"));
@@ -48,8 +49,25 @@ export function bindMapControls(map) {
   document.getElementById("rotate-east").addEventListener("click", () => map.rotateStep(1));
   gridBtn.addEventListener("click", toggleGrid);
 
+  // Vollbild (F oder Knopf); Esc beendet es auch (Browser)
+  const fsBtn = document.getElementById("fullscreen");
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) document.exitFullscreen?.();
+    else document.documentElement.requestFullscreen?.().catch(() => { /* nicht erlaubt */ });
+  };
+  fsBtn.hidden = !document.documentElement.requestFullscreen;
+  fsBtn.addEventListener("click", toggleFullscreen);
+  document.addEventListener("fullscreenchange", () => fsBtn.setAttribute("aria-pressed", String(!!document.fullscreenElement)));
+
+  // Bewegen (WASD, Pfeile) und Zoomen (Q/E), solange gedrückt – siehe map/keyboard.js
+  new KeyboardControl(map);
+
   addEventListener("keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if ((e.key === "f" || e.key === "F") && !e.target.closest?.("input, textarea, [contenteditable]")) {
+      e.preventDefault();
+      return toggleFullscreen();
+    }
     if (document.querySelector("dialog[open]")) return;
     if (e.target.closest?.("input, textarea, [contenteditable]")) return; // z. B. Chat-Eingabe
     switch (e.key) {
@@ -57,10 +75,6 @@ export function bindMapControls(map) {
       case "-": case "_": map.zoomBy(1 / zoomStep()); break;
       case "0": map.resetZoom(); break;
       case "g": case "G": toggleGrid(); break;
-      case "ArrowLeft": map.rotateStep(-1); break;
-      case "ArrowRight": map.rotateStep(1); break;
-      case "ArrowUp": map.panYBy(KEY_STEP_PX * prefs.get("moveSpeed")); break;
-      case "ArrowDown": map.panYBy(-KEY_STEP_PX * prefs.get("moveSpeed")); break;
       default: return;
     }
     e.preventDefault();
