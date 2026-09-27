@@ -1,6 +1,11 @@
 // Kartensteuerung: Zoom-Buttons, Dreh-Pfeile (45°), Tastatur, Gradnetz, Koordinaten- und Zoomanzeige.
 
+import { prefs } from "../settings/prefs.js";
+
 const KEY_STEP_PX = 80;
+const ZOOM_STEP = 1.6;
+/** Zoomschritt für Knöpfe und +/− (Zoom-Empfindlichkeit aus den Einstellungen) */
+const zoomStep = () => Math.pow(ZOOM_STEP, prefs.get("zoomSpeed"));
 
 export function bindMapControls(map) {
   const zoomEl = document.getElementById("zoom");
@@ -36,8 +41,8 @@ export function bindMapControls(map) {
     map.showGraticule(on);
   };
 
-  document.getElementById("zoom-in").addEventListener("click", () => map.zoomBy(1.6));
-  document.getElementById("zoom-out").addEventListener("click", () => map.zoomBy(1 / 1.6));
+  document.getElementById("zoom-in").addEventListener("click", () => map.zoomBy(zoomStep()));
+  document.getElementById("zoom-out").addEventListener("click", () => map.zoomBy(1 / zoomStep()));
   document.getElementById("zoom-reset").addEventListener("click", () => map.resetZoom());
   document.getElementById("rotate-west").addEventListener("click", () => map.rotateStep(-1));
   document.getElementById("rotate-east").addEventListener("click", () => map.rotateStep(1));
@@ -48,14 +53,14 @@ export function bindMapControls(map) {
     if (document.querySelector("dialog[open]")) return;
     if (e.target.closest?.("input, textarea, [contenteditable]")) return; // z. B. Chat-Eingabe
     switch (e.key) {
-      case "+": case "=": map.zoomBy(1.6); break;
-      case "-": case "_": map.zoomBy(1 / 1.6); break;
+      case "+": case "=": map.zoomBy(zoomStep()); break;
+      case "-": case "_": map.zoomBy(1 / zoomStep()); break;
       case "0": map.resetZoom(); break;
       case "g": case "G": toggleGrid(); break;
       case "ArrowLeft": map.rotateStep(-1); break;
       case "ArrowRight": map.rotateStep(1); break;
-      case "ArrowUp": map.panYBy(KEY_STEP_PX); break;
-      case "ArrowDown": map.panYBy(-KEY_STEP_PX); break;
+      case "ArrowUp": map.panYBy(KEY_STEP_PX * prefs.get("moveSpeed")); break;
+      case "ArrowDown": map.panYBy(-KEY_STEP_PX * prefs.get("moveSpeed")); break;
       default: return;
     }
     e.preventDefault();

@@ -1,8 +1,9 @@
-// Einstiegspunkt: Karte laden, Steuerung binden, Menü öffnen.
+// Einstiegspunkt: Karte laden, Steuerung binden, Hauptmenü oder Spiel öffnen.
 //
-// Jede Runde läuft auf dem Server als Lobby: das Einzelspiel ist eine Solo-Lobby (nur ein Spieler). Der
-// Browser merkt sich ihren Code; die Startseite setzt sie fort (die Adresse wird zu /CODE), bis sie
-// verfällt. Gibt es keine, öffnet das Menü – „Runde starten“ legt dann eine Solo-Lobby an.
+// Jede Runde läuft auf dem Server als Lobby: das Einzelspiel ist eine Solo-Lobby (nur ein Spieler). Die
+// Startseite (/) zeigt das Hauptmenü (home/home.js) mit den laufenden Spielen; /CODE öffnet ein Spiel. Auf einer
+// Seite ist höchstens eine Lobby verbunden: Wechselt man aus dem Hauptmenü in ein anderes Spiel, nachdem hier
+// schon eins lief, lädt die Seite neu (sauberer Zustand); „Zurück“ zum laufenden Spiel geht ohne Neuladen.
 
 import { createMap } from "./map/map.js";
 import { bindMapControls } from "./map/controls.js";
@@ -18,8 +19,12 @@ import { identity } from "./lobby/identity.js";
 import { askPlayer, showLobbyGone } from "./lobby/join-dialog.js";
 import { prepareRowIcon } from "./menu/item-picker.js";
 import { LoadingScreen, yielder } from "./ui/loading-screen.js";
+import { Home } from "./home/home.js";
+import { askLobbyCode } from "./home/code-dialog.js";
+import { SettingsDialog } from "./settings/settings-dialog.js";
 
 const WMG = window.WMG ?? {};
+const NEW_GAME_URL = "/?neu"; // Startseite direkt mit dem Spielmenü öffnen (nach einem Wechsel mit Neuladen)
 
 // Ladephasen mit Gewicht ≈ typischem Zeitanteil (Download hängt von der Leitung ab). Geladen wird nur
 // die grobe Stufe; feinere Kacheln und Items kommen beim Hineinzoomen nach.
@@ -52,39 +57,102 @@ createMap({
     await yielder()(true);
     bindMapControls(map);
     const game = new Game(map);
-    const ctx = { map, game, menu: null };
+    /** used: auf dieser Seite wurde schon ein Spiel verbunden · code: das gerade verbundene (oder null) */
+    const ctx = { map, game, menu: null, home: null, client: null, used: false, code: null };
     const menu = new Menu(map, (config) => startSolo(config, ctx), {
-      onCreateLobby: (config) => createLobby(config, menu.ttl.value),
+      onCreateLobby: (config) => createLobby(config, menu.ttl.value, ctx),
     });
     ctx.menu = menu;
-    Object.assign(WMG, { game, map, menu }); // Debug-Zugriff über die Konsole
-    loading.done(); // blendet aus, während das Menü schon aufgeht
+    const settings = new SettingsDialog();
+    settings.onName = (name) => ctx.client?.rename(name);
+    const home = new Home({
+      map,
+      apiBase: WMG.apiBase,
+      mapLabel: (config) => menu.mapLabel(config),
+      current: () => ctx.code,
+      on: {
+        play: () => openNewGame(ctx),
+        join: async () => {
+          const code = await askLobbyCode(WMG.apiBase);
+          if (code) openGame(code, ctx);
+        },
+        settings: () => settings.open(),
+        resume: (code) => openGame(code, ctx),
+        removed: (code) => { if (code === ctx.code) ctx.code = null; },
+      },
+    });
+    ctx.home = home;
+    Object.assign(WMG, { game, map, menu, home, settings }); // Debug-Zugriff über die Konsole
+    loading.done(); // blendet aus, während das Hauptmenü schon aufgeht
 
+    // Im Spiel: Einstellungen, zurück zum Hauptmenü, Rundenende-Dialog
+    document.getElementById("open-settings").addEventListener("click", () => settings.open());
+    document.getElementById("to-home").addEventListener("click", () => showHome(ctx));
     const roundDialog = document.getElementById("round-dialog");
-    document.getElementById("new-round").addEventListener("click", () => menu.open({ canCancel: game.running }));
     document.getElementById("dlg-again").addEventListener("click", () => {
       roundDialog.close();
       game.again();
     });
     document.getElementById("dlg-menu").addEventListener("click", () => {
       roundDialog.close();
-      menu.open();
+      openGameMenu(ctx);
+    });
+    document.getElementById("dlg-home").addEventListener("click", () => {
+      roundDialog.close();
+      showHome(ctx);
     });
 
     if (WMG.lobbyCode) return startLobby(WMG.lobbyCode, ctx);
-    // Startseite: eigenes Einzelspiel fortsetzen, falls es noch besteht
-    const solo = identity.solo;
-    if (solo && identity.get(solo) && (await lobbyInfo(solo))?.solo) {
-      history.replaceState(null, "", `/${solo}`);
-      return startLobby(solo, ctx);
-    }
-    identity.solo = null;
-    menu.open();
+    const newGame = new URLSearchParams(location.search).has("neu");
+    showHome(ctx); // setzt die Adresse auf /
+    if (newGame) openNewGame(ctx);
   })
   .catch((err) => {
     loading.fail(`${err.message} – bitte Verbindung prüfen und neu laden.`);
     console.error(err);
   });
+
+// ---------- Navigation ----------
+
+/** Hauptmenü zeigen; ein verbundenes Spiel bleibt im Hintergrund (Einzelspiel: Timer pausiert) */
+function showHome(ctx) {
+  ctx.game.cancelHeld();
+  if (ctx.menu.isOpen) ctx.menu.dialog.close();
+  history.replaceState(null, "", "/");
+  ctx.home.show();
+}
+
+/** Spielmenü „Neues Spiel“ – auf einer Seite, auf der schon ein Spiel lief, erst neu laden */
+function openNewGame(ctx) {
+  if (ctx.used) {
+    location.href = NEW_GAME_URL;
+    return;
+  }
+  ctx.menu.open({ canCancel: true, back: "Zurück", onDismiss: () => ctx.home.show() });
+}
+
+/** Laufendes Spiel öffnen: das verbundene ohne Neuladen, sonst verbinden (bzw. Seite neu laden) */
+function openGame(code, ctx) {
+  if (code === ctx.code) {
+    ctx.home.hide();
+    history.replaceState(null, "", `/${code}`);
+    return;
+  }
+  if (ctx.used) {
+    location.href = `/${code}`;
+    return;
+  }
+  ctx.home.hide();
+  history.replaceState(null, "", `/${code}`);
+  startLobby(code, ctx);
+}
+
+/** Einstellungen des laufenden Spiels (Einzelspiel oder Lobby) */
+function openGameMenu(ctx) {
+  ctx.menu.open({ canCancel: ctx.game.running, back: "Hauptmenü", onBack: () => showHome(ctx) });
+}
+
+// ---------- Server ----------
 
 /** Öffentliche Infos einer Lobby oder null (gibt es nicht mehr) */
 async function lobbyInfo(code) {
@@ -120,13 +188,13 @@ async function startSolo(config, ctx) {
   } catch (err) {
     return alert(`Die Runde konnte nicht gestartet werden (${err.message}).`);
   }
-  identity.solo = lobby.code;
+  ctx.home.hide();
   history.replaceState(null, "", lobby.url);
   await startLobby(lobby.code, ctx, { autoStart: true });
 }
 
-/** Startseite → neue Mehrspieler-Lobby mit der aktuellen Menü-Konfiguration */
-async function createLobby(config, ttl) {
+/** Neue Mehrspieler-Lobby mit der aktuellen Menü-Konfiguration */
+async function createLobby(config, ttl, ctx) {
   const who = await askPlayer({
     title: "Lobby erstellen",
     text: "Du wirst Host. Die aktuellen Einstellungen werden übernommen; Passwort und Spielerzahl stellst du danach in der Lobby ein.",
@@ -142,27 +210,31 @@ async function createLobby(config, ttl) {
     return alert("Die Lobby konnte nicht erstellt werden.");
   }
   identity.name = lobby.player.name;
-  location.href = lobby.url;
+  ctx.menu.dialog.close();
+  ctx.home.hide();
+  history.replaceState(null, "", lobby.url);
+  await startLobby(lobby.code, ctx);
 }
 
 /**
  * Server-Runde (Einzelspiel oder Lobby): beitreten (Name/Passwort), verbinden, Menü im Lobby-Modus,
  * Runden übernehmen. autoStart: gleich eine Runde starten (neues Einzelspiel).
  */
-async function startLobby(code, { game, menu }, { autoStart = false } = {}) {
+async function startLobby(code, ctx, { autoStart = false } = {}) {
+  const { game, menu, home } = ctx;
+  ctx.used = true;
   const info = await lobbyInfo(code);
   if (!info) {
-    if (code === identity.solo) { // eigenes Einzelspiel verfallen → neu anfangen
-      identity.solo = null;
-      return location.replace("/");
-    }
+    identity.clear(code);
     return showLobbyGone("Diese Lobby gibt es nicht (mehr). Lobbys verfallen nach der eingestellten Zeit ohne Aktivität.");
   }
   if (info.solo && !identity.get(code)) {
     return showLobbyGone("Das ist die Einzelspieler-Runde eines anderen Spielers. Beitreten geht erst, wenn sie zur Lobby gemacht wird.", "Einzelspiel");
   }
+  ctx.code = info.code;
 
   const client = new LobbyClient(code);
+  ctx.client = client;
   // Gemeinsame Runde: Server verteilt die Teile (jedes nur einmal), Einsetzen wird für alle synchronisiert
   const remote = new RemoteRound(game, client);
   const rail = new PlayersRail(document.getElementById("players-rail"), client, game);
@@ -173,8 +245,10 @@ async function startLobby(code, { game, menu }, { autoStart = false } = {}) {
   const again = document.getElementById("dlg-again");
   game.again = () => client.startRound();
 
-  const hud = document.getElementById("lobby-badge");
-  hud.addEventListener("click", () => menu.open({ canCancel: game.running }));
+  // Badge oben rechts: Einzelspiel bzw. Lobby-Code + Spielerzahl → Einstellungen dieses Spiels
+  const badge = document.getElementById("lobby-badge");
+  badge.hidden = false;
+  badge.addEventListener("click", () => openGameMenu(ctx));
 
   let started = !autoStart;
   client.addEventListener("state", ({ detail: state }) => {
@@ -183,15 +257,14 @@ async function startLobby(code, { game, menu }, { autoStart = false } = {}) {
       started = true;
       if (!state.round) client.startRound();
     }
-    // Einzelspiel sieht aus wie bisher; erst als Lobby gibt es Badge, „Lobby“-Knopf und „für alle“
     const solo = !!state.settings.solo;
-    hud.hidden = solo;
-    document.getElementById("new-round").textContent = solo ? "Neue Runde" : "Lobby";
-    document.getElementById("dlg-menu").textContent = solo ? "Einstellungen" : "Lobby";
+    document.getElementById("dlg-menu").textContent = solo ? "Anpassen" : "Lobby";
     again.textContent = solo ? "Nochmal" : "Neue Runde für alle";
     const online = state.players.filter((p) => p.online).length;
-    hud.querySelector("b").textContent = code;
-    hud.querySelector("span").textContent = `${online} Spieler`;
+    badge.querySelector("b").textContent = solo ? "Einzelspiel" : code;
+    badge.querySelector("span").textContent = solo ? "" : `${online} Spieler`;
+    badge.title = solo ? "Einstellungen dieses Spiels" : "Lobby öffnen";
+    badge.classList.toggle("solo", solo);
     // Neue Runde vom Host (oder laufende Runde beim ersten Beitritt) → mitspielen
     if (state.round && state.round.number !== remote.number && menu.isOpen) menu.dialog.close();
     remote.apply(state, client.hand);
@@ -199,18 +272,20 @@ async function startLobby(code, { game, menu }, { autoStart = false } = {}) {
     again.hidden = !client.isHost; // neue Runde startet nur der Host
     menu.setCloseable(game.running);
   });
-  // Verlassen: zurück zum Einzelspiel. Beendet (vom Host): Hinweis für alle.
-  client.addEventListener("left", () => {
-    if (code === identity.solo) identity.solo = null;
-    location.href = "/";
-  });
-  client.addEventListener("closed", ({ detail }) => {
-    if (client.isHost) location.href = "/";
-    else showLobbyGone(detail.message, "Lobby beendet");
-  });
+  // Verlassen bzw. vom Host beendet: im Hauptmenü nur die Liste aktualisieren, sonst dorthin
+  const gone = (message, title) => {
+    identity.clear(code);
+    ctx.code = null;
+    ctx.client = null;
+    if (home.visible) return home.refresh();
+    if (message) showLobbyGone(message, title);
+    else location.href = "/";
+  };
+  client.addEventListener("left", () => gone());
+  client.addEventListener("closed", ({ detail }) => gone(client.isHost ? null : detail.message, "Lobby beendet"));
   client.addEventListener("connection", ({ detail }) => {
-    hud.classList.toggle("offline", !detail.connected);
-    hud.title = detail.connected ? "Lobby öffnen" : "Verbindung getrennt – verbinde neu …";
+    badge.classList.toggle("offline", !detail.connected);
+    if (!detail.connected) badge.title = "Verbindung getrennt – verbinde neu …";
   });
 
   // Beitritt: bekannte Spieler (ID + Token im Browser) direkt, sonst Name/Passwort abfragen
@@ -227,7 +302,7 @@ async function startLobby(code, { game, menu }, { autoStart = false } = {}) {
     join = who;
     identity.name = who.name;
   }
-  if (!autoStart) menu.open();
+  if (!autoStart) openGameMenu(ctx);
   client.addEventListener("error", async ({ detail: err }) => {
     if (!err.fatal) return console.warn("Lobby:", err.message);
     if (err.code === "password" || err.code === "full") {

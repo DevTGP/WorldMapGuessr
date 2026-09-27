@@ -467,3 +467,46 @@ def test_config_keeps_refill_positive_and_start_reachable():
     assert c["refillEvery"] == 2 and c["startItems"] == 2          # C > E, S ≥ E
     assert c["mode"] == "hardcore" and c["level"] == 4 and c["missLoses"] is True
     assert clean_config({"mode": "egal"})["mode"] == "casual"
+
+
+# ---------- Hauptmenü: eigene Lobbys ----------
+def test_summary_only_for_members(store):
+    hub, code, h, g = two_players(store)
+    host = next(m for m in h.ws.sent if m["type"] == "welcome")["player"]
+    lobby = store.get(code)
+    host_id = lobby["host"]
+    guest = next(m for m in g.ws.sent if m["type"] == "welcome")["player"]
+    s = store.summary(code, guest["id"], guest["token"], online=2)
+    assert s["isHost"] is False and s["players"] == 2 and s["online"] == 2 and not s["solo"]
+    assert s["round"]["total"] == 23 and s["round"]["placed"] == 0 and s["round"]["status"] == "running"
+    assert s["expiresAt"] > s["lastActive"] and "country-eu" in s["config"]["kinds"]
+    assert store.summary(code, guest["id"], "falsch") is None
+    assert store.summary(code, host_id, None) is None and host["id"] == host_id
+
+
+def test_remove_guest_leaves_host_closes_for_everyone(store):
+    hub, code, h, g = two_players(store)
+    guest = next(m for m in g.ws.sent if m["type"] == "welcome")["player"]
+    with pytest.raises(LobbyError):
+        hub.remove(code, guest["id"], "falsch")
+    assert hub.remove(code.lower(), guest["id"], guest["token"]) == "left"
+    assert g.ws.sent[-1]["type"] == "left" and guest["id"] not in store.get(code)["players"]
+    assert sum(round_of(h)["handCounts"].values()) == 3  # Gast-Items zurück im Vorrat
+
+
+def test_http_mine_and_delete(client):
+    host = client.post("/api/lobbies", json={"name": "Manu", "solo": True}).get_json()
+    other = client.post("/api/lobbies", json={"name": "Manu"}).get_json()
+    body = {"lobbies": [
+        {"code": host["code"], **host["player"]},
+        {"code": other["code"], "id": other["player"]["id"], "token": "falsch"},
+        {"code": "ZZZZZ", "id": "x", "token": "y"},
+    ]}
+    r = client.post("/api/lobbies/mine", json=body).get_json()
+    assert [s["code"] for s in r["lobbies"]] == [host["code"]] and r["lobbies"][0]["isHost"] is True
+    assert r["lobbies"][0]["solo"] is True and r["lobbies"][0]["round"] is None
+    assert sorted(r["gone"]) == sorted([other["code"], "ZZZZZ"])
+    assert client.delete(f"/api/lobbies/{other['code']}", json={"id": "x", "token": "y"}).status_code == 400
+    r = client.delete(f"/api/lobbies/{host['code']}", json=host["player"])
+    assert r.get_json() == {"result": "closed"}
+    assert client.get(f"/api/lobbies/{host['code']}").status_code == 404

@@ -10,6 +10,8 @@ import { boxTest } from "./project.js";
 import { quality } from "./quality.js";
 
 export const MIN_ZOOM = 1;
+/** Größter Zoom (16000 %) – bei jeder Kartenqualität gleich */
+export const MAX_ZOOM = 160;
 const IDLE_AFTER_MS = 140;   // so lange nach der letzten Bewegung wird in voller Qualität gezeichnet
 const PAN_MARGIN = 0.22;     // vertikaler Spielraum beim Zoomen (Anteil der Fensterhöhe), z. B. für Antarktika über dem Inventar
 const PAN_MARGIN_RAMP = 0.5; // Spielraum wächst von Zoom 1 bis 1 + RAMP stetig an (kein Sprung beim Herauszoomen)
@@ -145,7 +147,7 @@ export class WorldMap {
 
   /** Ansicht auf gültige Werte begrenzen */
   clamp(v) {
-    const k = Math.max(MIN_ZOOM, Math.min(this.maxZoom ?? quality.value.maxZoom, v.k));
+    const k = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, v.k));
     // Bei 100 % ist die Y-Achse fest; erst beim Hineinzoomen darf senkrecht verschoben werden
     const ramp = Math.min(1, (k - MIN_ZOOM) / PAN_MARGIN_RAMP);
     const maxTy = (Math.max(0, (this.baseHeight * k - this.size.h) / 2) + this.size.h * PAN_MARGIN) * ramp;
@@ -305,7 +307,6 @@ export class WorldMap {
 
   /** Kartenqualität übernehmen (map/quality.js) */
   _applyQuality(q) {
-    this.maxZoom = q.maxZoom;
     this.pieceStep = q.pieceStep;
     this.tiles.detail = q.detail;
     this.tiles.maxPoints = q.maxPoints;

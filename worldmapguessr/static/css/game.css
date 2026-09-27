@@ -281,5 +281,9 @@ body.is-holding #map { cursor: crosshair; }
   .progress { min-width: 66px; padding: 0 8px; }
 }
 @media (max-width: 420px) {
-  .hud-status a.btn-icon { display: none; } /* Statistik: auf der Startseite/Desktop erreichbar */
+  .hud-status #to-home span { display: none; } /* nur das Haus-Symbol */
 }
+
+/* Zurück zum Hauptmenü (Haus + „Menü“) */
+#to-home { display: inline-flex; align-items: center; gap: 6px; }
+#to-home svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }

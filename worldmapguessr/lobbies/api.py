@@ -1,4 +1,5 @@
-"""HTTP-API der Lobbys: anlegen und öffentliche Infos (für den Beitrittsdialog)."""
+"""HTTP-API der Lobbys: anlegen, öffentliche Infos (Beitrittsdialog), eigene Lobbys fürs Hauptmenü
+(Überblick, Entfernen)."""
 from flask import Blueprint, current_app, jsonify, request, url_for
 
 from .store import LobbyError
@@ -36,6 +37,38 @@ def lobby_info(code):
     hub = current_app.extensions["lobby_hub"]
     info["online"] = hub.online_count(info["code"])
     return jsonify(info)
+
+
+MINE_MAX = 50  # so viele Lobbys fragt das Hauptmenü höchstens auf einmal ab
+
+
+@bp.post("/mine")
+def my_lobbies():
+    """Body: {lobbies: [{code, id, token}]} (was der Browser kennt) → {lobbies: [summary]} für die, die es noch
+    gibt und in denen der Spieler noch ist; {gone: [code]} für die übrigen (der Browser vergisst sie)."""
+    body = request.get_json(silent=True) or {}
+    hub = current_app.extensions["lobby_hub"]
+    found, gone = [], []
+    for entry in (body.get("lobbies") or [])[:MINE_MAX]:
+        if not isinstance(entry, dict):
+            continue
+        code = str(entry.get("code") or "")
+        lobby = _store().get(code)
+        summary = _store().summary(code, entry.get("id"), entry.get("token"),
+                                   online=hub.online_count(lobby["code"]) if lobby else 0)
+        if summary:
+            found.append(summary)
+        else:
+            gone.append(code)
+    return jsonify(lobbies=found, gone=gone)
+
+
+@bp.delete("/<code>")
+def remove_lobby(code):
+    """Body: {id, token}. Host: Lobby für alle beenden; sonst: Lobby verlassen → {result: "closed"|"left"}"""
+    body = request.get_json(silent=True) or {}
+    result = current_app.extensions["lobby_hub"].remove(code, body.get("id"), body.get("token"))
+    return jsonify(result=result)
 
 
 @bp.errorhandler(LobbyError)

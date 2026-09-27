@@ -1,0 +1,101 @@
+/* WorldMapGuessr – Hauptmenü (Startseite): Aktionen und laufende Spiele (home/home.js) */
+
+.home {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  overflow: auto;
+  background: rgba(8, 14, 20, 0.28);
+}
+.home[hidden] { display: none; }
+body.at-home .hud { visibility: hidden; }
+
+.home-card {
+  box-sizing: border-box;
+  width: min(760px, 100%);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 28px 28px 24px;
+  background: var(--panel);
+  backdrop-filter: blur(18px) saturate(1.1);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  border: 1px solid var(--panel-line);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  color: var(--ink);
+  animation: menu-in 0.22s ease-out;
+}
+.home-head h1 { margin: 2px 0 6px; font-size: 34px; letter-spacing: 0.005em; }
+.home-tagline { margin: 0; color: var(--ink-soft); max-width: 52ch; }
+
+.home-actions { display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: 8px; }
+.home-actions .btn {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+}
+.home-actions svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.home-play svg { fill: currentColor; stroke: none; }
+
+.home-games-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.home-games-head h2 { margin: 0; font-size: 15px; }
+.home-count { font: 500 12px "IBM Plex Mono", ui-monospace, monospace; color: var(--ink-soft); }
+.home-empty { margin: 0; padding: 18px; border: 1px dashed var(--panel-line); border-radius: 10px; color: var(--ink-soft); text-align: center; }
+
+.game-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 46vh; overflow: auto; }
+.game-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1.5px solid var(--panel-line);
+  border-radius: 12px;
+}
+.game-item.current { border-color: var(--piece); background: var(--piece-fill); }
+.game-item.loading { opacity: 0.6; }
+.game-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: var(--panel-line); color: var(--ink-soft); }
+.game-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.game-main { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.game-main p { margin: 0; }
+.game-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-weight: 600; }
+.game-title code { font: 600 13px "IBM Plex Mono", ui-monospace, monospace; letter-spacing: 0.06em; }
+.game-sub { font-size: 13px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.game-meta { font-size: 12.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.game-meta .won { color: var(--good); font-weight: 600; }
+.game-meta .lost { color: var(--bad); font-weight: 600; }
+.tag {
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-line);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.tag.accent { border-color: var(--piece); color: var(--piece); }
+.game-bar { height: 4px; border-radius: 2px; background: var(--panel-line); overflow: hidden; }
+.game-bar i { display: block; height: 100%; background: var(--piece); }
+.game-actions { display: flex; gap: 6px; }
+.game-actions .btn-icon:hover { color: var(--bad); border-color: var(--bad); }
+
+@media (max-width: 640px) {
+  .home-card { padding: 20px 16px; gap: 18px; }
+  .home-head h1 { font-size: 28px; }
+  .home-actions { grid-template-columns: 1fr 1fr; }
+  .home-play { grid-column: 1 / -1; }
+  .home-actions .btn-lg { padding-inline: 10px; font-size: 14px; }
+  .game-item { grid-template-columns: minmax(0, 1fr) auto; }
+  .game-icon { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-card { animation: none; }
+}

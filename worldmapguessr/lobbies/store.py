@@ -78,6 +78,30 @@ class LobbyStore:
             "solo": bool(lobby["settings"].get("solo")),
         }
 
+    def summary(self, code, player_id, token, online=0) -> dict | None:
+        """Kurzüberblick einer Lobby für das Hauptmenü („Laufende Spiele“) – nur für Mitglieder
+        (gültiger Token), sonst None. online: Zahl der verbundenen Spieler (vom Hub)."""
+        lobby = self.get(code)
+        if not lobby or not self.authenticate(lobby["code"], player_id, token):
+            return None
+        s, rnd = lobby["settings"], lobby["round"]
+        cfg = rnd["config"] if rnd else s["config"]
+        return {
+            "code": lobby["code"],
+            "solo": bool(s.get("solo")),
+            "isHost": lobby["host"] == player_id,
+            "private": bool(s["passwordHash"]),
+            "players": len(lobby["players"]),
+            "online": online,
+            "config": {k: cfg.get(k) for k in ("mode", "level", "kinds", "excluded")},
+            "round": {
+                "number": rnd["number"], "status": rnd["status"], "placed": len(rnd["placed"]),
+                "total": rnd["total"], "lives": rnd["lives"], "livesMax": rnd["livesMax"],
+            } if rnd else None,
+            "lastActive": lobby["lastActive"],
+            "expiresAt": lobby["lastActive"] + self.ttl_of(lobby),
+        }
+
     # ---------- Anlegen / Beitreten ----------
     def create(self, *, player_name, config=None, max_players=None, password="", solo=False,
                ttl=None, send_every=None) -> tuple[dict, dict]:

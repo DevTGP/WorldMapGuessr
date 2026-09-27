@@ -12,6 +12,9 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/menu.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/lobby.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/feed.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/map-picker.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">
 </head>
 <body>
 
@@ -53,10 +56,13 @@
     <b id="progress">0 / 0</b>
   </div>
   <div class="lives" id="lives" role="img" title="Leben"></div>
-  <button class="btn" id="new-round" type="button">Neue Runde</button>
-  <a class="btn btn-icon" href="{{ url_for('main.stats') }}" title="Statistik" aria-label="Statistik">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-6"/></svg>
-  </a>
+  <button class="btn btn-icon" id="open-settings" type="button" title="Einstellungen" aria-label="Einstellungen">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M4.2 7.5l2 1.2M17.8 15.3l2 1.2M4.2 16.5l2-1.2M17.8 8.7l2-1.2"/><circle cx="12" cy="12" r="7"/></svg>
+  </button>
+  <button class="btn" id="to-home" type="button" title="Zurück zum Hauptmenü – die Runde bleibt erhalten">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5L12 5l8 6.5M6.5 9.8V19h11V9.8"/></svg>
+    <span>Menü</span>
+  </button>
 </div>
 
 <section class="hud hud-inventory" aria-label="Inventar">
@@ -99,7 +105,8 @@
   <h2 id="dlg-title"></h2>
   <p id="dlg-text"></p>
   <div class="actions">
-    <button class="btn" id="dlg-menu" type="button">Einstellungen</button>
+    <button class="btn" id="dlg-home" type="button">Hauptmenü</button>
+    <button class="btn" id="dlg-menu" type="button">Anpassen</button>
     <button class="btn btn-primary" id="dlg-again" type="button" autofocus>Nochmal</button>
   </div>
 </dialog>
@@ -109,7 +116,7 @@
     <header class="menu-head">
       <div>
         <p class="eyebrow">WorldMapGuessr</p>
-        <h2 id="menu-title">Neue Runde</h2>
+        <h2 id="menu-title">Neues Spiel</h2>
       </div>
       <button type="button" class="menu-close" id="menu-close" aria-label="Zurück zur laufenden Runde" title="Zurück zur Runde (Esc)">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -178,13 +185,7 @@
           <h4 id="sec-level">Schwierigkeit</h4>
           <div class="level-bar" id="level-bar" role="radiogroup" aria-labelledby="sec-level"></div>
           <p class="preset-values" id="preset-values"></p>
-          <h4 id="sec-scope">Items</h4>
-          <div class="scope-toggles" id="scope-toggles"></div>
         </section>
-        <div class="field quality-field" id="quality-field">
-          <span class="quality-label">Kartenqualität<small>nur auf diesem Gerät · „Hoch“ braucht mehr Leistung</small></span>
-          <div class="quality-bar" role="radiogroup" aria-label="Kartenqualität"></div>
-        </div>
         <button type="button" class="adv-toggle" id="menu-advanced" aria-expanded="false" aria-controls="menu-form">
           <span>Erweiterte Einstellungen</span>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
@@ -194,25 +195,38 @@
           <div class="fields" id="rule-fields"></div>
           <p class="balance-note" id="balance-note"></p>
         </section>
-        <section class="menu-section game-settings adv-only" aria-labelledby="sec-kinds">
-          <h4 id="sec-kinds">Item-Gruppen</h4>
-          <div class="kind-cards" id="kind-cards"></div>
-        </section>
       </div>
 
-      <section class="menu-section menu-col picker game-settings adv-only" aria-labelledby="sec-picker">
-        <div class="picker-head">
-          <h4 id="sec-picker">Einzelne Items</h4>
-          <input type="search" id="picker-search" placeholder="Item suchen" autocomplete="off" aria-label="Item suchen" data-always="1">
+      <section class="menu-section menu-col map-col game-settings" id="map-picker" aria-labelledby="sec-map">
+        <h4 id="sec-map">Karte <span class="custom-badge" id="map-custom-badge" hidden>Eigene Auswahl</span></h4>
+        <div class="map-presets" role="radiogroup" aria-labelledby="sec-map"></div>
+        <div class="map-sub" id="map-sub">
+          <p class="map-sub-title">Länder aus</p>
+          <div class="continent-chips" role="group" aria-label="Kontinente der Länder"></div>
+          <label class="field toggle" id="map-small-field" for="map-small">
+            <span>Mit Kleinstaaten<small id="map-small-hint"></small></span>
+            <input id="map-small" type="checkbox" role="switch" checked>
+          </label>
         </div>
-        <p class="picker-hint">Abgewählte Items kommen in der Runde nicht vor.</p>
-        <div class="picker-list" id="picker-list"></div>
+        <p class="map-summary" id="map-summary" aria-live="polite"></p>
+        <button type="button" class="adv-toggle" id="picker-toggle" aria-expanded="false" aria-controls="picker-panel" data-always="1">
+          <span>Einzelne Items anpassen</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="picker" id="picker-panel" hidden>
+          <div class="picker-head">
+            <p class="picker-hint">Abgewählte Items kommen in der Runde nicht vor.</p>
+            <input type="search" id="picker-search" placeholder="Item suchen" autocomplete="off" aria-label="Item suchen" data-always="1">
+          </div>
+          <div class="picker-list" id="picker-list"></div>
+        </div>
       </section>
     </div>
 
     <footer class="menu-foot">
       <p id="menu-summary" aria-live="polite"></p>
       <div class="foot-actions">
+        <button type="button" class="btn btn-lg" id="menu-back" hidden>Zurück</button>
         <button type="button" class="btn btn-lg" id="menu-create-lobby">Lobby erstellen</button>
         <button type="submit" class="btn btn-primary btn-lg" id="menu-start">Runde starten</button>
       </div>
@@ -267,7 +281,89 @@
 <dialog class="join-dialog" id="lobby-gone">
   <h2>Lobby nicht verfügbar</h2>
   <p></p>
-  <div class="actions"><a class="btn btn-primary" href="{{ url_for('main.index') }}">Zum Einzelspiel</a></div>
+  <div class="actions"><a class="btn btn-primary" href="{{ url_for('main.index') }}">Zum Hauptmenü</a></div>
+</dialog>
+
+<section class="home" id="home" aria-labelledby="home-title" hidden>
+  <div class="home-card">
+    <header class="home-head">
+      <p class="eyebrow">Geografie-Spiel</p>
+      <h1 id="home-title">WorldMapGuessr</h1>
+      <p class="home-tagline">Kontinente und Länder an die richtige Stelle der Weltkarte setzen – allein oder mit anderen.</p>
+    </header>
+    <nav class="home-actions" aria-label="Hauptmenü">
+      <button type="button" class="btn btn-primary btn-lg home-play" id="home-play">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>Spielen
+      </button>
+      <button type="button" class="btn btn-lg" id="home-join">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7l5 5-5 5M15 12H3M14 4h5a1 1 0 011 1v14a1 1 0 01-1 1h-5"/></svg>Lobby beitreten
+      </button>
+      <a class="btn btn-lg" href="{{ url_for('main.stats') }}" id="home-stats">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-6"/></svg>Statistik
+      </a>
+      <button type="button" class="btn btn-lg" id="home-settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M4.2 7.5l2 1.2M17.8 15.3l2 1.2M4.2 16.5l2-1.2M17.8 8.7l2-1.2"/><circle cx="12" cy="12" r="7"/></svg>Einstellungen
+      </button>
+    </nav>
+    <section class="home-games" aria-labelledby="home-games-title">
+      <div class="home-games-head">
+        <h2 id="home-games-title">Laufende Spiele <span class="home-count" id="home-count"></span></h2>
+        <button type="button" class="link" id="home-refresh">Aktualisieren</button>
+      </div>
+      <ul class="game-list" id="home-games"></ul>
+      <p class="home-empty" id="home-empty" hidden>Noch keine laufenden Spiele. Starte eins über „Spielen“ oder tritt einer Lobby bei.</p>
+    </section>
+  </div>
+</section>
+
+<dialog class="join-dialog" id="code-dialog">
+  <form>
+    <h2>Lobby beitreten</h2>
+    <p>Code aus dem Einladungslink eingeben (z. B. <code>K7M2Q</code>) – oder einfach den Link öffnen.</p>
+    <p class="join-error" role="alert" hidden></p>
+    <label for="code-input">Lobby-Code</label>
+    <input id="code-input" type="text" maxlength="80" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+    <div class="actions">
+      <button type="button" class="btn" id="code-cancel">Abbrechen</button>
+      <button type="submit" class="btn btn-primary">Beitreten</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="settings-dialog" id="settings" aria-labelledby="settings-title">
+  <form method="dialog" class="settings-card">
+    <header class="settings-head">
+      <div>
+        <p class="eyebrow">Nur auf diesem Gerät</p>
+        <h2 id="settings-title">Einstellungen</h2>
+      </div>
+      <button type="submit" class="menu-close" aria-label="Schließen" title="Schließen (Esc)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </header>
+    <div class="settings-body">
+      <div class="set-field">
+        <label for="set-name">Spielername<small>für neue Spiele und Lobbys; in einer laufenden Lobby sofort</small></label>
+        <input id="set-name" type="text" autocomplete="nickname" placeholder="Spieler">
+      </div>
+      <div class="set-field quality-field" id="set-quality">
+        <span class="quality-label">Kartenqualität<small>Detail der Karte · „Hoch“ braucht mehr Leistung</small></span>
+        <div class="quality-bar" role="radiogroup" aria-label="Kartenqualität"></div>
+      </div>
+      <div class="set-field range-field">
+        <label for="set-zoomSpeed">Zoom-Empfindlichkeit<small>Mausrad, Pinch, Zoom-Knöpfe und +/−</small></label>
+        <div class="range-row"><input id="set-zoomSpeed" type="range"><output id="set-zoomSpeed-val"></output></div>
+      </div>
+      <div class="set-field range-field">
+        <label for="set-moveSpeed">Bewegungsempfindlichkeit<small>Ziehen zum Drehen und Verschieben, Pfeiltasten ↑/↓</small></label>
+        <div class="range-row"><input id="set-moveSpeed" type="range"><output id="set-moveSpeed-val"></output></div>
+      </div>
+    </div>
+    <footer class="settings-foot">
+      <button type="button" class="btn" id="settings-reset">Standard wiederherstellen</button>
+      <button type="submit" class="btn btn-primary">Fertig</button>
+    </footer>
+  </form>
 </dialog>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>

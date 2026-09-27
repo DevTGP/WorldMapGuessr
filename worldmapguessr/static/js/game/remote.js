@@ -133,7 +133,8 @@ export class RemoteRound {
   _syncPause() {
     const round = this.client.state?.round;
     if (!this.solo || !this.client.connected || round?.status !== "running" || !round.timer) return;
-    const paused = !!document.querySelector("dialog[open]") || document.hidden;
+    const paused = !!document.querySelector("dialog[open]") || document.hidden ||
+      document.body.classList.contains("at-home"); // Hauptmenü offen
     if (paused === this.paused) return;
     this.paused = paused;
     this.client.pause(paused);

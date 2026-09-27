@@ -17,21 +17,14 @@ export const LIMITS = {
 /** Item-Gruppen im Menü (je eine Karte zum An-/Abwählen); config.kinds enthält Gruppen-IDs */
 export const GROUPS = [
   { id: "continent", title: "Kontinente", preview: ["AF", "SA", "OC"] },
-  { id: "country-eu", title: "Staaten Europas", preview: ["ITA", "DEU", "NOR"] },
-  { id: "country-na", title: "Staaten Nordamerikas", preview: ["USA", "MEX", "CUB"] },
-  { id: "country-sa", title: "Staaten Südamerikas", preview: ["BRA", "ARG", "COL"] },
-  { id: "country-af", title: "Staaten Afrikas", preview: ["EGY", "ZAF", "MDG"] },
-  { id: "country-as", title: "Staaten Asiens", preview: ["CHN", "IND", "JPN"] },
-  { id: "country-oc", title: "Staaten Ozeaniens", preview: ["AUS", "NZL", "PNG"] },
+  { id: "country-eu", title: "Staaten Europas", short: "Europa", preview: ["ITA", "DEU", "NOR"] },
+  { id: "country-na", title: "Staaten Nordamerikas", short: "Nordamerika", preview: ["USA", "MEX", "CUB"] },
+  { id: "country-sa", title: "Staaten Südamerikas", short: "Südamerika", preview: ["BRA", "ARG", "COL"] },
+  { id: "country-af", title: "Staaten Afrikas", short: "Afrika", preview: ["EGY", "ZAF", "MDG"] },
+  { id: "country-as", title: "Staaten Asiens", short: "Asien", preview: ["CHN", "IND", "JPN"] },
+  { id: "country-oc", title: "Staaten Ozeaniens", short: "Ozeanien", preview: ["AUS", "NZL", "PNG"] },
 ];
 export const GROUP_LABELS = Object.fromEntries(GROUPS.map((g) => [g.id, g]));
-
-/** Einfache Item-Auswahl im Menü: Kontinente / Länder / Bundesländer → Gruppen-IDs */
-export const SCOPES = [
-  { id: "continents", title: "Kontinente", groups: ["continent"] },
-  { id: "countries", title: "Länder", groups: GROUPS.filter((g) => g.id.startsWith("country-")).map((g) => g.id) },
-  { id: "regions", title: "Bundesländer", groups: [], soon: true },
-];
 
 /**
  * Standard: Casual, Normal (Werte siehe menu/presets.js). Felder:

@@ -8,12 +8,17 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
 
 - Die Karte lässt sich wie ein Globus um die Längsachse drehen: seitlich ziehen oder die Pfeile oben (bzw. `←`/`→`), die in 45°-Schritten (π/4) auf 0°, 45°, 90° … weiterdrehen. Was in der Mitte liegt, ist am wenigsten verzerrt.
 - Bei 100 % ist die Y-Achse fest (Ziehen dreht nur). Erst nach dem Hineinzoomen lässt sich die Karte auch senkrecht verschieben.
-- **Kartenqualität** (Menü, gilt sofort und nur auf diesem Gerät, der Browser merkt sie sich): Niedrig / Mittel (Standard) / Hoch. Sie bestimmt, wie fein Karte und gehaltenes Item gezeichnet werden und wie weit man hineinzoomen kann (4000 / 8000 / 16000 %). Details: „Detailstufen (LOD)“.
+- **Hauptmenü** (Startseite `/`, im Spiel über „Menü“ oben rechts; die Karte dreht sich dahinter langsam): **Spielen** (Spielmenü, s. u.), **Lobby beitreten** (Code oder Einladungslink eingeben), **Statistik** (nur hier erreichbar), **Einstellungen** und **Laufende Spiele**:
+  - Alle Spiele, die dieser Browser kennt – eigene Einzelspiele (beliebig viele) und beigetretene Lobbys –, zuletzt aktive zuerst. Je Spiel: Typ und Code, Modus und Stufe, Kartenauswahl, Runde mit Fortschritt und Leben, Spieler online, Host, Verfall.
+  - **Fortsetzen/Öffnen** verbindet das Spiel (das gerade offene ohne Neuladen; ein anderes, nachdem auf der Seite schon eins lief, mit Neuladen). **Entfernen** (Mülleimer, mit Bestätigung): als Host wird die Lobby auf dem Server gelöscht und alle Verbundenen sehen „Lobby beendet“; sonst verlässt man die Lobby (Items zurück in den Vorrat). Ein Einzelspiel wird gelöscht. Verfallene Spiele verschwinden von selbst.
+  - Im Hauptmenü pausiert der Timer eines offenen Einzelspiels.
+- **Einstellungen** (Popup im Hauptmenü und im Spiel über ⚙, gilt sofort und nur auf diesem Gerät): Spielername (für neue Spiele; in einer laufenden Lobby wird man sofort umbenannt), **Kartenqualität** Niedrig / Mittel (Standard) / Hoch (wie fein Karte und gehaltenes Item gezeichnet werden, Details: „Detailstufen (LOD)“), Zoom-Empfindlichkeit (Mausrad, Pinch, Zoom-Knöpfe, +/−) und Bewegungsempfindlichkeit (Ziehen, ↑/↓) je 25–200 %, „Standard wiederherstellen“. Der größte Zoom ist bei jeder Qualität 16000 %.
 - Beim Start zeigt ein Ladebildschirm den Fortschritt: Kartendaten herunterladen (in MB, der Server gibt die Größe des Startpakets mit), Umrisse vorbereiten, Items (Icons) vorbereiten, Karte zeichnen. Der Balken läuft nie rückwärts; ein Schimmer zeigt auch während längerer Rechenschritte, dass noch etwas passiert. Schlägt das Laden fehl, gibt es eine Meldung mit „Neu laden“.
-- Vor jeder Runde öffnet sich das Menü (auch über „Neue Runde“ oben rechts und nach Rundenende über „Einstellungen“):
-  - **Item-Arten:** sieben Karten zum An-/Abwählen – 7 Kontinente, 45 Staaten Europas (klassisches Europa inkl. Russland und Kosovo, ohne Türkei, Zypern und Kaukasus), 23 Staaten Nordamerikas (USA, Kanada, Mexiko, 7 Staaten Mittelamerikas, 13 Karibikstaaten; ohne abhängige Gebiete wie Grönland oder Puerto Rico), 12 Staaten Südamerikas (ohne Französisch-Guayana und Falklandinseln), 54 Staaten Afrikas (ohne Westsahara, Réunion, Mayotte, St. Helena), 49 Staaten Asiens (46 unabhängige Staaten inkl. Türkei, Kaukasus und Kasachstan, dazu Zypern, Taiwan und Palästina; Russland zählt als Ganzes zu Europa), 14 Staaten Ozeaniens (ohne abhängige Gebiete wie Neukaledonien, Französisch-Polynesien, Cookinseln, Niue, Guam).
-  - **Einfache Ansicht:** Spielmodus (Casual, Vereinfachter Fokus, Fokus, Tempo, Hardcore), Schwierigkeit (Sehr einfach … Sehr schwer, darunter die Werte als Kurzzeile) und die Items als drei Schalter: Kontinente / Länder / Bundesländer (Bundesländer kommen noch). Standard: Casual, Normal, Kontinente + Länder. Alle Modi, Regeln und Werte: [docs/spielmodi.md](docs/spielmodi.md).
-  - **Erweiterte Einstellungen** (Knopf, der Browser merkt sich den Zustand): Reihenfolge-Regler, Leben, Start-Items, Nachschub, Timer/Schonfrist/Wegnahme (10-s-Schritte), „Kein Zurücklegen“, „Fehlwurf kostet das Item“, Kennzahlen (Mindesttempo, „leer nach“, Puffer), Item-Gruppen, Einzelauswahl (Suche, „Alle“/„Keine“), Aufbewahren und in der Lobby deren Einstellungen. Wer dort einen Regelwert ändert, hat „Eigene Einstellungen“.
+- **Spielmenü** („Neues Spiel“ über „Spielen“; im Spiel über das Badge oben rechts – „Einzelspiel“ bzw. der Lobby-Code – und nach Rundenende über „Anpassen“/„Lobby“). Links die Regeln, rechts die Karte:
+  - **Kartenauswahl** (rechts) als Presets mit Mini-Weltkarte: **Kontinente** (7), **Länder** (197; darunter die Kontinente als Chips – „Alle“ oder einzelne, mehrere möglich), **Alles** (Kontinente und Länder, 204) und **Bundesländer** (kommt noch). Der Schalter **Mit Kleinstaaten** gilt für Länder und Alles: aus = ohne die 25 Staaten unter 1.100 km² (Vatikanstadt, Monaco, Tuvalu, Nauru, San Marino, Malediven, Liechtenstein, Marshallinseln, St. Kitts und Nevis, Malta, Grenada, St. Vincent, Seychellen, Barbados, Andorra, Antigua und Barbuda, Palau, Singapur, Tonga, St. Lucia, Mikronesien, Bahrain, Dominica, Kiribati, São Tomé und Príncipe). **Einzelne Items anpassen** klappt die Einzelauswahl auf (Suche, „Alle“/„Keine“ je Gruppe); passt das Ergebnis zu keinem Preset, heißt es „Eigene Auswahl“. Gespeichert werden weiterhin Gruppen und ausgeschlossene Items (`config.kinds`, `config.excluded`), das Preset erkennt `menu/map-presets.js`.
+  - **Item-Gruppen:** 7 Kontinente, 45 Staaten Europas (klassisches Europa inkl. Russland und Kosovo, ohne Türkei, Zypern und Kaukasus), 23 Staaten Nordamerikas (USA, Kanada, Mexiko, 7 Staaten Mittelamerikas, 13 Karibikstaaten; ohne abhängige Gebiete wie Grönland oder Puerto Rico), 12 Staaten Südamerikas (ohne Französisch-Guayana und Falklandinseln), 54 Staaten Afrikas (ohne Westsahara, Réunion, Mayotte, St. Helena), 49 Staaten Asiens (46 unabhängige Staaten inkl. Türkei, Kaukasus und Kasachstan, dazu Zypern, Taiwan und Palästina; Russland zählt als Ganzes zu Europa), 14 Staaten Ozeaniens (ohne abhängige Gebiete wie Neukaledonien, Französisch-Polynesien, Cookinseln, Niue, Guam).
+  - **Einfache Ansicht:** Spielmodus (Casual, Vereinfachter Fokus, Fokus, Tempo, Hardcore), Schwierigkeit (Sehr einfach … Sehr schwer, darunter die Werte als Kurzzeile) Standard: Casual, Normal, Alles. Alle Modi, Regeln und Werte: [docs/spielmodi.md](docs/spielmodi.md).
+  - **Erweiterte Einstellungen** (Knopf, der Browser merkt sich den Zustand): Reihenfolge-Regler, Leben, Start-Items, Nachschub, Timer/Schonfrist/Wegnahme (10-s-Schritte), „Kein Zurücklegen“, „Fehlwurf kostet das Item“, Kennzahlen (Mindesttempo, „leer nach“, Puffer), Aufbewahren und in der Lobby deren Einstellungen. Wer dort einen Regelwert ändert, hat „Eigene Einstellungen“.
   - **Reihenfolge:** Regler 0–100 % (unter „Erweitert“), bestimmt, ob leichte oder schwere Items zuerst kommen: Je Item Wert = (1 − z) · Item-Schwierigkeit/10 + z · Zufall mit Zufallsanteil z = min(Regler, 100 % − Regler). Bis 50 % kommt das Item mit dem kleinsten Wert zuerst (0 % = streng von leicht nach schwer), ab 51 % das mit dem größten (100 % = streng von schwer nach leicht). Die Reihenfolge berechnet der Server (`worldmapguessr/difficulty.py`).
   - **Timer (Tempo, Hardcore):** Fester Takt ab Rundenbeginn: Nach der Schonfrist gehen alle *Timer* Sekunden *Wegnahme* Items aus dem Inventar zurück in den Vorrat (an zufällige Stellen) – immer die ältesten, auch ein gerade gehaltenes. Über dem Inventar zählt eine Anzeige herunter (letzte 5 s rot, im Endspurt „Endspurt“). Der Timer steht, solange niemand verbunden ist; im Einzelspiel zusätzlich, solange Menü oder Rundendialog offen sind oder der Tab im Hintergrund liegt („pausiert“).
   - **Kein Zurücklegen (Fokus, Hardcore):** Slot, `Esc`, Rechtsklick und Wechsel zu einem anderen Item sind gesperrt – das Item muss eingesetzt (in der Lobby auch: gesendet) werden.
@@ -35,10 +40,10 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
 
 ## Einzelspiel = Solo-Lobby
 
-- Jede Runde läuft auf dem Server, auch das Einzelspiel: „Runde starten“ auf der Startseite legt eine Lobby nur für einen Spieler an (`solo`) und startet die Runde darin. Die Adresse wird zu `/CODE`; der Browser merkt sich den Code (localStorage `wmg.soloLobby`).
-- **Fortsetzen:** Die Startseite setzt das eigene Einzelspiel automatisch fort – auch Stunden oder Tage später, solange es nicht verfallen ist (Inventar, Leben, eingesetzte Items, Timer bleiben erhalten). Ist es verfallen, öffnet das Menü für eine neue Runde. „Neue Runde“ startet in derselben Solo-Lobby neu (mit Rückfrage, wenn eine Runde läuft). Es gibt je Browser genau ein Einzelspiel.
-- Niemand sonst kann beitreten (auch nicht mit dem Code). Die Oberfläche bleibt die des Einzelspiels: kein Lobby-Badge, kein Chat, keine Sende-Spalte.
-- **Mitspieler einladen:** Knopf im Menü → Name eingeben → aus dem Einzelspiel wird eine normale Lobby, die laufende Runde geht mit allen weiter, die über den Link beitreten. Die Startseite beginnt danach wieder ein neues Einzelspiel.
+- Jede Runde läuft auf dem Server, auch das Einzelspiel: „Einzelspiel starten“ im Spielmenü legt eine Lobby nur für einen Spieler an (`solo`) und startet die Runde darin. Die Adresse wird zu `/CODE`; der Browser merkt sich ID und Token (localStorage `wmg.lobby.CODE`, wie bei jeder Lobby).
+- **Fortsetzen:** über „Laufende Spiele“ im Hauptmenü – auch Stunden oder Tage später, solange es nicht verfallen ist (Inventar, Leben, eingesetzte Items, Timer bleiben erhalten). Mehrere Einzelspiele gleichzeitig sind möglich. „Runde neu starten“ im Spielmenü startet in derselben Solo-Lobby neu (mit Rückfrage, wenn eine Runde läuft).
+- Niemand sonst kann beitreten (auch nicht mit dem Code). Die Oberfläche bleibt die des Einzelspiels: Badge „Einzelspiel“, kein Chat, keine Sende-Spalte.
+- **Mitspieler einladen:** Knopf im Spielmenü → Name eingeben → aus dem Einzelspiel wird eine normale Lobby, die laufende Runde geht mit allen weiter, die über den Link beitreten.
 - **Aufbewahren:** im Menü (Einzelspiel und Lobby, nur Host): 1 h, 3 h, 6 h, 12 h, 1 Tag (Standard), 2, 3 oder 7 Tage. So lange bleibt eine Lobby samt Runde ohne Aktivität erhalten, danach wird sie gelöscht. Jede Aktion (Einsetzen, Chat, Einstellungen …) setzt die Zeit neu.
 
 ## Lobbys
@@ -49,12 +54,12 @@ Geografie-Spiel: Kontinente, Länder, Bundesländer und Regionen auf einer Weltk
 - **Wiedererkennung:** Spieler-ID und Token liegen im Browser (localStorage). Neu laden oder später zurückkommen führt ohne erneuten Beitritt in dieselbe Rolle – auch als Host.
 - **Einstellungen (nur Host):** Spielkonfiguration wie im Einzelspiel, max. Spielerzahl (Standard 8), Passwort (setzen/entfernen), „Items senden“ (Standard an, wirkt sofort), Sendelimit (je Modus: Casual 3, Vereinfachter Fokus 4, Fokus 5, Tempo 5, Hardcore 10; 0 = ohne). Lobby-Einstellungen stehen unter „Erweitert“. Gäste sehen alles live, aber gesperrt.
 - **Host-Wechsel:** Ist der Host länger als 10 s getrennt, übernimmt der am längsten anwesende Spieler.
-- **Verlassen (alle):** „Lobby verlassen“ im Lobby-Bereich des Menüs → Bestätigung → zurück zum Einzelspiel. Der Spieler wird aus der Lobby entfernt, seine gespeicherte Identität gelöscht; über den Link kann er später als neuer Spieler wieder beitreten. Verlässt der Host, geht die Rolle sofort an den am längsten anwesenden Online-Spieler. Verlässt der letzte Spieler, wird die Lobby gelöscht.
-- **Beenden (nur Host):** „Lobby beenden“ → Bestätigung → die Lobby wird für alle gelöscht. Alle anderen sehen „Lobby beendet“ mit dem Weg zum Einzelspiel; der Link funktioniert danach nicht mehr.
+- **Verlassen (alle):** „Lobby verlassen“ im Lobby-Bereich des Menüs → Bestätigung → zurück zum Hauptmenü (oder dort „Entfernen“). Der Spieler wird aus der Lobby entfernt, seine gespeicherte Identität gelöscht; über den Link kann er später als neuer Spieler wieder beitreten. Verlässt der Host, geht die Rolle sofort an den am längsten anwesenden Online-Spieler. Verlässt der letzte Spieler, wird die Lobby gelöscht.
+- **Beenden (nur Host):** „Lobby beenden“ → Bestätigung → die Lobby wird für alle gelöscht. Auch über „Entfernen“ im Hauptmenü. Alle anderen sehen „Lobby beendet“ mit dem Weg zum Hauptmenü; der Link funktioniert danach nicht mehr.
 - **Runde starten:** Der Host startet für alle („Neue Runde für alle“ im Menü oder im Rundenende-Dialog). Ablauf siehe *Mehrspieler-Runde*.
 - **Speicherung:** MongoDB-Collection `lobbies` bzw. Fallback `instance/lobbies.json` (Passwörter nur als Hash, Spieler-Tokens als SHA-256). Lobbys verfallen nach ihrer eingestellten Zeit ohne Aktivität („Aufbewahren“, Standard 1 Tag); ein Aufräumlauf alle 10 Minuten löscht sie.
 - **Chat:** Eingabefeld unten in der Nachrichtenleiste (Enter sendet, max. 200 Zeichen). Die letzten 50 Nachrichten werden mit der Lobby gespeichert; wer beitritt, sieht die letzten 10.
-- **Technik:** WebSocket `/ws/lobby/<code>` über `flask-sock`. Protokoll (JSON): Client → `join`, `settings`, `start`, `place {key, correct}`, `give {key, to}`, `chat {text}`, `pause {paused}` (nur Einzelspiel), `rename`, `leave`, `close`, `ping`; Server → `welcome`, `state {lobby, hand, sends}`, `error`, `left`, `closed`, `pong`. Der Rundenzustand enthält ein Ereignisprotokoll (`log`, letzte 40 Ereignisse mit `seq`), aus dem jeder Browser die Meldungen genau einmal erzeugt. HTTP: `POST /api/lobbies` (`{name, config, solo, ttl, maxPlayers, password}`), `GET /api/lobbies/<code>`.
+- **Technik:** WebSocket `/ws/lobby/<code>` über `flask-sock`. Protokoll (JSON): Client → `join`, `settings`, `start`, `place {key, correct}`, `give {key, to}`, `chat {text}`, `pause {paused}` (nur Einzelspiel), `rename`, `leave`, `close`, `ping`; Server → `welcome`, `state {lobby, hand, sends}`, `error`, `left`, `closed`, `pong`. Der Rundenzustand enthält ein Ereignisprotokoll (`log`, letzte 40 Ereignisse mit `seq`), aus dem jeder Browser die Meldungen genau einmal erzeugt. HTTP: `POST /api/lobbies` (`{name, config, solo, ttl, maxPlayers, password}`), `GET /api/lobbies/<code>`, `POST /api/lobbies/mine` (`{lobbies: [{code, id, token}]}` → Überblick je Lobby, nur mit gültigem Token; `gone`: die übrigen), `DELETE /api/lobbies/<code>` (`{id, token}`: Host beendet, sonst verlassen).
 
 ## Mehrspieler-Runde
 
@@ -70,7 +75,7 @@ Der Server führt die Runde (`lobbies/round.py`); der Browser prüft nur, ob ein
 - **Items senden:** Links am Rand steht ein Feld je Online-Mitspieler (Name, Anzahl seiner Items). Item aufnehmen, dann ein Feld anklicken → das Item fliegt hinüber und liegt danach im Inventar des Mitspielers; alle sehen eine Meldung. Nur an verbundene Spieler. Ist „Items senden“ aus, verschwindet die Spalte und der Server lehnt Senden ab.
 - **Sendelimit:** Je N vom Server erhaltene Items (Start, Nachschub) darf ein Spieler 1 Item senden (Lobbyeinstellung, vom Modus vorbelegt, 0 = ohne Limit). Geschenkte Items zählen nicht mit – so entsteht kein Hin-und-Her. Die Spalte zeigt „Du kannst 1 Item senden“ bzw. „Senden wieder nach 3 Items“; der Server prüft (`send_limit`).
 - **Timer in der Lobby:** Der Server führt ihn (`round.tick`, Prüfung alle 0,5 s): gemeinsamer fester Takt ab Rundenbeginn, nach der Schonfrist je Takt *Wegnahme* Items insgesamt – wie beim Verteilen reihum in fester Reihenfolge (eigener Zeiger), bei jedem Spieler sein ältestes Item. Wer keins hat oder getrennt ist, wird übersprungen. Verpasste Takte (Server war aus, niemand verbunden) werden nicht nachgeholt.
-- **Menü in der Lobby:** zwei Blöcke – *Lobby* („wirkt sofort“: Spielerzahl, Passwort, Items senden) und *Runde* (Item-Arten, Regeln; läuft eine Runde, gilt „ab der nächsten Runde“). Ein Hinweis zeigt, was gerade gilt und wer einstellt; „So läuft eine Lobby-Runde“ erklärt die Regeln aufklappbar. Die Regler zeigen, was sie in der Lobby bewirken (z. B. „für alle zusammen, reihum (jetzt 3 + 2)“), der Fuß fasst alles zusammen. Startet der Host neu, während eine Runde läuft, fragt ein Dialog nach („bricht die Runde für alle ab“).
+- **Menü in der Lobby:** zwei Blöcke – *Lobby* („wirkt sofort“: Spielerzahl, Passwort, Items senden) und *Runde* (Regeln, Kartenauswahl; läuft eine Runde, gilt „ab der nächsten Runde“). Ein Hinweis zeigt, was gerade gilt und wer einstellt; „So läuft eine Lobby-Runde“ erklärt die Regeln aufklappbar. Die Regler zeigen, was sie in der Lobby bewirken (z. B. „für alle zusammen, reihum (jetzt 3 + 2)“), der Fuß fasst alles zusammen. Startet der Host neu, während eine Runde läuft, fragt ein Dialog nach („bricht die Runde für alle ab“).
 - **Rundenende:** Gewonnen (alles eingesetzt) oder verloren (keine Leben) – der Dialog erscheint bei allen. Nur der Host sieht „Neue Runde für alle“. Eine Rangliste gibt es noch nicht.
 - Der Rundenzustand wird mit der Lobby gespeichert und übersteht einen Server-Neustart.
 
@@ -133,7 +138,7 @@ Der Browser meldet nichts (`lobbies/round.py` sammelt die Ereignisse, `item_even
 Hinweis: Bis zu dieser Version haben in Lobbys die Browser gezählt – ältere Zahlen können dort Spawns doppelt enthalten
 (Neuladen, gesendete Items).
 
-**Statistik-Seite:** <http://127.0.0.1:5000/stats> (oder das Balken-Symbol oben rechts im Spiel). Tabelle aller Items,
+**Statistik-Seite:** <http://127.0.0.1:5000/stats> (im Hauptmenü „Statistik“). Tabelle aller Items,
 sortierbar per Klick auf den Spaltenkopf (zweiter Klick kehrt die Richtung um), Filter Kontinente/Staaten, Suche nach
 Name, Code oder UID. Oben Kacheln mit den Summen (Spawns, Eingesetzt, Fehlplatziert), den Quoten
 **Eingesetzt / Spawns** und **Trefferquote** (eingesetzt / Versuche) sowie **Ø Schwierigkeit** – jeweils für den aktuellen Filter; dieselben
@@ -176,6 +181,9 @@ worldmapguessr/
   static/css/tokens.css       Farb-Tokens hell/dunkel (von allen Seiten genutzt)
   static/css/style.css        Karte & HUD
   static/css/stats.css        Statistik-Seite
+  static/css/home.css         Hauptmenü
+  static/css/map-picker.css   Kartenauswahl im Spielmenü
+  static/css/settings.css     Einstellungs-Popup
   static/css/game.css         Inventar, Leben, Dialog
   static/css/menu.css         Menü
   static/css/lobby.css        Lobby (HUD, Menü-Bereich, Beitritt)
@@ -186,7 +194,7 @@ worldmapguessr/
   static/js/map/items.js      Item-Umrisse: Startstufe für alle, feinere Stufe je Item bei Bedarf
   static/js/map/project.js    Schnelle Natural-Earth-Projektion, Sichtbarkeitstest für Längen/Breiten-Boxen
   static/js/map/renderer.js   Canvas-Zeichnung aus Kacheln (Zellfarben, Küsten, Grenzen, Kleinststaat-Ringe)
-  static/js/map/quality.js    Kartenqualität Niedrig/Mittel/Hoch (Detailfaktor, Schrittweiten, Max-Zoom, Speichergrenze)
+  static/js/map/quality.js    Kartenqualität Niedrig/Mittel/Hoch (Detailfaktor, Schrittweiten, Speichergrenze)
   static/js/map/geometry.js   Anker, Fläche, Zerlegung in Teile (Sichtbarkeit, Datumsgrenze)
   static/js/map/gestures.js   Ziehen, Mausrad, Pinch, Doppelklick
   static/js/map/controls.js   Buttons, Tastatur, Koordinatenanzeige
@@ -202,7 +210,14 @@ worldmapguessr/
   static/js/ui/feed.js        Nachrichtenleiste unten rechts (Meldungen, Chat, einklappbar)
   static/css/feed.css         Nachrichtenleiste
   static/js/game/remote.js    Server-Runde (Einzelspiel/Lobby): Zustand auf Karte, Inventar, Leben, Meldungen abbilden
-  static/js/menu/menu.js      Menü vor der Runde (Einzelspiel und Lobby)
+  static/js/menu/menu.js      Spielmenü (Neues Spiel, Einzelspiel, Lobby): Regeln links, Karte rechts
+  static/js/menu/map-picker.js   Kartenauswahl: Preset-Kacheln mit Mini-Weltkarte, Kontinent-Chips, Kleinstaaten, Einzelauswahl
+  static/js/menu/map-presets.js  Karten-Presets anwenden/erkennen, Kleinstaaten (< 1.100 km²)
+  static/js/home/home.js      Hauptmenü: Aktionen, laufende Spiele (Fortsetzen, Entfernen)
+  static/js/home/code-dialog.js  „Lobby beitreten“ per Code oder Link
+  static/js/settings/settings-dialog.js  Einstellungs-Popup (Name, Qualität, Empfindlichkeit)
+  static/js/settings/prefs.js     Zoom- und Bewegungsempfindlichkeit (localStorage)
+  static/js/settings/quality-field.js  Auswahl „Kartenqualität“
   static/js/lobby/client.js   WebSocket-Client mit automatischem Wiederverbinden
   static/js/lobby/lobby-menu.js  Lobby-Bereich im Menü (Link, Spieler, Einstellungen, Rechte)
   static/js/lobby/identity.js Spieler-ID/Token und Name im Browser
@@ -214,9 +229,8 @@ worldmapguessr/
   static/js/menu/stepper.js   Zahlen-Stepper (Schrittweite, Einheit)
   static/js/menu/toggle.js    Schalter-Feld (Kein Zurücklegen, Fehlwurf kostet das Item)
   static/js/menu/presets.js   Spielmodi und Schwierigkeitsstufen (Voreinstellungen, Kennzahlen)
-  static/js/menu/mode-picker.js  Einfache Ansicht: Modus, Stufe, Kontinente/Länder/Bundesländer
+  static/js/menu/mode-picker.js  Einfache Ansicht: Modus, Stufe
   static/js/menu/ttl-field.js Auswahl „Aufbewahren“ (Verfall nach Untätigkeit)
-  static/js/menu/quality-field.js  Auswahl „Kartenqualität“
   static/js/menu/item-picker.js  Einzelauswahl der Teile
   static/js/map/icon.js       Umriss-Icons (Inventar, Menü)
   static/js/game/held-piece.js  Teil in der Hand, Einrast-Toleranz, Animationen

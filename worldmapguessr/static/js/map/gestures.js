@@ -1,5 +1,8 @@
 // Eingabe auf der Karte: Ziehen (horizontal = drehen, vertikal = verschieben), Mausrad-Zoom,
 // Pinch-Zoom, Doppelklick-Zoom. Ein Klick ohne Bewegung wird als "click" an die Karte gemeldet.
+// Empfindlichkeit aus den Einstellungen (settings/prefs.js): moveSpeed fürs Ziehen, zoomSpeed für Rad und Pinch.
+
+import { prefs } from "../settings/prefs.js";
 
 const CLICK_TOLERANCE_PX = 4;
 
@@ -57,9 +60,10 @@ export class Gestures {
       const m = mid(a, b);
       const d = dist(a, b);
       map.markMoving();
-      let v = map.zoomedView(map.view, m[0], m[1], d / this.pinch.dist);
-      const rate = map.degPerPx(map.invert(m[0], m[1]));
-      v = { ...v, lambda: v.lambda + (m[0] - this.pinch.mid[0]) * rate, ty: v.ty + (m[1] - this.pinch.mid[1]) };
+      let v = map.zoomedView(map.view, m[0], m[1], Math.pow(d / this.pinch.dist, prefs.get("zoomSpeed")));
+      const rate = map.degPerPx(map.invert(m[0], m[1])) * prefs.get("moveSpeed");
+      const ty = (m[1] - this.pinch.mid[1]) * prefs.get("moveSpeed");
+      v = { ...v, lambda: v.lambda + (m[0] - this.pinch.mid[0]) * rate, ty: v.ty + ty };
       map.setView(v);
       this.pinch = { mid: m, dist: d };
       return;
@@ -73,7 +77,8 @@ export class Gestures {
     drag.moved = true;
     this.el.classList.add("dragging");
     map.markMoving();
-    map.setView({ ...drag.view, lambda: drag.view.lambda + dx * drag.rate, ty: drag.view.ty + dy });
+    const speed = prefs.get("moveSpeed");
+    map.setView({ ...drag.view, lambda: drag.view.lambda + dx * drag.rate * speed, ty: drag.view.ty + dy * speed });
   }
 
   _up(e, cancelled = false) {
@@ -97,7 +102,7 @@ export class Gestures {
   _wheel(e) {
     e.preventDefault();
     const unit = e.deltaMode === 1 ? 0.05 : e.deltaMode ? 1 : 0.002;
-    const factor = Math.pow(2, -e.deltaY * unit * (e.ctrlKey ? 5 : 1));
+    const factor = Math.pow(2, -e.deltaY * unit * (e.ctrlKey ? 5 : 1) * prefs.get("zoomSpeed"));
     this.map.markMoving();
     this.map.zoomAt(e.clientX, e.clientY, factor);
   }

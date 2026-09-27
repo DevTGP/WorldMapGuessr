@@ -205,7 +205,6 @@ export class LobbyMenu {
     identity.name = who.name;
     this.client.rename(who.name);
     this.client.sendSettings({ solo: false });
-    identity.solo = null; // die Startseite beginnt künftig ein neues Einzelspiel
   }
 
   async _leave() {

@@ -142,6 +142,19 @@ class LobbyHub:
             raise LobbyError("protocol", f"Unbekannte Nachricht: {kind}")
         self.broadcast(code)
 
+    def remove(self, code: str, player_id: str, token: str) -> str:
+        """Hauptmenü „Entfernen“ (ohne WebSocket): Host beendet die Lobby für alle, alle anderen verlassen sie.
+        Gibt "closed" oder "left" zurück; LobbyError, wenn Lobby oder Spieler unbekannt sind."""
+        lobby = self.store.get(code)
+        if not lobby or not self.store.authenticate(lobby["code"], player_id, token):
+            raise LobbyError("not_found", "Diese Lobby gibt es nicht (mehr).")
+        code = lobby["code"]
+        if lobby["host"] == player_id:
+            self._close(code, player_id)
+            return "closed"
+        self._leave_for_good(code, player_id)
+        return "left"
+
     def _leave_for_good(self, code: str, player_id: str):
         """Spieler verlässt die Lobby (alle seine Tabs). Er muss danach neu beitreten."""
         with self.lock:

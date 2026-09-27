@@ -1,8 +1,7 @@
-// Einfache Menü-Ansicht: Spielmodus (Karten), Schwierigkeit (5 Stufen) und Item-Auswahl
-// (Kontinente / Länder / Bundesländer). Die Werte der gewählten Voreinstellung stehen als Kurzzeile darunter.
+// Einfache Menü-Ansicht: Spielmodus (Karten) und Schwierigkeit (5 Stufen). Die Werte der gewählten
+// Voreinstellung stehen als Kurzzeile darunter. Die Kartenauswahl steht daneben (menu/map-picker.js).
 
 import { LEVELS, MODES, valuesLine } from "./presets.js";
-import { SCOPES } from "./config.js";
 
 /** Kleine Symbole für die Regeln eines Modus */
 const FLAG_ICONS = {
@@ -14,11 +13,9 @@ const FLAG_TITLES = { timer: "Timer nimmt Items weg", noReturn: "Kein Zurückleg
 
 export class ModePicker {
   /**
-   * @param {{onMode: (id: string) => void, onLevel: (level: number) => void,
-   *          onScope: (scopeId: string, on: boolean) => void}} handlers
-   * @param {Map<string, number>} groupCounts  Items je Gruppen-ID
+   * @param {{onMode: (id: string) => void, onLevel: (level: number) => void}} handlers
    */
-  constructor({ onMode, onLevel, onScope }, groupCounts) {
+  constructor({ onMode, onLevel }) {
     this.cards = new Map();
     const wrap = document.getElementById("mode-cards");
     for (const m of MODES) {
@@ -51,27 +48,6 @@ export class ModePicker {
       this.levels.push(btn);
     });
 
-    this.scopes = new Map();
-    const toggles = document.getElementById("scope-toggles");
-    for (const sc of SCOPES) {
-      const count = sc.groups.reduce((n, g) => n + (groupCounts.get(g) ?? 0), 0);
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "scope-toggle";
-      btn.setAttribute("role", "checkbox");
-      btn.innerHTML = '<span class="scope-check" aria-hidden="true"></span><span class="scope-title"></span><small></small>';
-      btn.querySelector(".scope-title").textContent = sc.title;
-      btn.querySelector("small").textContent = sc.soon ? "bald" : `${count} Items`;
-      if (sc.soon || !count) {
-        btn.disabled = true;
-        btn.dataset.lockedByLimit = "1"; // bleibt gesperrt, auch wenn das Menü entsperrt wird
-        btn.dataset.soon = "1";
-      } else {
-        btn.addEventListener("click", () => onScope(sc.id, btn.getAttribute("aria-checked") !== "true"));
-      }
-      toggles.append(btn);
-      this.scopes.set(sc.id, btn);
-    }
     this.values = document.getElementById("preset-values");
     this.customBadge = document.getElementById("custom-badge");
   }
@@ -82,12 +58,6 @@ export class ModePicker {
     for (const [id, btn] of this.cards) btn.setAttribute("aria-checked", String(!custom && config.mode === id));
     this.levels.forEach((btn, i) => btn.setAttribute("aria-checked", String(!custom && config.level === i)));
     this.customBadge.hidden = !custom;
-    for (const sc of SCOPES) {
-      const btn = this.scopes.get(sc.id);
-      if (btn.dataset.soon) { btn.setAttribute("aria-checked", "false"); continue; }
-      const on = sc.groups.filter((g) => config.kinds.has(g)).length;
-      btn.setAttribute("aria-checked", on === 0 ? "false" : on === sc.groups.length ? "true" : "mixed");
-    }
     const who = players > 1 ? ` (bei ${players} Spielern)` : "";
     this.values.textContent = valuesLine(config, players) + who;
   }

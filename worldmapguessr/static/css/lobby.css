@@ -73,9 +73,9 @@
 .lobby-section.readonly .field.password label { margin-bottom: 0; }
 
 /* Gäste: Einstellungen sichtbar, aber gesperrt */
-.menu-card.readonly .game-settings .kind-card { cursor: default; }
-.menu-card.readonly .game-settings .kind-card:hover { border-color: var(--panel-line); }
-.menu-card.readonly .game-settings .kind-card[aria-checked="true"]:hover { border-color: var(--piece); }
+.menu-card.readonly .game-settings .map-tile { cursor: default; }
+.menu-card.readonly .game-settings .map-tile:hover { border-color: var(--panel-line); }
+.menu-card.readonly .game-settings .map-tile[aria-checked="true"]:hover { border-color: var(--piece); }
 .guest-note { color: var(--ink); font-weight: 600; }
 
 .foot-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
@@ -206,3 +206,4 @@ body.is-holding .rail-hint { color: var(--piece); }
 @media (max-width: 520px) {
   .lobby-badge b { display: none; }
 }
+.lobby-badge span:empty { display: none; }

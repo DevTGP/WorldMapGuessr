@@ -1,21 +1,20 @@
-// Menü vor jeder Runde.
+// Spielmenü („Neues Spiel“ aus dem Hauptmenü; im Spiel: Einstellungen des Einzelspiels bzw. der Lobby).
 //
-// Einfache Ansicht: Spielmodus, Schwierigkeit (Voreinstellungen aus menu/presets.js) und Item-Auswahl
-// (Kontinente / Länder / Bundesländer). „Erweiterte Einstellungen“ zeigt alle Einzelwerte, die Item-Gruppen
-// und die Einzelauswahl, „Aufbewahren“ und in der Lobby deren Einstellungen. Wer dort einen Regelwert ändert,
-// hat „Eigene Einstellungen“ (mode = "custom"); ein Klick auf Modus oder Stufe setzt wieder die Voreinstellung.
-// In einer Lobby übernimmt lobby/lobby-menu.js Titel, Hauptaktion und Schreibschutz (nur der Host stellt ein).
+// Links: Spielmodus und Schwierigkeit (Voreinstellungen aus menu/presets.js); „Erweiterte Einstellungen“ zeigt
+// alle Einzelwerte, „Aufbewahren“ und in der Lobby deren Einstellungen. Wer dort einen Regelwert ändert, hat
+// „Eigene Einstellungen“ (mode = "custom"); ein Klick auf Modus oder Stufe setzt wieder die Voreinstellung.
+// Rechts: Kartenauswahl (menu/map-picker.js). In einer Lobby übernimmt lobby/lobby-menu.js Titel, Hauptaktion
+// und Schreibschutz (nur der Host stellt ein).
 
-import { iconPath } from "../map/icon.js";
 import { createStepper } from "./stepper.js";
 import { createDifficultySlider } from "./difficulty-slider.js";
-import { ItemPicker } from "./item-picker.js";
+import { MapPicker } from "./map-picker.js";
 import { createToggle } from "./toggle.js";
 import { createTtlField } from "./ttl-field.js";
 import { ModePicker } from "./mode-picker.js";
-import { createQualityField } from "./quality-field.js";
 import { DEFAULT_LEVEL, DEFAULT_MODE, LEVELS, MODE, applyPreset, metrics, mmss, perMinute, valuesLine } from "./presets.js";
-import { GROUPS, LIMITS, SCOPES, cloneConfig, defaultConfig, enforceBalance, poolFor } from "./config.js";
+import { describeMap } from "./map-presets.js";
+import { GROUPS, LIMITS, cloneConfig, defaultConfig, enforceBalance, poolFor } from "./config.js";
 
 const ADVANCED_KEY = "wmg.menu.advanced";
 const MAX_TEMPO = 6; // Treffer pro Minute – darüber warnt „Erweitert“
@@ -34,8 +33,6 @@ export const SOLO_HINTS = {
   missLoses: "Das Item geht zurück in den Vorrat (außer im Endspurt)",
 };
 
-const KIND_ICON_W = 44;
-const KIND_ICON_H = 30;
 
 export class Menu {
   /**
@@ -57,15 +54,17 @@ export class Menu {
     /** Aufruf nach jeder Änderung durch den Nutzer (Lobby: an den Server senden) */
     this.onConfigEdited = null;
     /** Beschriftung/Zustand des Hauptknopfs; im Lobby-Modus ersetzt */
-    this.primaryLabel = (pool) => (pool ? `Runde starten · ${pool} Items` : "Runde starten");
+    this.primaryLabel = (pool) => (pool ? `Einzelspiel starten · ${pool} Items` : "Einzelspiel starten");
     /** HTML vor der Zusammenfassung (Lobby: Hinweis für Gäste) */
     this.summaryPrefix = () => "";
     /** Spieler, für die Start-Items und Leben gerechnet werden; im Lobby-Modus ersetzt */
     this.players = () => 1;
     /** Hinweis über den Rundeneinstellungen (null = keiner); im Lobby-Modus ersetzt */
-    this.roundNote = () => (this.canCancel ? "Es läuft eine Runde. Änderungen gelten ab der nächsten Runde." : null);
+    this.roundNote = () => (this.running ? "Es läuft eine Runde. Änderungen gelten ab der nächsten Runde." : null);
     /** Läuft eine Runde? (Kennzeichnung „gilt ab der nächsten Runde“); im Lobby-Modus ersetzt */
-    this.roundRunning = () => this.canCancel;
+    this.roundRunning = () => this.running;
+    /** Es läuft eine Runde, zu der ✕ zurückführt (nicht beim neuen Spiel aus dem Hauptmenü) */
+    this.running = false;
     /** „Lobby erstellen“; im Einzelspiel (Solo-Lobby) ersetzt durch „Mitspieler einladen“ */
     this.onCreateLobby = onCreateLobby ?? null;
     /** Aufbewahren geändert (Lobby: an den Server) */
@@ -82,14 +81,12 @@ export class Menu {
     this.modePicker = new ModePicker({
       onMode: (id) => this._preset(id, this.config.mode === "custom" ? this.config.level ?? DEFAULT_LEVEL : this.config.level),
       onLevel: (level) => this._preset(this.config.mode === "custom" ? this.lastMode : this.config.mode, level),
-      onScope: (id, on) => this._scope(id, on),
-    }, new Map(this.groups.map((g) => [g.kind, g.features.length])));
-    this._buildKinds();
+    });
     this._buildRules();
     this._bindAdvanced();
-    createQualityField(document.getElementById("quality-field"));
-    this.picker = new ItemPicker(document.getElementById("picker-list"), this.groups, () => this._edited());
-    document.getElementById("picker-search").addEventListener("input", (e) => this.picker.filter(e.target.value));
+    this.mapPicker = new MapPicker(document.getElementById("map-picker"), map.features, this.groups, () => this._edited());
+    /** Schließen ohne Start (Zurück/✕/Esc) – z. B. zurück ins Hauptmenü */
+    this.onDismiss = null;
 
     document.getElementById("menu-form").addEventListener("submit", (e) => {
       e.preventDefault();
@@ -98,15 +95,36 @@ export class Menu {
     const create = document.getElementById("menu-create-lobby");
     create.addEventListener("click", () => this.onCreateLobby?.(cloneConfig(this.config)));
     create.hidden = !onCreateLobby;
-    document.getElementById("menu-close").addEventListener("click", () => this.dialog.close());
-    // Esc schließt nur, wenn eine Runde läuft, zu der man zurückkehren kann
-    this.dialog.addEventListener("cancel", (e) => { if (!this.canCancel) e.preventDefault(); });
+    const dismiss = () => {
+      this.dialog.close();
+      this.onDismiss?.();
+    };
+    document.getElementById("menu-close").addEventListener("click", dismiss);
+    document.getElementById("menu-back").addEventListener("click", () => {
+      if (!this.onBack) return dismiss();
+      this.dialog.close();
+      this.onBack();
+    });
+    // Esc schließt nur, wenn es etwas gibt, wohin man zurückkehren kann (Runde oder Hauptmenü)
+    this.dialog.addEventListener("cancel", (e) => {
+      e.preventDefault();
+      if (this.canCancel) dismiss();
+    });
   }
 
-  /** @param {{canCancel?: boolean}} opts  true = es läuft eine Runde, Schließen führt zurück */
-  open({ canCancel = false } = {}) {
+  /**
+   * @param {{canCancel?: boolean, onDismiss?: () => void, back?: string, onBack?: () => void}} opts
+   *   canCancel: Schließen möglich (Runde läuft bzw. aus dem Hauptmenü) · onDismiss: nach ✕/Esc aufrufen ·
+   *   back: Beschriftung des Zurück-Knopfs unten links (ohne: keiner) · onBack: sein Ziel (sonst wie ✕)
+   */
+  open({ canCancel = false, onDismiss = null, back = null, onBack = null } = {}) {
+    this.onDismiss = onDismiss;
+    this.onBack = onBack;
+    const backBtn = document.getElementById("menu-back");
+    backBtn.hidden = !back;
+    if (back) backBtn.textContent = back;
     this.setCloseable(canCancel);
-    this.picker.bind(this.config);
+    this.mapPicker.bind(this.config);
     this._syncControls();
     this._update();
     if (!this.dialog.open) this.dialog.showModal();
@@ -120,7 +138,7 @@ export class Menu {
   /** Konfiguration von außen übernehmen (Lobby-Zustand vom Server) */
   applyConfig(config) {
     this.config = config;
-    this.picker.bind(this.config);
+    this.mapPicker.bind(this.config);
     this._syncControls();
     this._update();
   }
@@ -133,6 +151,7 @@ export class Menu {
       if (el.dataset.always) return; // z. B. Suche bleibt nutzbar
       el.disabled = readOnly || el.dataset.lockedByLimit === "1";
     });
+    this.mapPicker.setReadOnly(readOnly);
     if (!readOnly) this._syncControls(); // Stepper-Grenzen (−/+) wieder korrekt setzen
   }
 
@@ -141,18 +160,6 @@ export class Menu {
     applyPreset(this.config, modeId, level);
     this.lastMode = modeId;
     this._syncControls();
-    this._edited();
-  }
-
-  /** Einfache Item-Auswahl: alle Gruppen eines Bereichs an/aus */
-  _scope(id, on) {
-    const scope = SCOPES.find((s) => s.id === id);
-    for (const g of scope.groups) {
-      if (!this.groups.some((x) => x.kind === g)) continue;
-      if (on) this.config.kinds.add(g); else this.config.kinds.delete(g);
-    }
-    this._syncControls();
-    this.picker.refresh();
     this._edited();
   }
 
@@ -192,43 +199,17 @@ export class Menu {
 
   setCloseable(canCancel) {
     this.canCancel = canCancel;
+    this.running = canCancel && !this.onDismiss;
     document.getElementById("menu-close").hidden = !canCancel;
     this._update();
   }
 
+  /** Kurzbeschreibung der Kartenauswahl („Länder · Europa“) */
+  mapLabel(config = this.config) { return describeMap(config, this.map.features).label; }
+
   _edited() {
     this._update();
     this.onConfigEdited?.(this.config);
-  }
-
-  _buildKinds() {
-    const wrap = document.getElementById("kind-cards");
-    this.kindButtons = new Map();
-    for (const { kind, title: label, preview: previewIds, features } of this.groups) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "kind-card";
-      btn.setAttribute("role", "checkbox");
-      const preview = (previewIds ?? [])
-        .map((id) => features.find((f) => f.id === id))
-        .filter(Boolean)
-        .map((f) => `<svg viewBox="0 0 ${KIND_ICON_W} ${KIND_ICON_H}"><path d="${iconPath(f, KIND_ICON_W, KIND_ICON_H, 2)}"/></svg>`)
-        .join("");
-      btn.innerHTML = `
-        <span class="kind-preview" aria-hidden="true">${preview}</span>
-        <span class="kind-title">${label}</span>
-        <span class="kind-count">${features.length} Items</span>
-        <span class="kind-check" aria-hidden="true"></span>`;
-      btn.addEventListener("click", () => {
-        const on = !this.config.kinds.has(kind);
-        if (on) this.config.kinds.add(kind); else this.config.kinds.delete(kind);
-        this._syncControls();
-        this.picker.refresh();
-        this._edited();
-      });
-      wrap.append(btn);
-      this.kindButtons.set(kind, btn);
-    }
   }
 
   _buildRules() {
@@ -274,7 +255,6 @@ export class Menu {
   }
 
   _syncControls() {
-    for (const [kind, btn] of this.kindButtons) btn.setAttribute("aria-checked", String(this.config.kinds.has(kind)));
     for (const [key, s] of Object.entries(this.steppers)) s.value = this.config[key];
     // Schonfrist und Wegnahme wirken nur mit Timer
     for (const key of ["grace", "timerTake"]) this.steppers[key].el.classList.toggle("muted", !this.config.timer);
@@ -311,7 +291,6 @@ export class Menu {
     this.modePicker.sync(c, this.players());
     this._balanceNote();
     const pool = this._pool().length;
-    const total = this.groups.filter((g) => c.kinds.has(g.kind)).reduce((n, g) => n + g.features.length, 0);
     const summary = document.getElementById("menu-summary");
     const button = document.getElementById("menu-start");
     const note = this.roundNote();
@@ -328,9 +307,8 @@ export class Menu {
       return;
     }
     summary.className = "";
-    const excluded = total - pool;
     summary.innerHTML = this.summaryPrefix() +
-      `<b>${pool}</b> Items${excluded ? ` (${excluded} ausgeschlossen)` : ""} · ${modeText(c)} · ` +
+      `<b>${pool}</b> Items · ${escapeHtml(this.mapLabel())} · ${modeText(c)} · ` +
       escapeHtml(valuesLine(c, this.players())) + flagText(c);
   }
 }

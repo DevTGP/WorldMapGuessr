@@ -1,4 +1,4 @@
-// Auswahl „Kartenqualität“ im Menü (Niedrig / Mittel / Hoch) – gilt sofort und nur auf diesem Gerät.
+// Auswahl „Kartenqualität“ im Einstellungs-Popup (Niedrig / Mittel / Hoch) – gilt sofort und nur auf diesem Gerät.
 
 import { QUALITIES, quality } from "../map/quality.js";
 

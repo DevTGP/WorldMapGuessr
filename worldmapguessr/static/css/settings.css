@@ -1,0 +1,52 @@
+/* WorldMapGuessr – Einstellungs-Popup (Hauptmenü und im Spiel, settings/settings-dialog.js) */
+
+.settings-dialog {
+  width: min(480px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  padding: 0;
+  border: 1px solid var(--panel-line);
+  border-radius: 14px;
+  background: var(--panel);
+  backdrop-filter: blur(18px) saturate(1.1);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  color: var(--ink);
+}
+.settings-dialog::backdrop { background: rgba(8, 14, 20, 0.4); }
+.settings-card { display: flex; flex-direction: column; }
+.settings-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 18px 20px 6px; }
+.settings-head h2 { margin: 2px 0 0; font-size: 22px; }
+.settings-body { display: flex; flex-direction: column; gap: 16px; padding: 10px 20px 18px; }
+.settings-foot { display: flex; justify-content: space-between; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--panel-line); }
+
+.set-field { display: flex; flex-direction: column; gap: 8px; }
+.set-field > label, .quality-label { display: flex; flex-direction: column; font-weight: 600; font-size: 14px; }
+.set-field small { font-weight: 400; font-size: 12px; color: var(--ink-soft); }
+.set-field input[type="text"] {
+  padding: 8px 10px;
+  border: 1px solid var(--panel-line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+}
+.set-field input[type="text"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+/* Kartenqualität: Niedrig / Mittel / Hoch */
+.quality-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1.5px solid var(--panel-line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.quality-bar .level { padding: 8px 12px; }
+
+/* Empfindlichkeit */
+.range-row { display: flex; align-items: center; gap: 12px; }
+.range-row input[type="range"] { flex: 1; accent-color: var(--piece); }
+.range-row output { min-width: 52px; text-align: right; font: 600 13px "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 420px) {
+  .settings-foot { flex-direction: column-reverse; }
+}
