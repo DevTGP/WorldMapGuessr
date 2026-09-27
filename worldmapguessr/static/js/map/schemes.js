@@ -7,27 +7,28 @@
 //          Helles Land verträgt „hard-light“; auf dunklem Land wirkt „soft-light“ ruhiger (kein Grieseln).
 
 import { prefs } from "../settings/prefs.js";
+import { t } from "../i18n/index.js";
 
 export const SCHEMES = {
   a: {
-    label: "Nachtatlas",
-    blurb: "Dunkles Land, Fortschritt wird warm und hell",
+    label: t("scheme.a"),
+    blurb: t("scheme.a.blurb"),
     map: { sea: "#1d3b52", shelf: "#28506b", coast: "#8fa3b0", border: "#1a1f24", water: "#2f5c7a", outside: null },
     stops: ["#2a3036", "#6f7d6a", "#bdb697", "#efe9d6"],
     item: { color: "#ff8a3d", fill: "rgba(255, 138, 61, 0.34)", halo: "rgba(255, 255, 255, 0.9)" },
     relief: { light: [["soft-light", 1]], strong: [["soft-light", 1], ["soft-light", 0.8]] },
   },
   b: {
-    label: "Papierkarte",
-    blurb: "Helle Karte, Fortschritt wird grüner",
+    label: t("scheme.b"),
+    blurb: t("scheme.b.blurb"),
     map: { sea: "#bcd9e8", shelf: "#d8eaf3", coast: "#7a8a93", border: "#f4f1ea", water: "#a9cde0", outside: null },
     stops: ["#dcd6ca", "#b5d0a4", "#6fa77a", "#2f6b4a"],
     item: { color: "#d9480f", fill: "rgba(217, 72, 15, 0.3)", halo: "rgba(255, 255, 255, 0.95)" },
     relief: { light: [["hard-light", 0.55]], strong: [["hard-light", 1]] },
   },
   c: {
-    label: "Kontinentfarben",
-    blurb: "Jeder Kontinent bekommt beim Einsetzen seinen Farbton",
+    label: t("scheme.c"),
+    blurb: t("scheme.c.blurb"),
     map: { sea: "#16324a", shelf: "#1f4461", coast: "#8fa3b0", border: "#1a1f24", water: "#2b5776", outside: null },
     stops: ["#2a3036", "#7b8794", "#b9c3cc", "#eef1f4"], // Fallback (Zellen ohne Kontinent)
     continents: {

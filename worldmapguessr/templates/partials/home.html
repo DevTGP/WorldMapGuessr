@@ -1,0 +1,32 @@
+{# Hauptmenü (Startseite) – Logik: static/js/home/home.js #}
+<section class="home" id="home" aria-labelledby="home-title" hidden>
+  <div class="home-card">
+    <header class="home-head">
+      <p class="eyebrow">{{ t('home.eyebrow') }}</p>
+      <h1 id="home-title">WorldMapGuessr</h1>
+      <p class="home-tagline">{{ t('app.tagline') }}</p>
+    </header>
+    <nav class="home-actions" aria-label="{{ t('home.nav') }}">
+      <button type="button" class="btn btn-primary btn-lg home-play" id="home-play">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>{{ t('home.play') }}
+      </button>
+      <button type="button" class="btn btn-lg" id="home-join">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7l5 5-5 5M15 12H3M14 4h5a1 1 0 011 1v14a1 1 0 01-1 1h-5"/></svg>{{ t('home.join') }}
+      </button>
+      <a class="btn btn-lg" href="{{ url_for('main.stats') }}" id="home-stats">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-6"/></svg>{{ t('home.stats') }}
+      </a>
+      <button type="button" class="btn btn-lg" id="home-settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M4.2 7.5l2 1.2M17.8 15.3l2 1.2M4.2 16.5l2-1.2M17.8 8.7l2-1.2"/><circle cx="12" cy="12" r="7"/></svg>{{ t('settings.title') }}
+      </button>
+    </nav>
+    <section class="home-games" aria-labelledby="home-games-title">
+      <div class="home-games-head">
+        <h2 id="home-games-title">{{ t('home.games') }} <span class="home-count" id="home-count"></span></h2>
+        <button type="button" class="link" id="home-refresh">{{ t('home.refresh') }}</button>
+      </div>
+      <ul class="game-list" id="home-games"></ul>
+      <p class="home-empty" id="home-empty" hidden>{{ t('home.empty') }}</p>
+    </section>
+  </div>
+</section>

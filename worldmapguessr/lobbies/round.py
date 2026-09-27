@@ -31,8 +31,11 @@ Rundenzustand (JSON-serialisierbar, wird mit der Lobby gespeichert):
  pool: [key], hands: {playerId: [key]}, placed: [key], placedBy: {key: playerId},
  order: [playerId], cursor, dealt: {playerId: n}, sent: {playerId: n}, sinceRefill,
  timer: {nextAt, graceUntil, pausedAt} | None, takeCursor, events, log: [event], last: event}
-Zusätzlich: endspurt (bool), lostReason.
-Ereignis: {seq, type: placed|miss|refill|gift|take|join|endspurt|empty, player?, key?, count?, to?, items?, lost?}
+Zusätzlich: endspurt (bool), lostReason, Punkte (scoring.py): scores {playerId: {points, hits, misses}},
+pace {playerId: Zeit der letzten Aktion}, diff {key: Schwierigkeit zu Rundenbeginn}, bonus (Rundenende),
+pausedAt/resumedAt (Pause des Einzelspiels, auch ohne Timer – für das Tempo).
+Ereignis: {seq, type: placed|miss|refill|gift|take|join|endspurt|empty, player?, key?, count?, to?, items?, lost?,
+ points? (placed/miss: Punkte des Spielers)}
  refill: to = {playerId: n}; take: items = [{player, key}]; miss: lost = Item ging zurück in den Vorrat;
  join: count = Items für den Neuen, lives = zusätzliche Leben
 `events` zählt Ereignisse hoch; `log` hält die letzten LOG_SIZE, der Client zeigt jedes (seq) genau einmal.
@@ -48,6 +51,7 @@ import random
 import time
 
 from ..difficulty import order_by_difficulty
+from . import scoring
 
 RUNNING, WON, LOST = "running", "won", "lost"
 PER_PLAYER = 2      # Start-Items und Leben je weiterem Spieler
@@ -57,10 +61,13 @@ STATS = "_stats"  # vorübergehende Liste [(key, event)] für die Item-Statistik
 
 
 class RoundError(Exception):
-    def __init__(self, code: str, message: str):
+    """Fehler mit Code; params: Werte für den übersetzten Text im Browser (i18n err.<code>)."""
+
+    def __init__(self, code: str, message: str, params: dict | None = None):
         super().__init__(message)
         self.code = code
         self.message = message
+        self.params = params or {}
 
 
 def build_pool(catalog: dict[str, list[str]], config: dict, rng: random.Random,
@@ -91,9 +98,14 @@ def new_round(number: int, config: dict, catalog, online: list[str], seed: int, 
         "timer": {"nextAt": now + config.get("grace", 0) + config["timer"], "graceUntil": now + config.get("grace", 0),
                   "pausedAt": None} if config.get("timer") else None,
         "takeCursor": 0, "endspurt": False, "lostReason": None,
+        # Item-Schwierigkeit zu Rundenbeginn (Punkte, scoring.py) – für alle Spieler gleich
+        "diff": {k: round(float((difficulty or {}).get(k, scoring.DEFAULT_DIFFICULTY)), 1) for k in pool},
     }
+    for pid in online:
+        scoring.start_pace(rnd, pid, now)
     if not pool:
         rnd["status"] = WON
+        scoring.finish(rnd)
     for pid in online:
         rnd["hands"][pid] = []
     deal(rnd, online, start["startItems"])
@@ -155,13 +167,14 @@ def _event(rnd: dict, **event) -> None:
     del log[:-LOG_SIZE]
 
 
-def join(rnd: dict, pid: str) -> bool:
+def join(rnd: dict, pid: str, now: float | None = None) -> bool:
     """Spieler kommt (neu) in eine laufende Runde: reiht sich hinten in die Reihenfolge ein, bekommt sofort
     PER_PLAYER Items aus dem Vorrat, und die Lobby PER_PLAYER Leben mehr. True, wenn er neu eingereiht wurde."""
     order = _rotation(rnd)
     if rnd["status"] != RUNNING or pid in order:
         return False
     order.append(pid)
+    scoring.start_pace(rnd, pid, time.time() if now is None else now)
     hand = rnd["hands"].setdefault(pid, [])
     count = 0
     while count < PER_PLAYER and rnd["pool"]:
@@ -178,8 +191,9 @@ def join(rnd: dict, pid: str) -> bool:
     return True
 
 
-def place(rnd: dict, pid: str, key: str, correct: bool, online: list[str]) -> dict:
-    """Einsetzversuch. Gibt {"refill": n} zurück (neu verteilte Teile)."""
+def place(rnd: dict, pid: str, key: str, correct: bool, online: list[str], now: float | None = None) -> dict:
+    """Einsetzversuch. Gibt {"refill": n, "points": p} zurück (neu verteilte Teile, Punkte des Spielers)."""
+    now = time.time() if now is None else now
     if rnd["status"] != RUNNING:
         raise RoundError("round_over", "Die Runde ist schon vorbei.")
     hand = rnd["hands"].get(pid, [])
@@ -194,21 +208,24 @@ def place(rnd: dict, pid: str, key: str, correct: bool, online: list[str]) -> di
         if lost:
             hand.remove(key)
             rnd["pool"].insert(random.randint(0, len(rnd["pool"])), key)
-        _event(rnd, type="miss", player=pid, key=key, lost=lost)
+        points = scoring.miss(rnd, pid, now)
+        _event(rnd, type="miss", player=pid, key=key, lost=lost, points=points)
         if rnd["lives"] == 0:
             _lose(rnd, "lives")
         else:
             _check_empty(rnd)
-        return {"refill": 0}
+        return {"refill": 0, "points": points}
 
     hand.remove(key)
     rnd["placed"].append(key)
     rnd["placedBy"][key] = pid
     rnd["sinceRefill"] += 1
-    _event(rnd, type="placed", player=pid, key=key)
+    points = scoring.hit(rnd, pid, key, now)
+    _event(rnd, type="placed", player=pid, key=key, points=points)
     if len(rnd["placed"]) == rnd["total"]:
         rnd["status"] = WON
-        return {"refill": 0}
+        scoring.finish(rnd)
+        return {"refill": 0, "points": points}
 
     refill = 0
     if rnd["sinceRefill"] >= rnd["config"]["refillEvery"] and rnd["pool"]:
@@ -219,7 +236,7 @@ def place(rnd: dict, pid: str, key: str, correct: bool, online: list[str]) -> di
             _event(rnd, type="refill", player=None, count=refill, to=to)
     _check_endspurt(rnd)
     _check_empty(rnd)
-    return {"refill": refill}
+    return {"refill": refill, "points": points}
 
 
 def send_quota(rnd: dict, pid: str, every: int) -> dict:
@@ -244,7 +261,8 @@ def give(rnd: dict, pid: str, to: str, key: str, every: int = 0) -> None:
     quota = send_quota(rnd, pid, every)
     if quota["left"] == 0:
         n = quota["next"]
-        raise RoundError("send_limit", f"Senden wieder möglich nach {n} weiteren {'Item' if n == 1 else 'Items'}.")
+        raise RoundError("send_limit", f"Senden wieder möglich nach {n} weiteren {'Item' if n == 1 else 'Items'}.",
+                         {"n": n})
     hand.remove(key)
     rnd["hands"].setdefault(to, []).append(key)
     sent = rnd.setdefault("sent", {})
@@ -308,7 +326,14 @@ def take(rnd: dict, online: list[str], count: int, rng: random.Random | None = N
 
 def pause_timer(rnd: dict | None, now: float, paused: bool) -> bool:
     """Timer anhalten (niemand verbunden, Einzelspieler im Menü) bzw. weiterlaufen lassen – Takt und
-    Schonfrist verschieben sich um die Pause. True, wenn sich etwas geändert hat."""
+    Schonfrist verschieben sich um die Pause. True, wenn sich der Timer geändert hat.
+    Auch ohne Timer merkt sich die Runde die Pause: Das Tempo (Punkte) zählt erst ab ihrem Ende."""
+    if rnd and rnd.get("status") == RUNNING:
+        if paused and rnd.get("pausedAt") is None:
+            rnd["pausedAt"] = now
+        elif not paused and rnd.get("pausedAt") is not None:
+            rnd["pausedAt"] = None
+            rnd["resumedAt"] = now
     timer = (rnd or {}).get("timer")
     if not timer or rnd["status"] != RUNNING:
         return False
@@ -362,6 +387,7 @@ def _leave_rotation(rnd: dict, pid: str) -> None:
 def _lose(rnd: dict, reason: str) -> None:
     rnd["status"] = LOST
     rnd["lostReason"] = reason
+    scoring.finish(rnd)
 
 
 def _check_endspurt(rnd: dict) -> None:
@@ -403,4 +429,5 @@ def public_view(rnd: dict | None, now: float | None = None) -> dict | None:
         "handCounts": {pid: len(h) for pid, h in rnd["hands"].items()}, "last": rnd["last"],
         "log": rnd.get("log", []), "events": rnd.get("events", 0), "timer": timer_view(rnd, now),
         "endspurt": bool(rnd.get("endspurt")), "lostReason": rnd.get("lostReason"),
+        "score": scoring.view(rnd),
     }

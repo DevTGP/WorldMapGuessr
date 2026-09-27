@@ -7,6 +7,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# gzip-Fassungen der Kartendaten und statischen Dateien (worldmapguessr/compression.py)
+RUN python -m worldmapguessr.precompress
+
 EXPOSE 5000
 
 # 1 Worker: LobbyHub und JSON-Stores halten Zustand im Prozess.

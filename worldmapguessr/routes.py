@@ -1,9 +1,10 @@
 """Seiten-Routen."""
 import re
 
-from flask import Blueprint, abort, current_app, redirect, render_template, request, send_from_directory, url_for
+from flask import Blueprint, abort, current_app, redirect, render_template, request, url_for
 
 from .lobbies.codes import PATTERN, normalize
+from .compression import send_compressed
 from .map_data import CACHE_SECONDS, map_dir
 
 bp = Blueprint("main", __name__)
@@ -25,7 +26,7 @@ def index():
 def map_data(version, filename):
     """Kartendaten (Kacheln, Items, Index). Die Version im Pfad ändert sich mit jedem Build, daher darf
     der Browser alles ein Jahr lang zwischenspeichern."""
-    return send_from_directory(map_dir(current_app.static_folder), filename, max_age=CACHE_SECONDS)
+    return send_compressed(map_dir(current_app.static_folder), filename, max_age=CACHE_SECONDS)
 
 
 @bp.get("/stats")

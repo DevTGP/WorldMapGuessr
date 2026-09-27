@@ -13,6 +13,7 @@ import { boxTest, useProjection } from "./project.js";
 import { makeProjection, projectionDef } from "./projections.js";
 import { prefs } from "../settings/prefs.js";
 import { quality } from "./quality.js";
+import { locale } from "../i18n/index.js";
 
 export const MIN_ZOOM = 1;
 /** Größter Zoom (16000 %) – bei jeder Kartenqualität gleich */
@@ -84,7 +85,7 @@ async function fetchJson(url, onBytes) {
   return JSON.parse(new TextDecoder().decode(bytes));
 }
 
-const mbFmt = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const mbFmt = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const mb = (bytes) => mbFmt.format(bytes / 1e6);
 
 export class WorldMap {

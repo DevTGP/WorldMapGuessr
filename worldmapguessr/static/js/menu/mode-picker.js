@@ -2,6 +2,7 @@
 // Voreinstellung stehen als Kurzzeile darunter. Die Kartenauswahl steht daneben (menu/map-picker.js).
 
 import { LEVELS, MODES, valuesLine } from "./presets.js";
+import { t } from "../i18n/index.js";
 
 /** Kleine Symbole für die Regeln eines Modus */
 const FLAG_ICONS = {
@@ -9,7 +10,7 @@ const FLAG_ICONS = {
   noReturn: '<svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/><path d="M3 21L21 3"/></svg>',
   missLoses: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
 };
-const FLAG_TITLES = { timer: "Timer nimmt Items weg", noReturn: "Kein Zurücklegen", missLoses: "Fehlwurf kostet das Item" };
+const FLAG_TITLES = { timer: t("flag.timer"), noReturn: t("rule.noReturn"), missLoses: t("rule.missLoses") };
 
 export class ModePicker {
   /**
@@ -58,7 +59,7 @@ export class ModePicker {
     for (const [id, btn] of this.cards) btn.setAttribute("aria-checked", String(!custom && config.mode === id));
     this.levels.forEach((btn, i) => btn.setAttribute("aria-checked", String(!custom && config.level === i)));
     this.customBadge.hidden = !custom;
-    const who = players > 1 ? ` (bei ${players} Spielern)` : "";
+    const who = players > 1 ? ` ${t("values.forPlayers", { n: players })}` : "";
     this.values.textContent = valuesLine(config, players) + who;
   }
 }

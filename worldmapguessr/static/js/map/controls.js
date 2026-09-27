@@ -3,6 +3,7 @@
 
 import { prefs } from "../settings/prefs.js";
 import { KeyboardControl } from "./keyboard.js";
+import { locale, t } from "../i18n/index.js";
 
 const ZOOM_STEP = 1.6;
 /** Zoomschritt für Knöpfe und +/− (Zoom-Empfindlichkeit aus den Einstellungen) */
@@ -14,9 +15,9 @@ export function bindMapControls(map) {
   const coordEl = document.getElementById("coord");
   const gridBtn = document.getElementById("grid");
 
-  const fmt = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const fmt0 = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 });
-  const lonText = (lon, f = fmt) => `${f.format(Math.abs(lon))}° ${lon >= 0 ? "O" : "W"}`;
+  const fmt = new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt0 = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
+  const lonText = (lon, f = fmt) => `${f.format(Math.abs(lon))}° ${t(lon >= 0 ? "coord.east" : "coord.west")}`;
   const latText = (lat) => `${fmt.format(Math.abs(lat))}° ${lat >= 0 ? "N" : "S"}`;
 
   map.onView((v) => {

@@ -3,6 +3,7 @@
 
 import { iconPath } from "../map/icon.js";
 import { GROUP_LABELS } from "./config.js";
+import { locale, t } from "../i18n/index.js";
 
 const ICON_W = 34;
 const ICON_H = 24;
@@ -12,7 +13,7 @@ const ICON_PAD = 1.5;
 export function prepareRowIcon(feature) {
   iconPath(feature, ICON_W, ICON_H, ICON_PAD);
 }
-const collator = new Intl.Collator("de");
+const collator = new Intl.Collator(locale);
 
 export class ItemPicker {
   /**
@@ -39,8 +40,8 @@ export class ItemPicker {
         <header>
           <h4>${label} <span class="count"></span></h4>
           <div class="group-actions">
-            <button type="button" class="link" data-all="1">Alle</button>
-            <button type="button" class="link" data-all="0">Keine</button>
+            <button type="button" class="link" data-all="1">${t("common.all")}</button>
+            <button type="button" class="link" data-all="0">${t("common.none")}</button>
           </div>
         </header>
         <ul></ul>`;

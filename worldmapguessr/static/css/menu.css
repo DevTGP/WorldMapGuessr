@@ -354,9 +354,9 @@
   --diff: var(--good);
 }
 .field.difficulty[data-level="normal"] { --diff: #c7a12b; }
-.field.difficulty[data-level="schwierig"] { --diff: var(--piece); }
-.field.difficulty[data-level="sehr-schwierig"],
-.field.difficulty[data-level="unmöglich"] { --diff: var(--bad); }
+.field.difficulty[data-level="hard"] { --diff: var(--piece); }
+.field.difficulty[data-level="very-hard"],
+.field.difficulty[data-level="extreme"] { --diff: var(--bad); }
 .difficulty-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .difficulty-head label { display: flex; flex-direction: column; font-weight: 600; font-size: 14px; }
 .difficulty-head label small { font-weight: 400; font-size: 12px; color: var(--ink-soft); }

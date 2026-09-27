@@ -1,0 +1,64 @@
+# Kartendaten
+
+## Neu erzeugen
+
+```
+cd build
+npm install
+pip install -r requirements.txt
+npm run build
+```
+
+`npm run build` führt vier Schritte aus (Dauer: unter einer Minute plus einmalig die Downloads, ~55 MB):
+
+1. `python 1-cells.py` – lädt Natural Earth 1:10m Admin-0 (nach `build/tmp/src`), ordnet jedes Landstück einem Kontinent und höchstens einem Staat-Item zu („Zelle“, z. B. Europa × Russland) und wendet die Sonderfälle unten an. Ausgabe in `build/tmp/`.
+2. `node 2-tiles.mjs` – baut daraus `worldmapguessr/static/data/map/`:
+   - `tiles/z0…z4/{x}_{y}.json` – Karte in 5 Detailstufen, je Stufe ein Längen-/Breitengrad-Raster (90°, 45°, 22,5°, 11,25°, 5,625°). Inhalt je Kachel: Landflächen je Zelle und Linien (Küsten, Kontinent- und Staatsgrenzen), ganzzahlig und als Differenzen kodiert.
+   - `items/i0.json` – alle Items in der Startstufe; `items/i1…i4/{kind}-{id}.json` – feinere Umrisse je Item.
+   - `index.json` – Stufen, Zellen, Items (Name, englischer Name `nameEn` aus `world-countries`, Gruppe, Anker, Fläche), Kachelliste, Version (Hash über die Daten).
+
+3. `python 3-water.py` – Flüsse und Seen (Natural Earth 1:10m `rivers_lake_centerlines`, `lakes`, von GitHub) als Kacheln `water/z0…z4/{x}_{y}.json` im selben Raster: je Objekt die Kartenskala `sMin = 256 · 2^min_zoom / 2π` (aus Natural Earths `min_zoom`), ab der der Browser es zeichnet; je Stufe nur Objekte bis zu ihrem `sMax`, vereinfacht auf 0,6 px. ~5 MB, nur bei Bedarf geladen.
+4. `python 4-relief.py` – Geländeschummerung als Graustufen-JPEGs `relief/r0…r3/{x}_{y}.jpg` (512 px; Welt 1024 … 8192 px breit, reine Meereskacheln fehlen; ~3 MB). Quelle: Natural Earth „Shaded Relief“ (gemeinfrei) aus dem PyPI-Paket `basemap-data` (`shadedrelief.jpg`, 10800 × 5400 – naturalearthdata.com ist aus der Build-Umgebung nicht erreichbar). Daraus wird nur die Schummerung gewonnen: Helligkeit ÷ weichgezeichnetes Mittel über Land (σ = 6 px), 128 = neutral; Meer und ein 2-px-Küstensaum sind neutral (Landmaske aus Schritt 1). Braucht `numpy`, `scipy`, `pillow`.
+
+Schritte 3 und 4 ergänzen `index.json` (`water`, `relief`) und setzen die Version neu (`versions`: Hash je Teil). Nach Schritt 2 müssen sie erneut laufen.
+
+## Relief zeichnen
+
+Die Karte ist pseudozylindrisch (x = λ · fx(φ)), auf jeder Breite ist x also linear in der Länge. Jede Rasterkachel wird in waagerechten Streifen (3 px, beim Bewegen 8 px) auf eine graue Zwischenfläche gezeichnet, die dann einmal über die Landfarben geblendet wird – „hard-light“ auf hellem Land (B), „soft-light“ auf dunklem (A, C; ruhiger, kein Grieseln). Reihenfolge: Landflächen → Relief → Seen und Flüsse → Grenzen → Küsten.
+
+Der Server liefert die Dateien unter `/data/<version>/…` mit einem Jahr Cache und gzip-komprimiert aus ([server.md](server.md#komprimierung)); nach einem neuen Build ändert sich die Version und der Browser lädt neu.
+
+## Detailstufen (LOD)
+
+- Vereinfachung nach Visvalingam mit sphärischer Dreiecksfläche auf einer gemeinsamen Topologie: Grenzen zweier Zellen werden überall gleich vereinfacht, es entstehen keine Lücken – das gilt auch für spätere Bundesländer/Regionen, deren Außengrenzen genau auf den Staatsgrenzen liegen.
+- Stufe z wird bis zur Kartenskala `sMax` benutzt (Pixel je Bogenmaß: 450, 1100, 2800, 7000, ∞; bei 1280 px Breite ≈ Zoom 200 %, 500 %, 1250 %, 3100 %). Ein Punkt bleibt, wenn sein Dreieck bei `sMax` mindestens `PX2` = 4 px² groß wäre; Inseln unter 1 px fallen weg. Die feinste Stufe enthält jeden Punkt der Quelle.
+- Beim Zeichnen: nur Kacheln im Ausschnitt; fehlt eine, wird die nächstgröbere geladene gezeichnet, bis sie da ist. Punkte näher als *Schritt* px am vorigen werden übersprungen, Ringe unter 0,5 px ganz. Flächen werden je Kachel und Farbe zu einem Pfad gebündelt (ein `fill` statt eines je Zelle). Höchstens *Speicher* Punkte bleiben im Speicher (älteste Kacheln fallen raus).
+- Kartenqualität: Der Detailfaktor multipliziert die Kartenskala bei der Wahl der Stufe – bei „Hoch“ wird Stufe z also schon bei einem Sechstel ihres `sMax` durch die feinere ersetzt. Während Ziehen/Zoomen wird mit dem Bewegungsfaktor gezeichnet und nach dem Loslassen fein nachgezeichnet.
+
+  | | Niedrig | Mittel | Hoch |
+  |---|---|---|---|
+  | Detailfaktor (Ruhe / Bewegung) | 1 / 1 | 2,5 / 1 | 6 / 2,5 |
+  | Schritt (Ruhe / Bewegung, px) | 0,75 / 0,75 | 0,6 / 0,75 | 0,5 / 0,7 |
+  | Gehaltenes Item, Schritt (px) | 0,5 | 0,35 | 0,25 |
+  | Speicher (Punkte) | 2,5 Mio. | 4 Mio. | 6 Mio. |
+
+  Der größte Zoom ist bei jeder Qualität 16000 %. „Niedrig“ entspricht dem früheren Verhalten. Die Daten sind für alle Stufen dieselben; höhere Qualität lädt nur früher die feineren Kacheln und Item-Umrisse nach.
+- Kacheln überlappen um 1/512 ihrer Seite, und Kanten entlang eines Meridians (Kachelrand, ±180°) sind fein unterteilt – so bleiben keine Haarlinien an Kachelrändern. Unsichtbare Grenzen zwischen gleichfarbigen Zellen werden in der Flächenfarbe nachgezogen.
+- Items: Die Startstufe ist je Item so fein, wie sein Inventar-Icon oder die Weltansicht es braucht. Ein aufgenommenes Item lädt die zum Zoom passende Stufe nach (Kontinente höchstens Stufe 3); gezeichnet wird nur der Teil, der beim Verschieben sichtbar werden kann.
+- Inventar-Icons (unabhängig von der Kartenqualität): Jedes Icon lädt die Stufe nach, die das Icon bei 4 × Größe × Pixeldichte braucht, und wird neu gezeichnet (Icon-Cache je Stufe). Eingepasst wird immer auf die Startstufe – feinere Stufen bringen winzige, weit entfernte Inseln mit (Clipperton, Kokosinsel, Prinz-Edward-Inseln …), die das Hauptland sonst schrumpfen ließen; was außerhalb liegt, wird abgeschnitten. Umgekehrt lassen feinere Stufen Inseln unter 1 px ihrer Skala weg (Atolle von Kiribati, Malediven …); solche Inseln der Startstufe werden im Icon ergänzt.
+- Umlaufsinn: Nach dem Runden auf ganze Zahlen kann ein winziger Ring seine Richtung umkehren; d3 liest ihn dann als „alles außer dieser Fläche“ (z. B. füllte Kiribatis Icon die ganze Box). Der Build dreht Polygone mit sphärischer Fläche > 2π nach dem Runden wieder um.
+- Startpaket: `index.json` + `i0.json` + Stufe 0 ≈ 0,4 MB; alles Weitere nach Bedarf.
+
+## Datenentscheidungen
+
+- Quelle: Natural Earth 1:10m Admin-0 in voller Genauigkeit (GeoJSON aus dem Natural-Earth-Repository, nicht quantisiert), Regionen und deutsche Namen aus `world-countries`. Weltweit gleicher Detailgrad, alle Inseln; die Detailstufen sorgen dafür, dass beim Herauszoomen nur so viel gezeichnet wird, wie sichtbar ist. Volle Genauigkeit ist auch die Grundlage für Bundesländer/Regionen (Natural Earth Admin-1), deren Grenzen exakt auf die Staatsgrenzen passen müssen.
+- Europäische Staaten nur mit ihren europäischen Landesteilen; Russland ganz. Überseegebiete (Französisch-Guayana, Guadeloupe, Martinique, Réunion, Karibische Niederlande …) gehören zum Kontinent, auf dem sie liegen – nicht mehr zu Europa.
+- Staaten Nord- und Südamerikas mit allen Landesteilen: USA inkl. Alaska, Aleuten (über die Datumsgrenze ohne Naht) und Hawaii; Ecuador inkl. Galápagos, Chile inkl. Osterinsel.
+- Afrika: Somaliland (in den Quelldaten eigene Fläche, international nicht anerkannt) gehört zum Item Somalia. Marokko ist in den Quelldaten samt dem von ihm kontrollierten Teil der Westsahara eingezeichnet; als Item gilt es wie bei den Vereinten Nationen ohne Westsahara (Grenze 27°40′ N, `CUT_TO` in `build/1-cells.py`) – die Westsahara ist nur Kontinentfläche. Namen: Eswatini (statt Swasiland), Demokratische Republik Kongo / Republik Kongo, Elfenbeinküste.
+- Asien: Zypern gehört (samt Nordzypern, UN-Pufferzone und den britischen Basen Akrotiri/Dhekelia) als ein Item zu den Staaten Asiens und auch zur Kontinentfläche Asien. Taiwan und Palästina (Westjordanland + Gaza) sind eigene Items, obwohl sie nicht als unabhängig geführt werden (wie Kosovo). Hongkong und Macao zählen zu China, Baikonur zu Kasachstan; der Siachen-Gletscher ist nur Kontinentfläche.
+- Inselstaaten aus weit verstreuten Atollen (Tuvalu, Kiribati, Marshallinseln …): Im Inventar und Menü zeigen ihre Icons zu kleine Inseln als Punkte, damit sie sichtbar bleiben.
+- Item-Gruppen: Staaten tragen in `index.json` `region` (`EU`/`NA`/`SA`/`AF`/`AS`/`OC`); daraus entstehen die Gruppen `continent`, `country-eu`, `country-na`, `country-sa`, `country-af`, `country-as`, `country-oc` (Menü-Karten, `config.kinds`). Item-Keys bleiben `country:USA` usw., die Statistik ist davon unberührt. Ältere Lobbys mit `kinds: ["country"]` werden beim Laden zu `country-eu`.
+- Projektion: Natural Earth 1, wahlweise Equal Earth (flächentreu, Einstellung „Projektion“).
+- Europa/Asien: Ural-Kamm → Ural-Fluss → Kaspisches Meer → Kaukasus; Türkei, Georgien, Armenien, Aserbaidschan, Kasachstan = Asien.
+- Afrika/Asien: Grenze Ägypten/Israel (Sinai zählt zu Afrika). Nord-/Südamerika: Grenze Panama/Kolumbien.
+- Datumsgrenze: Die Quelle ist bei ±180° geteilt. Diese Schnittkanten gelten nicht als Küste (keine Linie), und die Flächen daran ragen wie an Kachelrändern minimal über die Kante – beim Drehen bleibt an der Datumsgrenze keine Naht.

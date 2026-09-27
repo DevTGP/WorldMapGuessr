@@ -2,6 +2,8 @@
 // Bekommt Sekundenwerte (Einzelspiel: RoundTimer.view(), Lobby: round.timer vom Server) und zählt
 // selbst herunter.
 
+import { t } from "../i18n/index.js";
+
 const FRAME_MS = 200;
 const URGENT_S = 5;
 
@@ -13,16 +15,16 @@ export class TimerMeter {
     this.id = null;
   }
 
-  /** @param {{nextIn: number, graceLeft: number, every: number, take: number}|null} t */
-  set(t) {
-    if (!t) return this.hide();
+  /** @param {{nextIn: number, graceLeft: number, every: number, take: number}|null} timer */
+  set(timer) {
+    if (!timer) return this.hide();
     const now = performance.now();
-    this.deadline = now + t.nextIn * 1000;
-    this.graceUntil = now + t.graceLeft * 1000;
-    this.every = t.every;
-    this.take = t.take;
-    this.paused = !!t.paused;
-    this.endspurt = !!t.endspurt;
+    this.deadline = now + timer.nextIn * 1000;
+    this.graceUntil = now + timer.graceLeft * 1000;
+    this.every = timer.every;
+    this.take = timer.take;
+    this.paused = !!timer.paused;
+    this.endspurt = !!timer.endspurt;
     this.frozenAt = undefined;
     this.el.hidden = false;
     if (!this.id) this.id = setInterval(() => this._render(), FRAME_MS);
@@ -37,11 +39,11 @@ export class TimerMeter {
 
   _render() {
     if (this.endspurt) {
-      this.text.innerHTML = '<b>Endspurt</b><span class="long"> · keine Wegnahme mehr</span>';
+      this.text.innerHTML = t("timer.endspurt");
       this.ring.style.strokeDashoffset = "0";
       this.el.classList.add("grace");
       this.el.classList.remove("urgent");
-      this.el.setAttribute("aria-label", "Endspurt: Der Timer nimmt keine Items mehr weg");
+      this.el.setAttribute("aria-label", t("timer.endspurtLabel"));
       return;
     }
     if (this.paused) {
@@ -56,22 +58,17 @@ export class TimerMeter {
     const now = performance.now();
     const left = Math.max(0, (this.deadline - now) / 1000);
     const grace = now < this.graceUntil;
-    const items = this.take === 1 ? "Item" : "Items";
-    let text;
-    if (grace) {
-      text = `Schonfrist <b>${clock((this.graceUntil - now) / 1000)}</b><span class="long"> · dann alle ${this.every} s −${this.take}</span>`;
-    } else {
-      text = `<b>${clock(left)}</b> bis <b>−${this.take}</b><span class="long"> ${items}</span>`;
-    }
-    this.text.innerHTML = text;
+    this.text.innerHTML = grace
+      ? t("timer.grace", { time: clock((this.graceUntil - now) / 1000), every: this.every, take: this.take })
+      : t("timer.next", { time: clock(left), take: this.take, n: this.take });
     const frac = grace ? 1 : Math.min(1, left / this.every);
     this.ring.style.strokeDashoffset = String(1 - frac);
-    if (this.paused) this.text.innerHTML += '<span class="long"> · pausiert</span>';
+    if (this.paused) this.text.innerHTML += t("timer.paused");
     this.el.classList.toggle("grace", grace);
     this.el.classList.toggle("urgent", !grace && left <= URGENT_S);
     this.el.setAttribute("aria-label", grace
-      ? `Schonfrist noch ${Math.ceil((this.graceUntil - now) / 1000)} Sekunden`
-      : `Noch ${Math.ceil(left)} Sekunden, dann ${this.take} ${items} zurück in den Vorrat`);
+      ? t("timer.graceLabel", { s: Math.ceil((this.graceUntil - now) / 1000) })
+      : t("timer.nextLabel", { s: Math.ceil(left), n: this.take }));
   }
 }
 

@@ -1,6 +1,7 @@
 // „Lobby beitreten“ im Hauptmenü: Code oder Einladungslink eingeben, prüfen, ob es die Lobby gibt.
 
 import { identity } from "../lobby/identity.js";
+import { t } from "../i18n/index.js";
 
 const CODE = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{5}$/; // wie lobbies/codes.py
 
@@ -41,14 +42,14 @@ export function askLobbyCode(apiBase) {
     const onSubmit = async (e) => {
       e.preventDefault();
       const code = parseCode(input.value);
-      if (!code) return fail("Das ist kein gültiger Code – 5 Zeichen, z. B. K7M2Q.");
+      if (!code) return fail(t("code.invalid"));
       try {
         const res = await fetch(`${apiBase}/lobbies/${code}`);
-        if (res.status === 404) return fail(`Die Lobby ${code} gibt es nicht (mehr).`);
+        if (res.status === 404) return fail(t("code.notFound", { code }));
         const info = await res.json();
-        if (info.solo && !identity.get(code)) return fail(`${code} ist ein Einzelspiel – beitreten geht erst, wenn es zur Lobby gemacht wird.`);
+        if (info.solo && !identity.get(code)) return fail(t("code.solo", { code }));
       } catch {
-        return fail("Keine Verbindung zum Server – bitte noch einmal versuchen.");
+        return fail(t("error.offline"));
       }
       done(code);
     };

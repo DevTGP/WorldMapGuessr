@@ -1,15 +1,15 @@
 // Auswahl „Aufbewahren“: nach wie langer Untätigkeit eine Runde (Lobby, auch Einzelspiel) gelöscht wird.
 // Stufen wie auf dem Server (lobbies/settings.py TTL_STEPS).
 
-export const TTL_STEPS = [
-  [3600, "1 Stunde"], [3 * 3600, "3 Stunden"], [6 * 3600, "6 Stunden"], [12 * 3600, "12 Stunden"],
-  [86400, "1 Tag"], [2 * 86400, "2 Tage"], [3 * 86400, "3 Tage"], [7 * 86400, "7 Tage"],
-];
+import { t } from "../i18n/index.js";
+
+const DAY = 86400;
+export const TTL_STEPS = [3600, 3 * 3600, 6 * 3600, 12 * 3600, DAY, 2 * DAY, 3 * DAY, 7 * DAY];
 export const DEFAULT_TTL = 86400;
 
 /** "1 Tag", "3 Stunden" … */
 export function ttlLabel(seconds) {
-  return (TTL_STEPS.find(([s]) => s === seconds) ?? [0, `${Math.round(seconds / 3600)} Stunden`])[1];
+  return seconds % DAY === 0 ? t("unit.days", { n: seconds / DAY }) : t("unit.hours", { n: Math.round(seconds / 3600) });
 }
 
 /**
@@ -18,7 +18,7 @@ export function ttlLabel(seconds) {
  */
 export function createTtlField(root, onChange) {
   const select = root.querySelector("select");
-  select.replaceChildren(...TTL_STEPS.map(([s, label]) => new Option(label, String(s))));
+  select.replaceChildren(...TTL_STEPS.map((s) => new Option(ttlLabel(s), String(s))));
   select.value = String(DEFAULT_TTL);
   select.addEventListener("change", () => onChange(Number(select.value)));
   return {

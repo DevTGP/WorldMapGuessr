@@ -1,5 +1,6 @@
 // Darstellungs- und Bedien-Einstellungen je Gerät (im Browser gespeichert).
-// Kartenqualität: map/quality.js · Spielername: lobby/identity.js · Oberfläche: settings/settings-dialog.js
+// Kartenqualität: map/quality.js · Spielername: lobby/identity.js · Sprache: i18n/index.js (Cookie)
+// Oberfläche: settings/settings-dialog.js
 //
 //   zoomSpeed, moveSpeed  Empfindlichkeit (Faktor, 1 = Standard)
 //   scheme                Farbschema der Karte (map/schemes.js): a Nachtatlas · b Papierkarte · c Kontinentfarben
@@ -20,7 +21,6 @@ const DEFS = {
   relief: { def: "light", options: ["off", "light", "strong"] },
   water: { def: true, bool: true },
 };
-export const PREF_DEFAULTS = Object.fromEntries(Object.entries(DEFS).map(([k, d]) => [k, d.def]));
 
 const listeners = new Set();
 let current = read();

@@ -1,0 +1,58 @@
+{# Kleine Dialoge: Rundenende, Beitreten, Bestätigen, Lobby weg, Lobby-Code #}
+<dialog class="round-dialog" id="round-dialog">
+  <h2 id="dlg-title"></h2>
+  <p id="dlg-text"></p>
+  <div class="dlg-score" id="dlg-score" hidden></div>
+  <div class="actions">
+    <button class="btn" id="dlg-home" type="button">{{ t('home.title') }}</button>
+    <button class="btn" id="dlg-menu" type="button">{{ t('end.adjust') }}</button>
+    <button class="btn btn-primary" id="dlg-again" type="button" autofocus>{{ t('end.again') }}</button>
+  </div>
+</dialog>
+
+<dialog class="join-dialog" id="join-dialog">
+  <form>
+    <h2></h2>
+    <p class="join-text"></p>
+    <p class="join-error" role="alert" hidden></p>
+    <label for="join-name">{{ t('join.name') }}</label>
+    <input id="join-name" type="text" maxlength="24" autocomplete="nickname" required>
+    <div class="join-password" hidden>
+      <label for="join-password">{{ t('lobby.password') }}</label>
+      <input id="join-password" type="password" maxlength="64" autocomplete="current-password">
+    </div>
+    <div class="actions">
+      <button type="button" class="btn" id="join-cancel">{{ t('common.cancel') }}</button>
+      <button type="submit" class="btn btn-primary" id="join-submit">{{ t('join.submit') }}</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="join-dialog" id="confirm-dialog">
+  <h2></h2>
+  <p></p>
+  <div class="actions">
+    <button type="button" class="btn" id="confirm-cancel">{{ t('common.cancel') }}</button>
+    <button type="button" class="btn btn-primary" id="confirm-ok"></button>
+  </div>
+</dialog>
+
+<dialog class="join-dialog" id="lobby-gone">
+  <h2>{{ t('gone.title') }}</h2>
+  <p></p>
+  <div class="actions"><a class="btn btn-primary" href="{{ url_for('main.index') }}">{{ t('gone.home') }}</a></div>
+</dialog>
+
+<dialog class="join-dialog" id="code-dialog">
+  <form>
+    <h2>{{ t('home.join') }}</h2>
+    <p>{{ t('code.text') | safe }}</p>
+    <p class="join-error" role="alert" hidden></p>
+    <label for="code-input">{{ t('code.label') }}</label>
+    <input id="code-input" type="text" maxlength="80" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+    <div class="actions">
+      <button type="button" class="btn" id="code-cancel">{{ t('common.cancel') }}</button>
+      <button type="submit" class="btn btn-primary">{{ t('join.submit') }}</button>
+    </div>
+  </form>
+</dialog>

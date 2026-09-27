@@ -13,6 +13,7 @@ import { identity } from "./identity.js";
 import { askPlayer } from "./join-dialog.js";
 import { roundNote, ruleHints, sendRule } from "./rules-text.js";
 import { MODE } from "../menu/presets.js";
+import { t } from "../i18n/index.js";
 
 const SEND_DELAY_MS = 250;
 const CROWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></svg>';
@@ -43,7 +44,7 @@ export class LobbyMenu {
 
     // Lobbyeinstellungen (nur Host)
     this.maxPlayers = createStepper({
-      id: "lobby-max", label: "Max. Spieler", hint: "gleichzeitig in der Lobby", value: 8, min: 1, max: 50,
+      id: "lobby-max", label: t("lobby.maxPlayers"), hint: t("lobby.maxPlayersHint"), value: 8, min: 1, max: 50,
       onChange: (v) => client.sendSettings({ maxPlayers: v }),
     });
     document.getElementById("lobby-fields").prepend(this.maxPlayers.el);
@@ -56,7 +57,7 @@ export class LobbyMenu {
     this.allowSend = document.getElementById("lobby-allow-send");
     this.allowSend.addEventListener("change", () => client.sendSettings({ allowSend: this.allowSend.checked }));
     this.sendEvery = createStepper({
-      id: "lobby-send-every", label: "Sendelimit", hint: "1 Senden je … erhaltene Items (0 = ohne Limit)",
+      id: "lobby-send-every", label: t("lobby.sendLimit"), hint: t("lobby.sendLimitHint"),
       value: 5, min: 0, max: 20,
       onChange: (v) => client.sendSettings({ sendEvery: v }),
     });
@@ -86,13 +87,13 @@ export class LobbyMenu {
       } else if (isPlaying()) onJoinRound();
     };
     menu.primaryLabel = (pool) => {
-      if (!client.connected) return { text: "Verbinde …", disabled: true };
+      if (!client.connected) return { text: t("lobby.connecting"), disabled: true };
       if (client.isHost) {
-        const what = running() ? "Runde neu starten" : this.solo ? "Runde starten" : "Runde für alle starten";
-        return pool ? `${what} · ${pool} Items` : what;
+        const what = t(running() ? "lobby.restart" : this.solo ? "menu.start" : "lobby.startAll");
+        return pool ? `${what} · ${t("unit.items", { n: pool })}` : what;
       }
-      if (isPlaying()) return "Zurück zur Runde";
-      return { text: "Warten auf den Host …", disabled: true };
+      if (isPlaying()) return t("lobby.backToRound");
+      return { text: t("lobby.waitHost"), disabled: true };
     };
 
     // Was die Einstellungen in der Lobby bewirken: Hinweise, Zusammenfassung, Rundenstatus
@@ -114,12 +115,11 @@ export class LobbyMenu {
     document.getElementById("mp-rules").hidden = solo;
     const create = document.getElementById("menu-create-lobby");
     create.hidden = !solo;
-    create.textContent = "Mitspieler einladen";
-    create.title = "Aus diesem Einzelspiel eine Lobby machen – die Runde läuft weiter";
-    document.getElementById("menu-title").textContent = solo ? "Einzelspiel" : `Lobby ${this.client.code}`;
-    document.querySelector("#menu .eyebrow").textContent = solo ? "WorldMapGuessr" : "WorldMapGuessr · Lobby";
-    document.getElementById("title-hint").textContent = solo ? this.titleHint
-      : "Item anklicken und auf der Karte einsetzen – oder links an einen Mitspieler senden · Karte ziehen oder WASD, Q/E zoomen";
+    create.textContent = t("invite.title");
+    create.title = t("invite.buttonTitle");
+    document.getElementById("menu-title").textContent = solo ? t("game.solo") : t("game.lobby", { code: this.client.code });
+    document.querySelector("#menu .eyebrow").textContent = solo ? "WorldMapGuessr" : `WorldMapGuessr · ${t("lobby.title")}`;
+    document.getElementById("title-hint").textContent = solo ? this.titleHint : t("hud.hintLobby");
     if (solo) this.menu.setHints(SOLO_HINTS);
   }
 
@@ -142,8 +142,7 @@ export class LobbyMenu {
     this.sendEvery.el.classList.toggle("muted", state.settings.allowSend === false);
     if (host) this.maxPlayers.value = state.settings.maxPlayers; // Grenzen neu anwenden
 
-    document.getElementById("lobby-privacy").textContent = state.settings.private
-      ? "Privat – Beitritt nur mit Passwort" : "Offen – Beitritt mit dem Link";
+    document.getElementById("lobby-privacy").textContent = t(state.settings.private ? "lobby.private" : "lobby.open");
     document.getElementById("lobby-password-clear").hidden = !state.settings.private;
     document.getElementById("lobby-close").hidden = !host;
     this.allowSend.checked = state.settings.allowSend !== false;
@@ -165,28 +164,31 @@ export class LobbyMenu {
       const li = document.createElement("li");
       li.className = `player${p.online ? "" : " offline"}${p.host ? " host" : ""}`;
       li.innerHTML = `${p.host ? CROWN : ""}<span class="pname"></span>`;
-      li.querySelector(".pname").textContent = p.name + (p.id === this.client.me?.id ? " (du)" : "");
-      li.title = p.host ? (p.online ? "Host" : "Host – gerade nicht verbunden") : "Spieler";
+      li.querySelector(".pname").textContent = p.name + (p.id === this.client.me?.id ? ` ${t("lobby.you")}` : "");
+      const role = t(p.host ? "lobby.host" : "player.default");
+      li.title = p.online ? role : t("lobby.offline", { role });
+      // Host: andere Spieler entfernen
+      if (this.client.isHost && p.id !== this.client.me?.id) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "player-kick";
+        btn.title = t("kick.button", { name: p.name });
+        btn.setAttribute("aria-label", t("kick.label", { name: p.name }));
+        btn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg>';
+        btn.addEventListener("click", () => this._kick(p));
+        li.append(btn);
+      }
       return li;
     }));
   }
 
   _confirmRestart() {
     const r = this.client.state?.round;
-    if (this.solo) {
-      return confirmDialog({
-        title: "Laufende Runde abbrechen?",
-        text: `Runde ${r?.number ?? ""} wird beendet (${r?.placed?.length ?? 0} von ${r?.total ?? 0} Items eingesetzt). ` +
-          "Die neue Runde startet sofort mit den aktuellen Einstellungen.",
-        confirm: "Neu starten",
-        danger: true,
-      });
-    }
+    const vars = { n: r?.number ?? "", placed: r?.placed?.length ?? 0, total: r?.total ?? 0 };
     return confirmDialog({
-      title: "Laufende Runde abbrechen?",
-      text: `Runde ${r?.number ?? ""} wird für alle beendet (${r?.placed?.length ?? 0} von ${r?.total ?? 0} Items eingesetzt). ` +
-        "Alle Inventare werden geleert und die neue Runde startet sofort mit den aktuellen Einstellungen.",
-      confirm: "Neu starten",
+      title: t("restart.title"),
+      text: t(this.solo ? "restart.textSolo" : "restart.textLobby", vars),
+      confirm: t("restart.confirm"),
       danger: true,
     });
   }
@@ -194,10 +196,9 @@ export class LobbyMenu {
   /** Einzelspiel → Lobby: Name festlegen, dann können andere über den Link beitreten */
   async _invite() {
     const who = await askPlayer({
-      title: "Mitspieler einladen",
-      text: "Aus deinem Einzelspiel wird eine Lobby. Die laufende Runde geht mit allen weiter, die über den Link " +
-        "beitreten. Unter welchem Namen spielst du?",
-      submit: "Lobby daraus machen",
+      title: t("invite.title"),
+      text: t("invite.text"),
+      submit: t("invite.submit"),
       name: identity.name,
       cancelable: true,
     });
@@ -209,25 +210,31 @@ export class LobbyMenu {
 
   async _leave() {
     const state = this.client.state;
-    let text = "Du kannst später über den Link wieder beitreten – als neuer Spieler.";
+    let text = t("leave.text");
     if (this.client.isHost) {
       const next = state?.players.find((p) => p.online && p.id !== this.client.me?.id);
-      text = next
-        ? `Du bist Host. Die Rolle geht an ${next.name}. ` + text
-        : "Du bist der letzte Spieler – die Lobby wird damit gelöscht.";
+      text = next ? `${t("leave.hostNext", { name: next.name })} ${text}` : t("leave.last");
     }
-    const ok = await confirmDialog({ title: "Lobby verlassen?", text, confirm: "Verlassen" });
+    const ok = await confirmDialog({ title: t("leave.title"), text, confirm: t("leave.confirm") });
     if (ok) this.client.leave();
+  }
+
+  async _kick(player) {
+    const ok = await confirmDialog({
+      title: t("kick.title", { name: player.name }),
+      text: t("kick.text"),
+      confirm: t("kick.confirm"),
+      danger: true,
+    });
+    if (ok) this.client.kick(player.id);
   }
 
   async _close() {
     const others = (this.client.state?.players ?? []).filter((p) => p.online && p.id !== this.client.me?.id).length;
     const ok = await confirmDialog({
-      title: "Lobby beenden?",
-      text: others
-        ? `Die Lobby wird für alle gelöscht – ${others} ${others === 1 ? "Spieler wird" : "Spieler werden"} hinausgeworfen. Der Link funktioniert danach nicht mehr.`
-        : "Die Lobby wird gelöscht. Der Link funktioniert danach nicht mehr.",
-      confirm: "Lobby beenden",
+      title: t("close.title"),
+      text: others ? t("close.textOthers", { n: others }) : t("close.text"),
+      confirm: t("lobby.close"),
       danger: true,
     });
     if (ok) this.client.close();
@@ -237,10 +244,10 @@ export class LobbyMenu {
     const label = button.textContent;
     try {
       await navigator.clipboard.writeText(text);
-      button.textContent = "Kopiert";
+      button.textContent = t("lobby.copied");
     } catch {
       document.getElementById("lobby-link").select();
-      button.textContent = "Markiert – Strg+C";
+      button.textContent = t("lobby.copySelected");
     }
     setTimeout(() => { button.textContent = label; }, 1400);
   }

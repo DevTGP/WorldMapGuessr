@@ -207,3 +207,13 @@ body.is-holding .rail-hint { color: var(--piece); }
   .lobby-badge b { display: none; }
 }
 .lobby-badge span:empty { display: none; }
+
+/* Host: Spieler entfernen (✕ am Namen) */
+.player-kick {
+  display: grid; place-items: center;
+  width: 18px; height: 18px; margin: 0 -4px 0 2px; padding: 0;
+  border: 0; border-radius: 50%; background: transparent; color: var(--ink-soft); cursor: pointer;
+}
+.player-kick svg { width: 12px; height: 12px; fill: none !important; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.player-kick:hover { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
+.player-kick:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }

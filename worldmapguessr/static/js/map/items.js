@@ -6,6 +6,7 @@
 
 import { partsOf } from "./geometry.js";
 import { RAD } from "./project.js";
+import { LANG } from "../i18n/index.js";
 
 export class ItemStore {
   /**
@@ -23,7 +24,7 @@ export class ItemStore {
       key: it.key,
       kind: it.kind,
       group: it.group,
-      properties: { name: it.name, region: it.region },
+      properties: { name: (LANG === "en" && it.nameEn) || it.name, region: it.region },
       geom: { anchor: it.anchor, area: it.area, centerLon: it.centerLon },
       geometry: { type: "MultiPolygon", coordinates: [] },
       parts: [],

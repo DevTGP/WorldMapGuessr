@@ -4,6 +4,7 @@
 // Ergebnis. Im Einzelspiel hält der Server den Timer an, solange hier ein Dialog offen ist.
 
 import { fromWire } from "../menu/config.js";
+import { parts, serverError, t } from "../i18n/index.js";
 
 /** Fehler, nach denen der eigene (optimistische) Stand verworfen wird */
 const RESYNC_ERRORS = new Set(["not_in_hand", "round_over", "no_round", "bad_target", "send_disabled", "send_limit"]);
@@ -34,7 +35,7 @@ export class RemoteRound {
     client.addEventListener("welcome", () => { this.paused = null; });
 
     client.addEventListener("error", ({ detail: err }) => {
-      if (err.code === "send_limit" || err.code === "send_disabled") game.toast(err.message, "hint");
+      if (err.code === "send_limit" || err.code === "send_disabled") game.toast(serverError(err), "hint");
       if (!RESYNC_ERRORS.has(err.code)) return;
       this.sent.clear();
       this.gifting.clear();
@@ -67,10 +68,10 @@ export class RemoteRound {
   apply(lobby, hand) {
     const solo = !!lobby.settings.solo;
     this.game.feed.setChat(solo ? null : (text) => this.client.chat(text));
-    this.game.lives.setTitle(solo ? "Leben" : "Gemeinsame Leben der Lobby");
+    this.game.lives.setTitle(t(solo ? "hud.lives" : "hud.livesShared"));
     this._chat(lobby);
-    const t = lobby.round?.status === "running" ? lobby.round.timer : null;
-    this.timer = t ? { ...t, at: performance.now() } : null;
+    const timer = lobby.round?.status === "running" ? lobby.round.timer : null;
+    this.timer = timer ? { ...timer, at: performance.now() } : null;
     this._showTimer();
     this.queued = { lobby, hand: hand ?? [] };
     if (!this.game.busy) this.flush();
@@ -132,7 +133,8 @@ export class RemoteRound {
 
   _syncPause() {
     const round = this.client.state?.round;
-    if (!this.solo || !this.client.connected || round?.status !== "running" || !round.timer) return;
+    // auch ohne Timer: die Tempo-Wertung (Punkte) soll Pausen nicht mitzählen
+    if (!this.solo || !this.client.connected || round?.status !== "running") return;
     const paused = !!document.querySelector("dialog[open]") || document.hidden ||
       document.body.classList.contains("at-home"); // Hauptmenü offen
     if (paused === this.paused) return;
@@ -142,21 +144,17 @@ export class RemoteRound {
 
   /** Timer-Anzeige aus dem zuletzt empfangenen Server-Timer (um die seitdem vergangene Zeit korrigiert) */
   _showTimer() {
-    const t = this.timer;
-    if (!t) return this.game.timerMeter.hide();
-    const gone = (performance.now() - t.at) / 1000;
-    this.game.timerMeter.set({ ...t, nextIn: Math.max(0, t.nextIn - gone), graceLeft: Math.max(0, t.graceLeft - gone) });
+    const timer = this.timer;
+    if (!timer) return this.game.timerMeter.hide();
+    const gone = (performance.now() - timer.at) / 1000;
+    this.game.timerMeter.set({ ...timer, nextIn: Math.max(0, timer.nextIn - gone), graceLeft: Math.max(0, timer.graceLeft - gone) });
   }
 
   /** Neue (oder beim Beitreten laufende) Runde in der Nachrichtenleiste */
   _roundStart(lobby, round, mine) {
-    const running = round.status === "running";
-    this.game.feed.push({
-      kind: "info",
-      parts: [running ? `Runde ${round.number}: ` : `Runde ${round.number} ist vorbei · `,
-        { b: `${round.placed.length} / ${round.total}` }, " eingesetzt",
-        ...(running ? [" · du hast ", { b: String(mine) }, mine === 1 ? " Item" : " Items"] : [])],
-    });
+    const vars = { n: round.number, placed: { b: `${round.placed.length} / ${round.total}` },
+      mine: { b: t("unit.items", { n: mine }) } };
+    this.game.feed.push({ kind: "info", parts: parts(round.status === "running" ? "feed.roundStart" : "feed.roundOver", vars) });
   }
 
   /** Alle noch nicht gezeigten Ereignisse der Runde (Einsetzen, Fehlwurf, Senden, Nachschub, Timer) */
@@ -172,50 +170,50 @@ export class RemoteRound {
 
   _message(lobby, round, ev) {
     const me = this.client.me?.id;
+    const mine = ev.player === me;
     const g = this.game;
-    const items = (n) => `${n} ${n === 1 ? "Item" : "Items"}`;
-    const item = (key) => ({ item: g.pieceFor(key)?.name ?? "ein Item" });
-    const who = (id, du = "Du") => (id === me ? { who: du, id } : { who: this._name(lobby, id), id });
+    const item = (key) => ({ item: g.pieceFor(key)?.name ?? t("feed.anItem") });
+    const who = (id, lower = false) => ({ who: id === me ? t(lower ? "feed.youLower" : "feed.you") : this._name(lobby, id), id });
+    const pts = typeof ev.points === "number" ? [{ pts: ev.points }] : [];
+    const msg = (kind, key, vars = {}, extra = []) => ({ kind, parts: [...parts(key, vars), ...extra] });
     switch (ev.type) {
       case "placed":
-        return ev.player === me
-          ? { kind: "good", parts: [item(ev.key), " sitzt"] }
-          : { kind: "good", parts: [who(ev.player), " hat ", item(ev.key), " eingesetzt"] };
+        return msg("good", mine ? "feed.placedMe" : "feed.placed", { who: who(ev.player), item: item(ev.key) }, pts);
       case "miss":
-        return {
-          kind: "bad",
-          parts: [...(ev.player === me ? ["Daneben – "] : [who(ev.player), " lag daneben – "]), item(ev.key),
-            ev.lost ? " geht zurück in den Vorrat" : "", round.lives > 0 ? ` · noch ${round.lives} Leben` : ""],
-        };
-      case "join":
-        return ev.player === me
-          ? { kind: "refill", parts: ["Du bist dazugekommen: ", { b: items(ev.count) }, ` · Lobby +${ev.lives} Leben`] }
-          : { kind: "refill", parts: [who(ev.player), " ist dazugekommen: ", { b: `+${ev.lives} Leben` }, ` · ${items(ev.count)} für `, who(ev.player)] };
+        return msg("bad", mine ? "feed.missMe" : "feed.miss", { who: who(ev.player), item: item(ev.key) }, [
+          ev.lost ? t("feed.missLost") : "",
+          round.lives > 0 ? t("feed.livesLeft", { n: round.lives }) : "",
+          ...pts,
+        ]);
+      case "join": {
+        const vars = { who: who(ev.player), items: { b: t("unit.items", { n: ev.count }) }, lives: { b: t("feed.plusLives", { n: ev.lives }) } };
+        return msg("refill", mine ? "feed.joinMe" : "feed.join", vars);
+      }
       case "endspurt": {
         const c = round.config ?? {};
-        const rules = [c.timer ? "keine Wegnahme mehr" : "", c.missLoses ? "Fehlwürfe behalten das Item" : ""].filter(Boolean);
-        return { kind: "info", parts: [{ b: "Endspurt" }, ": Der Vorrat ist leer", rules.length ? ` – ${rules.join(", ")}` : ""] };
+        const rules = [c.timer ? t("feed.endspurtNoTake") : "", c.missLoses ? t("feed.endspurtKeep") : ""].filter(Boolean);
+        return msg("info", "feed.endspurt", { title: { b: t("feed.endspurtTitle") } }, rules.length ? [` – ${rules.join(", ")}`] : []);
       }
       case "empty":
-        return { kind: "bad", parts: [{ b: "Inventar leer" }, " – die Runde ist verloren"] };
-      case "gift":
-        if (ev.to === me) return { kind: "gift", parts: [who(ev.player), " hat dir ", item(ev.key), " geschickt"] };
-        if (ev.player === me) return { kind: "gift", parts: ["Du hast ", item(ev.key), " an ", who(ev.to), " gesendet"] };
-        return { kind: "gift", parts: [who(ev.player), " hat ", item(ev.key), " an ", who(ev.to), " gesendet"] };
+        return msg("bad", "feed.empty", { title: { b: t("feed.emptyTitle") } });
+      case "gift": {
+        const vars = { who: who(ev.player), to: who(ev.to), item: item(ev.key) };
+        return msg("gift", ev.to === me ? "feed.giftToMe" : mine ? "feed.giftByMe" : "feed.gift", vars);
+      }
       case "refill": {
         const to = Object.entries(ev.to ?? {});
-        const parts = [{ b: `+${ev.count}` }, ` neue ${ev.count === 1 ? "Item" : "Items"}`];
+        const extra = [];
         if (to.length && !this.solo) {
-          parts.push(": ");
-          to.forEach(([id, n], i) => parts.push(...(i ? [", "] : []), who(id, i ? "du" : "Du"), ` ${n}`));
+          extra.push(": ");
+          to.forEach(([id, n], i) => extra.push(...(i ? [", "] : []), who(id, i > 0), ` ${n}`));
         }
-        return { kind: "refill", parts };
+        return msg("refill", "feed.refill", { count: { b: `+${ev.count}` }, n: ev.count }, extra);
       }
       case "take": {
-        const parts = ["Zeit abgelaufen – "];
-        (ev.items ?? []).forEach(({ player, key }, i) => parts.push(...(i ? [", "] : []), item(key), ...(this.solo ? [] : [" (", who(player, "du"), ")"])));
-        parts.push(" zurück in den Vorrat");
-        return { kind: "take", parts };
+        const items = [];
+        (ev.items ?? []).forEach(({ player, key }, i) =>
+          items.push(...(i ? [", "] : []), item(key), ...(this.solo ? [] : [" (", who(player, true), ")"])));
+        return msg("take", "feed.take", { items });
       }
       default:
         return null;
@@ -229,11 +227,14 @@ export class RemoteRound {
     let list = chat;
     if (this.chatSeq === null) list = chat.slice(-CHAT_HISTORY);
     else list = chat.filter((m) => m.seq > this.chatSeq);
-    for (const m of list) this.game.feed.chat({ id: m.player, name: m.name, text: m.text, mine: m.player === me });
+    for (const m of list) {
+      if (m.system === "kick") this.game.feed.push({ kind: "info", parts: parts("feed.kicked", { who: { who: m.name, id: m.player } }) });
+      else if (!m.system) this.game.feed.chat({ id: m.player, name: m.name, text: m.text, mine: m.player === me });
+    }
     this.chatSeq = chat.length ? chat[chat.length - 1].seq : (this.chatSeq ?? 0);
   }
 
   _name(lobby, id) {
-    return lobby.players.find((p) => p.id === id)?.name ?? "Jemand";
+    return lobby.players.find((p) => p.id === id)?.name ?? t("feed.someone");
   }
 }

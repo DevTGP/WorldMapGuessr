@@ -380,6 +380,7 @@ def test_send_limit_setting_and_quota_in_state(store):
     with pytest.raises(LobbyError) as e:
         hub.handle(code, h, {"type": "give", "key": hand_of(h)[0], "to": g.player_id})
     assert e.value.code == "send_limit" and "2 weiteren Items" in e.value.message
+    assert e.value.params == {"n": 2} and e.value.payload()["params"] == {"n": 2}
     hub.handle(code, h, {"type": "settings", "settings": {"sendEvery": 3}})
     hub.handle(code, h, {"type": "give", "key": hand_of(h)[0], "to": g.player_id})
     assert [m for m in h.ws.sent if m["type"] == "state"][-1]["sends"]["left"] == 0
@@ -510,3 +511,56 @@ def test_http_mine_and_delete(client):
     r = client.delete(f"/api/lobbies/{host['code']}", json=host["player"])
     assert r.get_json() == {"result": "closed"}
     assert client.get(f"/api/lobbies/{host['code']}").status_code == 404
+
+
+# ---------- Spieler entfernen ----------
+def test_host_kicks_player_hand_returns_and_notice(store):
+    hub, code, h, g = two_players(store)
+    guest = next(m for m in g.ws.sent if m["type"] == "welcome")["player"]
+    with pytest.raises(LobbyError):
+        hub.handle(code, g, {"type": "kick", "player": h.player_id})  # Gast darf nicht
+    with pytest.raises(LobbyError):
+        hub.handle(code, h, {"type": "kick", "player": h.player_id})  # sich selbst nicht
+    hub.handle(code, h, {"type": "kick", "player": guest["id"]})
+    assert g.ws.sent[-1] == {"type": "kicked"} and g.player_id is None
+    assert guest["id"] not in store.get(code)["players"]
+    last = [m for m in h.ws.sent if m["type"] == "state"][-1]["lobby"]
+    assert last["chat"][-1]["system"] == "kick" and last["chat"][-1]["name"] == "Gast"
+    assert sum(last["round"]["handCounts"].values()) == 3
+    assert store.authenticate(code, guest["id"], guest["token"]) is None  # Token ungültig, Neubeitritt möglich
+
+
+# ---------- Inaktive Lobbys ----------
+def test_idle_lobby_goes_inactive_is_restored_and_expires_later(tmp_path):
+    clock = Clock()
+    store = LobbyStore(tmp_path / "l.json", catalog=CATALOG, clock=clock)
+    hub = LobbyHub(store, clock=Clock())
+    lobby, host = store.create(player_name="Host", ttl=3600)
+    code = lobby["code"]
+    h = connect(hub, code, playerId=host["id"], token=host["token"])
+    hub.handle(code, h, {"type": "start"})
+    clock.t += 1200
+    assert hub.maintain()["inactive"] == []                     # jemand verbunden → bleibt aktiv
+    hub.leave(code, h)
+    assert hub.maintain() == {"inactive": [code], "expired": []}
+    assert not store.is_active(code) and code in store._inactive
+    s = store.summary(code, host["id"], host["token"])            # Übersicht lädt, ohne zu aktivieren
+    assert s["active"] is False and s["round"]["total"] == 23 and not store.is_active(code)
+    again = LobbyStore(store.persistence, clock=clock)            # Serverneustart: alles zunächst inaktiv
+    assert not again.is_active(code) and again.public_info(code)["code"] == code
+    h2 = connect(LobbyHub(again, clock=Clock()), code, playerId=host["id"], token=host["token"])
+    assert again.is_active(code) and h2.player_id == host["id"]   # wiederhergestellt beim Beitreten
+    assert again.get(code)["round"]["total"] == 23
+
+
+def test_inactive_lobby_deleted_after_ttl(tmp_path):
+    clock = Clock()
+    store = LobbyStore(tmp_path / "l.json", catalog=CATALOG, clock=clock)
+    hub = LobbyHub(store, clock=Clock())
+    lobby, host = store.create(player_name="Host", ttl=3600)
+    code = lobby["code"]
+    clock.t += 700
+    assert hub.maintain(expire=False)["inactive"] == [code]
+    clock.t += 3600
+    assert hub.maintain()["expired"] == [code]
+    assert store.peek(code) is None and LobbyStore(store.persistence).peek(code) is None

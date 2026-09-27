@@ -1,0 +1,117 @@
+{# Spielmenü: Lobby, Runde, Modus und Regeln (links), Kartenauswahl (rechts) #}
+<dialog class="menu" id="menu" aria-labelledby="menu-title">
+  <form class="menu-card" id="menu-form" novalidate>
+    <header class="menu-head">
+      <div>
+        <p class="eyebrow">WorldMapGuessr</p>
+        <h2 id="menu-title">{{ t('menu.titleNew') }}</h2>
+      </div>
+      <button type="button" class="menu-close" id="menu-close" aria-label="{{ t('menu.closeLabel') }}" title="{{ t('menu.closeTitle') }}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </header>
+
+    <div class="menu-body">
+      <div class="menu-col">
+        <section class="menu-section lobby-section" id="lobby-section" aria-labelledby="sec-lobby" hidden>
+          <div class="block-head">
+            <h3 id="sec-lobby">{{ t('lobby.title') }} <span class="lobby-count" id="lobby-count"></span></h3>
+            <span class="scope" title="{{ t('lobby.scopeTitle') }}">{{ t('lobby.scope') }}</span>
+          </div>
+          <div class="invite">
+            <input id="lobby-link" type="text" readonly aria-label="{{ t('lobby.link') }}">
+            <button type="button" class="btn" id="lobby-copy">{{ t('lobby.copy') }}</button>
+          </div>
+          <ul class="players" id="lobby-players" aria-label="{{ t('lobby.players') }}"></ul>
+          <div class="lobby-exit">
+            <button type="button" class="btn" id="lobby-leave">{{ t('lobby.leave') }}</button>
+            <button type="button" class="btn btn-danger" id="lobby-close" hidden>{{ t('lobby.close') }}</button>
+          </div>
+          <div class="fields adv-only" id="lobby-fields">
+            <div class="field password host-only">
+              <label for="lobby-password">{{ t('lobby.password') }}<small id="lobby-privacy"></small></label>
+              <div class="password-row">
+                <input id="lobby-password" type="password" autocomplete="new-password" placeholder="{{ t('lobby.passwordNew') }}" maxlength="64">
+                <button type="button" class="btn" id="lobby-password-set">{{ t('lobby.passwordSet') }}</button>
+                <button type="button" class="btn" id="lobby-password-clear">{{ t('lobby.passwordClear') }}</button>
+              </div>
+            </div>
+            <label class="field toggle host-only" for="lobby-allow-send">
+              <span>{{ t('lobby.allowSend') }}<small>{{ t('lobby.allowSendHint') }}</small></span>
+              <input id="lobby-allow-send" type="checkbox" role="switch" checked>
+            </label>
+          </div>
+        </section>
+        <div class="field keep-field adv-only" id="keep-field">
+          <label for="keep-ttl">{{ t('keep.label') }}<small>{{ t('keep.hint') }}</small></label>
+          <select id="keep-ttl"></select>
+        </div>
+        <div class="round-block">
+          <div class="block-head">
+            <h3 id="sec-round">{{ t('round.title') }}</h3>
+            <span class="scope" id="round-scope" hidden>{{ t('round.scope') }}</span>
+          </div>
+          <p class="round-note" id="round-note" hidden></p>
+          <details class="mp-rules" id="mp-rules" hidden>
+            <summary>{{ t('mpRules.title') }}</summary>
+            <ul>
+              {% for key in ["unique", "placed", "lives", "more", "send", "timer", "endgame", "feed", "late", "score"] %}
+              <li{% if key == "send" %} id="mp-rule-send"{% endif %}>{{ t('mpRules.' ~ key) | safe }}</li>
+              {% endfor %}
+            </ul>
+          </details>
+        </div>
+        <section class="menu-section game-settings mode-section" aria-labelledby="sec-mode">
+          <h4 id="sec-mode">{{ t('mode.title') }} <span class="custom-badge" id="custom-badge" hidden>{{ t('mode.custom') }}</span></h4>
+          <div class="mode-cards" id="mode-cards" role="radiogroup" aria-labelledby="sec-mode"></div>
+          <h4 id="sec-level">{{ t('level.title') }}</h4>
+          <div class="level-bar" id="level-bar" role="radiogroup" aria-labelledby="sec-level"></div>
+          <p class="preset-values" id="preset-values"></p>
+        </section>
+        <button type="button" class="adv-toggle" id="menu-advanced" aria-expanded="false" aria-controls="menu-form">
+          <span>{{ t('menu.advanced') }}</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <section class="menu-section game-settings adv-only" aria-labelledby="sec-rules">
+          <h4 id="sec-rules">{{ t('rules.title') }}</h4>
+          <div class="fields" id="rule-fields"></div>
+          <p class="balance-note" id="balance-note"></p>
+        </section>
+      </div>
+
+      <section class="menu-section menu-col map-col game-settings" id="map-picker" aria-labelledby="sec-map">
+        <h4 id="sec-map">{{ t('map.title') }} <span class="custom-badge" id="map-custom-badge" hidden>{{ t('map.custom') }}</span></h4>
+        <div class="map-presets" role="radiogroup" aria-labelledby="sec-map"></div>
+        <div class="map-sub" id="map-sub">
+          <p class="map-sub-title">{{ t('map.countriesFrom') }}</p>
+          <div class="continent-chips" role="group" aria-label="{{ t('map.continentsLabel') }}"></div>
+          <label class="field toggle" id="map-small-field" for="map-small">
+            <span>{{ t('map.small') }}<small id="map-small-hint"></small></span>
+            <input id="map-small" type="checkbox" role="switch" checked>
+          </label>
+        </div>
+        <p class="map-summary" id="map-summary" aria-live="polite"></p>
+        <button type="button" class="adv-toggle" id="picker-toggle" aria-expanded="false" aria-controls="picker-panel" data-always="1">
+          <span>{{ t('picker.toggle') }}</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="picker" id="picker-panel" hidden>
+          <div class="picker-head">
+            <p class="picker-hint">{{ t('picker.hint') }}</p>
+            <input type="search" id="picker-search" placeholder="{{ t('picker.search') }}" autocomplete="off" aria-label="{{ t('picker.search') }}" data-always="1">
+          </div>
+          <div class="picker-list" id="picker-list"></div>
+        </div>
+      </section>
+    </div>
+
+    <footer class="menu-foot">
+      <p id="menu-summary" aria-live="polite"></p>
+      <div class="foot-actions">
+        <button type="button" class="btn btn-lg" id="menu-back" hidden>{{ t('common.back') }}</button>
+        <button type="button" class="btn btn-lg" id="menu-create-lobby">{{ t('menu.createLobby') }}</button>
+        <button type="submit" class="btn btn-primary btn-lg" id="menu-start">{{ t('menu.start') }}</button>
+      </div>
+    </footer>
+  </form>
+</dialog>

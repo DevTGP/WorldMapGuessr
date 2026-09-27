@@ -1,0 +1,103 @@
+{# Karte, Ladebildschirm und alles, was im Spiel über der Karte liegt #}
+<div id="stage">
+  <canvas id="map" role="img" aria-label="{{ t('hud.mapLabel') }}"></canvas>
+</div>
+<div id="loading" class="loading" role="progressbar" aria-label="{{ t('loading.label') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+  <div class="loading-card">
+    <p class="loading-title">WorldMapGuessr</p>
+    <div class="loading-track"><i class="loading-fill"></i><i class="loading-shimmer"></i></div>
+    <p class="loading-row"><span class="loading-label">{{ t('loading.program') }}</span><b class="loading-pct">0 %</b></p>
+    <p class="loading-detail"></p>
+    <button class="btn btn-primary loading-retry" type="button" onclick="location.reload()" hidden>{{ t('loading.retry') }}</button>
+  </div>
+</div>
+
+<header class="hud hud-title">
+  <h1>WorldMapGuessr</h1>
+  <p id="title-hint">{{ t('hud.hintSolo') }}</p>
+</header>
+
+<nav class="hud hud-rotate" aria-label="{{ t('hud.rotate') }}">
+  <button id="rotate-west" type="button" title="{{ t('hud.rotateWestTitle') }}" aria-label="{{ t('hud.rotateWest') }}">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+  </button>
+  <span class="center"><small>{{ t('hud.center') }}</small><b id="center">0°</b></span>
+  <button id="rotate-east" type="button" title="{{ t('hud.rotateEastTitle') }}" aria-label="{{ t('hud.rotateEast') }}">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+  </button>
+</nav>
+
+<div class="hud hud-status">
+  <button class="lobby-badge" id="lobby-badge" type="button" title="{{ t('hud.openLobby') }}" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c.8-3.4 3.2-5 6-5s5.2 1.6 6 5M16 5.5a3 3 0 010 5.6M18.5 14c1.4.7 2.2 2.2 2.5 4"/></svg>
+    <b></b><span></span>
+  </button>
+  <div class="progress" id="progress-wrap" role="img" aria-label="{{ t('hud.progressLabel', placed=0, total=0) }}" title="{{ t('hud.progressTitle') }}">
+    <span class="progress-fill" id="progress-fill"></span>
+    <b id="progress">0 / 0</b>
+  </div>
+  <div class="lives" id="lives" role="img" title="{{ t('hud.lives') }}"></div>
+  <button class="btn btn-icon" id="open-settings" type="button" title="{{ t('settings.title') }}" aria-label="{{ t('settings.title') }}">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M4.2 7.5l2 1.2M17.8 15.3l2 1.2M4.2 16.5l2-1.2M17.8 8.7l2-1.2"/><circle cx="12" cy="12" r="7"/></svg>
+  </button>
+  <button class="btn" id="to-home" type="button" title="{{ t('hud.toHomeTitle') }}">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5L12 5l8 6.5M6.5 9.8V19h11V9.8"/></svg>
+    <span>{{ t('hud.toHome') }}</span>
+  </button>
+</div>
+
+<section class="hud hud-inventory" aria-label="{{ t('inv.label') }}">
+  <div class="inv-meters">
+    <div class="refill-meter" id="refill-meter" role="status" hidden><span class="pips" aria-hidden="true"></span><span class="refill-text"></span></div>
+    <div class="timer-meter" id="timer-meter" role="timer" hidden>
+      <svg class="timer-ring" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8"/><circle class="v" cx="10" cy="10" r="8" pathLength="1"/></svg>
+      <span class="timer-text"></span>
+    </div>
+  </div>
+  <span class="label" aria-hidden="true">{{ t('inv.label') }}</span>
+  <div class="slots" id="slots" tabindex="-1"></div>
+</section>
+
+<nav class="hud hud-players" id="players-rail" aria-label="{{ t('rail.label') }}" hidden>
+  <h2>{{ t('rail.title') }}</h2>
+  <ul></ul>
+  <p class="rail-quota" hidden></p>
+  <p class="rail-hint">{{ t('rail.hint') }}</p>
+</nav>
+
+<svg class="held-layer" id="held-layer" aria-hidden="true"></svg>
+<aside class="hud hud-feed" id="feed" aria-label="{{ t('feed.title') }}">
+  <header class="feed-head">
+    <h2>{{ t('feed.title') }}</h2>
+    <button type="button" class="feed-toggle" aria-controls="feed-list" aria-expanded="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+  </header>
+  <ol class="feed-list" id="feed-list" aria-live="polite"></ol>
+  <form class="feed-chat" hidden>
+    <input type="text" maxlength="200" placeholder="{{ t('feed.chatPlaceholder') }}" aria-label="{{ t('feed.chatLabel') }}" autocomplete="off" enterkeyhint="send">
+    <button type="submit" class="btn" aria-label="{{ t('feed.chatSend') }}" title="{{ t('feed.chatSendTitle') }}">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 16-2.5-6.5z"/></svg>
+    </button>
+  </form>
+</aside>
+
+<div class="hud hud-readout" aria-live="off">
+  <span class="coord" id="coord">— · —</span>
+  <span>{{ t('hud.zoom') }} <b id="zoom">100 %</b></span>
+</div>
+
+<nav class="hud hud-controls" aria-label="{{ t('controls.label') }}">
+  <button id="zoom-in" type="button" title="{{ t('controls.zoomInTitle') }}" aria-label="{{ t('controls.zoomIn') }}">+</button>
+  <button id="zoom-out" type="button" title="{{ t('controls.zoomOutTitle') }}" aria-label="{{ t('controls.zoomOut') }}">−</button>
+  <button id="zoom-reset" type="button" title="{{ t('controls.resetTitle') }}" aria-label="{{ t('controls.reset') }}">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+  </button>
+  <hr>
+  <button id="grid" type="button" title="{{ t('controls.gridTitle') }}" aria-label="{{ t('controls.grid') }}" aria-pressed="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c-3 3-3 14 0 17M12 3.5c3 3 3 14 0 17"/></svg>
+  </button>
+  <button id="fullscreen" type="button" title="{{ t('controls.fullscreenTitle') }}" aria-label="{{ t('controls.fullscreen') }}" aria-pressed="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5M4 4l5.5 5.5M20 4l-5.5 5.5M4 20l5.5-5.5M20 20l-5.5-5.5"/></svg>
+  </button>
+</nav>

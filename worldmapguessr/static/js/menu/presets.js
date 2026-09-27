@@ -11,7 +11,9 @@
 //   Mindesttempo:       60 · X / (T · (C/E − 1)) Treffer pro Minute, damit der Timer das Inventar nicht leert
 // (S Start-Items, C neue Items, E Treffer bis Nachschub, X Wegnahme, T Timer, L Leben)
 
-export const LEVELS = ["Sehr einfach", "Einfach", "Normal", "Schwer", "Sehr schwer"];
+import { fmt, t } from "../i18n/index.js";
+
+export const LEVELS = [0, 1, 2, 3, 4].map((i) => t(`level.${i}`));
 export const DEFAULT_MODE = "casual";
 export const DEFAULT_LEVEL = 2;
 
@@ -24,31 +26,31 @@ const TIMER_ROWS = {
 
 export const MODES = [
   {
-    id: "casual", title: "Casual", blurb: "Ohne Zeitdruck. Zurücklegen erlaubt, Fehlwürfe behalten das Item.",
+    id: "casual", title: t("modes.casual.title"), blurb: t("modes.casual.blurb"),
     timer: false, noReturn: false, missLoses: false, sendEvery: 3,
     lives: [20, 12, 8, 6, 4], startItems: [8, 7, 6, 5, 5],
     refill: [[3, 2], [3, 2], [4, 3], [5, 4], [6, 5]], difficulty: [0, 20, 50, 65, 80],
   },
   {
-    id: "easyfocus", title: "Vereinfachter Fokus", blurb: "Ein Fehlwurf kostet das Item. Zurücklegen erlaubt, mehr Leben.",
+    id: "easyfocus", title: t("modes.easyfocus.title"), blurb: t("modes.easyfocus.blurb"),
     timer: false, noReturn: false, missLoses: true, sendEvery: 4,
     lives: [12, 9, 7, 6, 5], startItems: [13, 10, 8, 8, 8],
     refill: [[4, 2], [4, 2], [3, 2], [4, 3], [5, 4]], difficulty: [10, 30, 50, 70, 90],
   },
   {
-    id: "focus", title: "Fokus", blurb: "Kein Zurücklegen, ein Fehlwurf kostet das Item.",
+    id: "focus", title: t("modes.focus.title"), blurb: t("modes.focus.blurb"),
     timer: false, noReturn: true, missLoses: true, sendEvery: 5,
     lives: [8, 6, 5, 4, 3], startItems: [9, 8, 6, 6, 6],
     refill: [[4, 2], [5, 3], [3, 2], [4, 3], [5, 4]], difficulty: [20, 40, 60, 80, 100],
   },
   {
-    id: "tempo", title: "Tempo", blurb: "Ein Timer nimmt Items weg. Zurücklegen erlaubt.",
+    id: "tempo", title: t("modes.tempo.title"), blurb: t("modes.tempo.blurb"),
     timer: true, noReturn: false, missLoses: false, sendEvery: 5,
     lives: [15, 10, 7, 5, 4], startItems: [8, 7, 6, 6, 6],
     refill: [[3, 2], [3, 2], [3, 2], [5, 3], [5, 3]], difficulty: [0, 20, 50, 65, 80], ...TIMER_ROWS,
   },
   {
-    id: "hardcore", title: "Hardcore", blurb: "Timer, kein Zurücklegen, ein Fehlwurf kostet das Item.",
+    id: "hardcore", title: t("modes.hardcore.title"), blurb: t("modes.hardcore.blurb"),
     timer: true, noReturn: true, missLoses: true, sendEvery: 10,
     lives: [6, 4, 3, 2, 1], startItems: [8, 7, 6, 6, 6],
     refill: [[3, 2], [3, 2], [3, 2], [5, 3], [5, 3]], difficulty: [20, 40, 60, 80, 100], ...TIMER_ROWS,
@@ -110,9 +112,9 @@ export function mmss(seconds) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-/** Tempo schön: 2,7 */
+/** Tempo schön: 2,7 bzw. 2.7 */
 export function perMinute(v) {
-  return (Math.round(v * 10) / 10).toLocaleString("de-DE");
+  return fmt(Math.round(v * 10) / 10);
 }
 
 /**
@@ -121,11 +123,12 @@ export function perMinute(v) {
  */
 export function valuesLine(config, players = 1) {
   const { startItems, lives } = scaled(config, players);
-  const parts = [`${lives} Leben`, `Start ${startItems}`, `+${config.refillCount} je ${config.refillEvery} Treffer`];
+  const parts = [t("values.lives", { n: lives }), t("values.start", { n: startItems }),
+    t("values.refill", { count: config.refillCount, n: config.refillEvery })];
   if (config.timer) {
     const m = metrics(config, players);
-    parts.push(`alle ${config.timer} s −${config.timerTake} (nach ${config.grace} s)`);
-    parts.push(`Mindesttempo ${perMinute(m.tempo)}/min`);
+    parts.push(t("values.timer", { timer: config.timer, take: config.timerTake, grace: config.grace }));
+    parts.push(t("values.tempo", { tempo: perMinute(m.tempo) }));
   }
   return parts.join(" · ");
 }

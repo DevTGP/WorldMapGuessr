@@ -2,6 +2,7 @@
 (Überblick, Entfernen)."""
 from flask import Blueprint, current_app, jsonify, request, url_for
 
+from .codes import normalize
 from .store import LobbyError
 
 bp = Blueprint("lobbies_api", __name__, url_prefix="/api/lobbies")
@@ -53,9 +54,7 @@ def my_lobbies():
         if not isinstance(entry, dict):
             continue
         code = str(entry.get("code") or "")
-        lobby = _store().get(code)
-        summary = _store().summary(code, entry.get("id"), entry.get("token"),
-                                   online=hub.online_count(lobby["code"]) if lobby else 0)
+        summary = _store().summary(code, entry.get("id"), entry.get("token"), online=hub.online_count(normalize(code)))
         if summary:
             found.append(summary)
         else:
@@ -73,4 +72,4 @@ def remove_lobby(code):
 
 @bp.errorhandler(LobbyError)
 def lobby_error(err):
-    return jsonify(error=err.message, code=err.code), 400
+    return jsonify(error=err.message, code=err.code, params=err.params), 400

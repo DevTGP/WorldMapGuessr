@@ -39,7 +39,7 @@ def test_wrong_costs_shared_life_and_keeps_item():
     for i in range(3):
         rounds.place(rnd, "a", key, False, ["a", "b"])
     assert rnd["lives"] == 0 and rnd["status"] == rounds.LOST and key in rnd["hands"]["a"]
-    assert rnd["last"] == {"seq": 3, "type": "miss", "player": "a", "key": key, "lost": False}
+    assert rnd["last"] == {"seq": 3, "type": "miss", "player": "a", "key": key, "lost": False, "points": -30}
     assert rnd["lostReason"] == "lives"
     with pytest.raises(rounds.RoundError) as e:
         rounds.place(rnd, "b", rnd["hands"]["b"][0], True, ["a", "b"])
@@ -58,7 +58,7 @@ def test_shared_refill_counter_deals_to_everyone():
     rounds.place(rnd, "a", rnd["hands"]["a"][0], True, ["a", "b"])
     assert rnd["sinceRefill"] == 1
     res = rounds.place(rnd, "b", rnd["hands"]["b"][0], True, ["a", "b"])  # 2. Treffer der Lobby
-    assert res == {"refill": 4} and rnd["sinceRefill"] == 0
+    assert res["refill"] == 4 and rnd["sinceRefill"] == 0
     assert [len(rnd["hands"][p]) for p in "ab"] == [3, 3]
     assert rnd["placedBy"] == {rnd["placed"][0]: "a", rnd["placed"][1]: "b"}
     assert_unique(rnd)

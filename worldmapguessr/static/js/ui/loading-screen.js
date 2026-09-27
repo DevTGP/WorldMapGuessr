@@ -3,6 +3,8 @@
 // umgerechnet. Der Balken läuft nie rückwärts. Ein Schimmer (reine CSS-Transform-Animation, läuft
 // auch weiter, wenn der Browser gerade rechnet) zeigt, dass noch etwas passiert.
 
+import { t } from "../i18n/index.js";
+
 const HIDE_DELAY_MS = 180;
 const FADE_MS = 350;
 
@@ -50,7 +52,7 @@ export class LoadingScreen {
 
   /** Alles fertig: auf 100 %, kurz stehen lassen, ausblenden */
   async done() {
-    this.labelEl.textContent = "Fertig";
+    this.labelEl.textContent = t("loading.done");
     this.detailEl.textContent = "";
     this._set(1);
     await wait(HIDE_DELAY_MS);
@@ -61,7 +63,7 @@ export class LoadingScreen {
 
   fail(message) {
     this.el.classList.add("failed");
-    this.labelEl.textContent = "Die Karte konnte nicht geladen werden";
+    this.labelEl.textContent = t("loading.failTitle");
     this.detailEl.textContent = message;
     this.el.querySelector(".loading-retry").hidden = false;
   }

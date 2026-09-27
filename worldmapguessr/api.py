@@ -25,7 +25,19 @@ def health():
 @bp.get("/items")
 def list_items():
     """Alle Items mit Zählern und Schwierigkeit (0–10), optional gefiltert: /api/items?kind=continent"""
-    return jsonify(items=[with_difficulty(i) for i in _store().list(request.args.get("kind"))])
+    names = _names_en()
+    items = [with_difficulty(i) for i in _store().list(request.args.get("kind"))]
+    for it in items:
+        it["nameEn"] = names.get((it["kind"], it["code"]), it["name"])
+    return jsonify(items=items)
+
+
+def _names_en() -> dict:
+    """Englische Namen (Kartendaten index.json) je (kind, code) – für die Statistikseite auf Englisch"""
+    ext = current_app.extensions
+    if "names_en" not in ext:
+        ext["names_en"] = {(it["kind"], it["id"]): it.get("nameEn") or it["name"] for it in ext["map_index"]["items"]}
+    return ext["names_en"]
 
 
 @bp.get("/items/<uid>")

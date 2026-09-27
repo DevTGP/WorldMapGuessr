@@ -7,6 +7,8 @@
 .pytest_cache/
 **/__pycache__/
 **/*.pyc
+**/*.gz
+**/*.gz.*.tmp
 instance/
 build/
 tests/
@@ -15,3 +17,4 @@ Dockerfile
 docker-compose.yml
 .dockerignore
 README.md
+docs/

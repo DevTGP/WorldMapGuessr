@@ -47,6 +47,8 @@ export class LobbyClient extends EventTarget {
   leave() { this._send({ type: "leave" }); }
   /** Nur Host: Lobby für alle beenden */
   close() { this._send({ type: "close" }); }
+  /** Nur Host: Spieler entfernen */
+  kick(playerId) { this._send({ type: "kick", player: playerId }); }
 
   _open() {
     const proto = location.protocol === "https:" ? "wss" : "ws";
@@ -92,6 +94,7 @@ export class LobbyClient extends EventTarget {
         break;
       case "left":
       case "closed":
+      case "kicked":
         // Verbindung endet hier; gespeicherte Identität ist wertlos geworden
         this.closedForGood = true;
         identity.clear(this.code);

@@ -2,6 +2,7 @@
 // richtig eingesetzte Teile zeigen kurz ihren Namen und verschwinden dann.
 
 import { iconPath } from "../map/icon.js";
+import { t } from "../i18n/index.js";
 
 export const ICON_W = 136;
 export const ICON_H = 76;
@@ -46,7 +47,7 @@ export class Inventory {
       btn.className = "slot entering";
       btn.dataset.id = p.id;
       btn.dataset.state = "ready";
-      btn.setAttribute("aria-label", "Item aufnehmen");
+      btn.setAttribute("aria-label", t("inv.pick"));
       btn.innerHTML = '<svg aria-hidden="true" preserveAspectRatio="xMidYMid meet"><path class="shape"/></svg>';
       btn.addEventListener("click", () => this.onSlotClick(p.id));
       this.container.append(btn);
@@ -70,7 +71,7 @@ export class Inventory {
 
   _changed() {
     const n = this.openCount;
-    this.countEl.innerHTML = n ? `Inventar <b>${n}</b>` : "Inventar";
+    this.countEl.innerHTML = n ? `${t("inv.label")} <b>${n}</b>` : t("inv.label");
     this._edges();
   }
 

@@ -2,6 +2,8 @@
 // Item aufnehmen, dann ein Feld anklicken → Item wird an diesen Spieler gesendet.
 // Nur sichtbar, wenn der Host das Senden erlaubt und eine Runde läuft.
 
+import { t } from "../i18n/index.js";
+
 export class PlayersRail {
   /**
    * @param {HTMLElement} el
@@ -39,9 +41,9 @@ export class PlayersRail {
       const count = btn.querySelector(".rail-count");
       count.innerHTML = "<b></b><span></span>";
       count.firstChild.textContent = n;
-      count.lastChild.textContent = n === 1 ? " Item" : " Items";
-      btn.title = `Gehaltenes Item an ${p.name} senden`;
-      btn.setAttribute("aria-label", `${p.name}, ${n} Items – gehaltenes Item senden`);
+      count.lastChild.textContent = ` ${t("unit.itemsWord", { n })}`;
+      btn.title = t("rail.sendTo", { name: p.name });
+      btn.setAttribute("aria-label", t("rail.sendLabel", { name: p.name, n }));
       btn.addEventListener("click", () => this._send(p, btn));
       li.append(btn);
       return li;
@@ -53,20 +55,18 @@ export class PlayersRail {
     const q = this.client.sends;
     this.quota.hidden = !q || q.left === null;
     if (this.quota.hidden) return;
-    this.quota.innerHTML = q.left > 0
-      ? `Du kannst <b>${q.left}</b> ${q.left === 1 ? "Item" : "Items"} senden`
-      : `Senden wieder nach <b>${q.next}</b> ${q.next === 1 ? "Item" : "Items"}`;
+    this.quota.innerHTML = q.left > 0 ? t("rail.quota", { n: q.left }) : t("rail.quotaNext", { n: q.next });
     this.quota.classList.toggle("empty", q.left === 0);
-    this.quota.title = `Je ${q.every} vom Server erhaltene Items darfst du 1 Item senden`;
+    this.quota.title = t("rail.quotaTitle", { n: q.every });
   }
 
   _send(player, btn) {
     const g = this.game;
     if (g.busy) return;
-    if (!g.held.active) return g.toast("Erst ein Item aus dem Inventar aufnehmen", "hint");
+    if (!g.held.active) return g.toast(t("rail.pickFirst"), "hint");
     const q = this.client.sends;
     if (q && q.left === 0) {
-      return g.toast(`Senden wieder möglich nach ${q.next} weiteren ${q.next === 1 ? "Item" : "Items"} vom Server`, "hint");
+      return g.toast(t("err.send_limit", { n: q.next }), "hint");
     }
     g.giveHeld(player.id, player.name, btn.querySelector(".avatar"));
   }

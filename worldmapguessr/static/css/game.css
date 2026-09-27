@@ -253,7 +253,7 @@ body.is-holding #map { cursor: crosshair; }
   border: 1px solid var(--panel-line);
   border-radius: 10px;
   padding: 20px 22px;
-  max-width: min(360px, calc(100% - 32px));
+  max-width: min(400px, calc(100% - 32px));
   background: var(--panel);
   color: var(--ink);
   backdrop-filter: blur(10px);
@@ -263,6 +263,21 @@ body.is-holding #map { cursor: crosshair; }
 .round-dialog h2 { margin: 0 0 6px; font-size: 18px; text-wrap: balance; }
 .round-dialog p { margin: 0 0 16px; color: var(--ink-soft); }
 .round-dialog .actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Punkte am Rundenende (game/score-view.js) */
+.dlg-score { margin: -4px 0 16px; }
+.score-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.score-table th { text-align: left; font-weight: 400; padding: 4px 0; color: var(--ink-soft); }
+.score-table td { text-align: right; padding: 4px 0 4px 12px; font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.score-table tbody tr + tr { border-top: 1px solid var(--panel-line); }
+.score-table .who { font-weight: 600; color: hsl(var(--hue, 210) 60% var(--who-l)); }
+.score-table small { color: var(--ink-soft); font-size: 12px; }
+.score-table tr.me th { color: var(--ink); }
+.score-table tr.bonus th { font-style: italic; }
+.score-table tfoot tr { border-top: 2px solid var(--panel-line); }
+.score-table tfoot th { color: var(--ink); font-weight: 600; padding-top: 8px; }
+.score-table tfoot td { font-weight: 600; font-size: 16px; padding-top: 8px; color: var(--ink); }
+.round-dialog .score-note { margin: 6px 0 0; font-size: 12px; }
 
 @media (max-width: 480px) {
   .slot { height: 76px; }

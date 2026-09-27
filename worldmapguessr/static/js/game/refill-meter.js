@@ -1,6 +1,8 @@
 // Anzeige am Inventar: wie viele Treffer noch fehlen, bis neue Teile kommen.
 // Einzelspiel: eigene Treffer. Lobby: Treffer der ganzen Lobby (gemeinsamer Zähler vom Server).
 
+import { t } from "../i18n/index.js";
+
 const MAX_PIPS = 10; // darüber nur Text
 
 export class RefillMeter {
@@ -22,7 +24,7 @@ export class RefillMeter {
     this.el.classList.toggle("empty", empty);
     if (empty) {
       this.pips.replaceChildren();
-      this.text.textContent = "Vorrat leer – keine neuen Items mehr";
+      this.text.textContent = t("refill.empty");
       this.el.setAttribute("aria-label", this.text.textContent);
       this.lastSince = 0;
       return;
@@ -37,11 +39,11 @@ export class RefillMeter {
         return pip;
       })
       : []));
-    this.text.innerHTML = `Noch <b></b> Treffer${shared ? '<span class="long"> der Lobby</span>' : ""} bis <b></b><span class="long"> Items</span>`;
+    this.text.innerHTML = t(shared ? "refill.textLobby" : "refill.text", { n: left });
     const [a, b] = this.text.querySelectorAll("b");
     a.textContent = left;
     b.textContent = `+${next}`;
-    this.el.setAttribute("aria-label", `Noch ${left} Treffer bis ${next} neue Items`);
+    this.el.setAttribute("aria-label", t("refill.label", { left, n: next }));
 
     // Nachschub gerade gekommen → kurz aufleuchten
     if (since < this.lastSince) {

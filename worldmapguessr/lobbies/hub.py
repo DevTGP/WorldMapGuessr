@@ -16,7 +16,8 @@ from .settings import DEFAULT_ALLOW_SEND, clean_name
 from .store import LobbyError, LobbyStore
 
 HOST_GRACE = 10.0         # s: so lange darf der Host weg sein (z. B. Seite neu laden), bevor die Rolle wechselt
-EXPIRE_INTERVAL = 600.0   # s: Abstand der Aufräumläufe für verfallene Lobbys
+MAINTENANCE_INTERVAL = 60.0  # s: Abstand der Pflegeläufe (inaktive Lobbys aus dem Speicher nehmen)
+EXPIRE_EVERY = 10            # jeder n-te Pflegelauf löscht verfallene Lobbys
 TICK_INTERVAL = 0.5       # s: Takt, in dem die Rundentimer geprüft werden
 CHAT_IN_STATE = 30        # letzte Chat-Nachrichten im Lobby-Zustand
 
@@ -117,6 +118,9 @@ class LobbyHub:
         if kind == "close":
             self._close(code, pid)
             return
+        if kind == "kick":
+            self._kick(code, pid, msg.get("player"))
+            return
         if kind == "settings":
             self.store.update_settings(code, pid, msg.get("settings") or {})
         elif kind == "start":
@@ -170,6 +174,28 @@ class LobbyHub:
         if lobby is not None:
             self.broadcast(code)
 
+    def _kick(self, code: str, host_id: str, target: str):
+        """Host entfernt einen Spieler: seine Items gehen zurück in den Vorrat, seine Tabs bekommen "kicked".
+        Über den Link kann er später als neuer Spieler wieder beitreten."""
+        with self.lock:
+            lobby = self.store.get(code)
+            if not lobby:
+                raise LobbyError("not_found", "Diese Lobby gibt es nicht (mehr).")
+            if lobby["host"] != host_id:
+                raise LobbyError("not_host", "Nur der Host kann Spieler entfernen.")
+            if target == host_id or target not in lobby["players"]:
+                raise LobbyError("bad_target", "Diesen Spieler gibt es in der Lobby nicht.")
+            name = lobby["players"][target]["name"]
+            conns = self.online.get(code, {}).pop(target, [])
+            self.offline_since.pop((code, target), None)
+            self.store.return_hand(code, target, online=self._online_ids(code))
+            self.store.remove_player(code, target, online=self.online.get(code, {}).keys())
+            self.store.log_notice(code, {"type": "kick", "player": target, "name": name})
+        for c in conns:
+            c.player_id = None
+            c.send({"type": "kicked"})
+        self.broadcast(code)
+
     def _close(self, code: str, player_id: str):
         """Host beendet die Lobby: alle bekommen "closed", die Lobby wird gelöscht."""
         with self.lock:
@@ -191,7 +217,6 @@ class LobbyHub:
         players = [
             {"id": p["id"], "name": p["name"], "online": p["id"] in online, "host": p["id"] == lobby["host"]}
             for p in sorted(lobby["players"].values(), key=lambda p: p["joined"])
-            if p["id"] in online or p["id"] == lobby["host"]
         ]
         s = lobby["settings"]
         return {
@@ -278,11 +303,27 @@ class LobbyHub:
         threading.Thread(target=loop, name="lobby-timer", daemon=True).start()
 
     # ---------- Aufräumen ----------
-    def start_expiry(self, interval: float = EXPIRE_INTERVAL):
+    def maintain(self, expire: bool = True) -> dict:
+        """Inaktive Lobbys (niemand verbunden, INACTIVE_AFTER ohne Aktivität) aus dem Speicher nehmen; verfallene
+        löschen. Gibt {"inactive": [...], "expired": [...]} zurück."""
+        with self.lock:
+            idle = self.store.hibernate(online_codes=[c for c, players in self.online.items() if players])
+            gone = self.store.expire() if expire else []
+            for code in idle + gone:
+                self.online.pop(code, None)
+                for key in [k for k in self.offline_since if k[0] == code]:
+                    del self.offline_since[key]
+        return {"inactive": idle, "expired": gone}
+
+    def start_maintenance(self, interval: float = MAINTENANCE_INTERVAL):
         def loop():
+            n = 0
             while True:
                 time.sleep(interval)
-                for code in self.store.expire():
-                    with self.lock:
-                        self.online.pop(code, None)
-        threading.Thread(target=loop, name="lobby-expiry", daemon=True).start()
+                n += 1
+                try:
+                    self.maintain(expire=n % EXPIRE_EVERY == 0)
+                except Exception:  # ein Fehler darf die Pflege nicht beenden
+                    import logging
+                    logging.getLogger(__name__).exception("Lobby-Pflege")
+        threading.Thread(target=loop, name="lobby-maintenance", daemon=True).start()

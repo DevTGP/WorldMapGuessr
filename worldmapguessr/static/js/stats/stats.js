@@ -3,9 +3,10 @@
 import { fetchItems } from "../api/items-api.js";
 import { sortItems, NUMERIC_KEYS } from "./sort.js";
 import { renderRows, renderSummary, renderTotals, renderFoot, renderJson } from "./render.js";
+import { LANG, t } from "../i18n/index.js";
 
 const $ = (id) => document.getElementById(id);
-const state = { items: [], kind: "", query: "", key: "name", dir: 1 };
+const state = { items: [], raw: new Map(), kind: "", query: "", key: "name", dir: 1 };
 
 function visibleItems() {
   const q = state.query.trim().toLowerCase();
@@ -21,7 +22,7 @@ function render() {
   renderSummary($("summary"), items);
   renderTotals(items);
   renderFoot($("foot"), items);
-  renderJson($("json"), items);
+  renderJson($("json"), items.map((i) => state.raw.get(i.uid)));
   $("empty").hidden = items.length > 0;
   document.querySelectorAll("th[data-key]").forEach((th) => {
     if (th.dataset.key === state.key) th.setAttribute("aria-sort", state.dir > 0 ? "ascending" : "descending");
@@ -30,12 +31,15 @@ function render() {
 }
 
 async function load() {
-  $("summary").textContent = "Lade Daten …";
+  $("summary").textContent = t("stats.loading");
   try {
-    state.items = await fetchItems(window.WMG?.apiBase);
+    const items = await fetchItems(window.WMG?.apiBase);
+    state.raw = new Map(items.map((i) => [i.uid, i]));
+    // Anzeige (Tabelle, Suche, Sortierung) in der Sprache der Seite; Rohdaten bleiben unverändert
+    state.items = LANG === "en" ? items.map((i) => ({ ...i, name: i.nameEn ?? i.name })) : items;
     render();
   } catch (err) {
-    $("summary").textContent = `Die Statistik konnte nicht geladen werden (${err.message}). Läuft der Server?`;
+    $("summary").textContent = t("stats.failed", { error: err.message });
   }
 }
 
@@ -68,7 +72,7 @@ $("rows").addEventListener("click", (e) => {
   const td = e.target.closest("td.uid");
   if (!td) return;
   navigator.clipboard?.writeText(td.dataset.uid).then(
-    () => { td.textContent = "kopiert"; setTimeout(() => { td.textContent = td.dataset.uid.slice(0, 8) + "…"; }, 900); },
+    () => { td.textContent = t("stats.copied"); setTimeout(() => { td.textContent = td.dataset.uid.slice(0, 8) + "…"; }, 900); },
     () => {},
   );
 });

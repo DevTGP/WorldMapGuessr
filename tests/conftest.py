@@ -14,6 +14,7 @@ def app(request, tmp_path):
         "ITEM_STORE_PATH": str(tmp_path / "items.json"),
         "LOBBY_STORE_PATH": str(tmp_path / "lobbies.json"),
         "LOBBY_EXPIRY_THREAD": False,
+        "PRECOMPRESS": False,
         "ITEM_IMPORT_PATH": "",
         "MONGODB_URI": "",
     }

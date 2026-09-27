@@ -3,6 +3,8 @@
 // Neue Meldungen stehen unten; ältere werden blasser, bleiben aber lesbar (Verlauf scrollbar).
 // Eingeklappt zeigt die Leiste nur die neueste Meldung.
 
+import { fmt, t } from "../i18n/index.js";
+
 const MAX_ENTRIES = 80;
 const FADE_AFTER_MS = 12000;
 const COLLAPSED_KEY = "wmg.feed.collapsed";
@@ -58,15 +60,15 @@ export class Feed {
     this.collapsed = collapsed;
     this.root.classList.toggle("collapsed", collapsed);
     this.toggleBtn.setAttribute("aria-expanded", String(!collapsed));
-    this.toggleBtn.title = collapsed ? "Meldungen aufklappen" : "Meldungen einklappen";
+    this.toggleBtn.title = t(collapsed ? "feed.expand" : "feed.collapse");
     if (!collapsed) { this.unread = 0; this._badge(); this._scroll(); }
     if (remember) try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify(collapsed)); } catch { /* egal */ }
   }
 
   /**
    * Meldung anhängen.
-   * @param {{kind?: string, parts: (string|{who: string, id?: string}|{item: string}|{b: string})[]}|string} msg
-   *   kind: good | bad | info | take | gift | refill | chat | hint · parts: Text, Spieler, Item, fett
+   * @param {{kind?: string, parts: (string|{who: string, id?: string}|{item: string}|{b: string}|{pts: number})[]}|string} msg
+   *   kind: good | bad | info | take | gift | refill | chat | hint · parts: Text, Spieler, Item, fett, Punkte
    */
   push(msg, kind = "info") {
     if (typeof msg === "string") msg = { parts: [msg], kind };
@@ -89,7 +91,7 @@ export class Feed {
 
   /** Chat-Nachricht eines Spielers */
   chat({ id, name, text, mine }) {
-    const li = this.push({ kind: "chat", parts: [{ who: mine ? "Du" : name, id }, ": ", text] });
+    const li = this.push({ kind: "chat", parts: [{ who: mine ? t("feed.you") : name, id }, ": ", text] });
     if (mine) li.classList.add("mine");
   }
 
@@ -128,6 +130,12 @@ function part(p) {
     b.className = "item";
     b.textContent = p.item;
     return b;
+  }
+  if ("pts" in p) {
+    const s = document.createElement("span");
+    s.className = `pts${p.pts < 0 ? " neg" : ""}`;
+    s.textContent = t("score.pts", { pts: (p.pts > 0 ? "+" : "") + fmt(p.pts) });
+    return s;
   }
   const b = document.createElement("b");
   b.textContent = p.b;

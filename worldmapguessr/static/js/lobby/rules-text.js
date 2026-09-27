@@ -1,6 +1,7 @@
 // Texte, die erklären, was die Rundeneinstellungen in einer Lobby bewirken.
 
 import { scaled } from "../menu/presets.js";
+import { t } from "../i18n/index.js";
 
 /**
  * Wie viele Items bekommt jeder, wenn `total` reihum an `players` Spieler geht?
@@ -10,54 +11,41 @@ export function splitText(total, players) {
   if (players <= 1) return String(total);
   const base = Math.floor(total / players);
   const extra = total % players;
-  if (players > 5) return extra ? `je ${base}–${base + 1}` : `je ${base}`;
+  if (players > 5) return t("lobbyHint.each", { n: extra ? `${base}–${base + 1}` : base });
   return Array.from({ length: players }, (_, i) => base + (i < extra ? 1 : 0)).join(" + ");
 }
 
 /** Hinweise unter den Reglern im Lobby-Modus */
 export function ruleHints(config, players) {
   const s = scaled(config, players);
+  const many = players > 1;
   return {
-    lives: players > 1
-      ? `für einen Spieler, +2 je weiterem – jetzt ${s.lives}, gemeinsam`
-      : "für einen Spieler, +2 je weiterem – gemeinsam",
-    startItems: players > 1
-      ? `für einen Spieler, +2 je weiterem – jetzt ${s.startItems}, reihum (${splitText(s.startItems, players)})`
-      : "für einen Spieler, +2 je weiterem – reihum verteilt",
-    refillCount: "insgesamt, reihum weiterverteilt",
-    refillEvery: "… Treffer der ganzen Lobby",
-    difficulty: "Reihenfolge, in der der Server austeilt",
-    timer: "gemeinsamer Takt ab Rundenbeginn (0 = aus)",
-    grace: "ab Rundenbeginn bis zum ersten Takt",
-    timerTake: players > 1
-      ? "für die ganze Lobby, reihum aus den Inventaren – je das älteste"
-      : "Items je Takt zurück in den Vorrat – das älteste zuerst",
-    noReturn: "Aufgenommenes muss eingesetzt (oder gesendet) werden",
-    missLoses: "Das Item geht zurück in den Vorrat (außer im Endspurt)",
+    lives: many ? t("lobbyHint.livesNow", { n: s.lives }) : t("lobbyHint.lives"),
+    startItems: many
+      ? t("lobbyHint.startItemsNow", { n: s.startItems, split: splitText(s.startItems, players) })
+      : t("lobbyHint.startItems"),
+    refillCount: t("lobbyHint.refillCount"),
+    refillEvery: t("lobbyHint.refillEvery"),
+    difficulty: t("lobbyHint.difficulty"),
+    timer: t("lobbyHint.timer"),
+    grace: t("hint.grace"),
+    timerTake: many ? t("lobbyHint.timerTakeMany") : t("lobbyHint.timerTake"),
+    noReturn: t("lobbyHint.noReturn"),
+    missLoses: t("hint.missLoses"),
   };
 }
 
 /** Regeltext zum Senden (Menü „So läuft eine Lobby-Runde“) */
 export function sendRule(settings) {
-  if (settings.allowSend === false) return "<b>Items senden</b> ist in dieser Lobby ausgeschaltet.";
+  if (settings.allowSend === false) return t("mpRules.sendOff");
   const n = settings.sendEvery ?? 0;
-  const limit = n ? ` Je <b>${n}</b> vom Server erhaltene Items darfst du <b>1</b> Item senden.` : "";
-  return `<b>Items senden:</b> Item aufnehmen und links einen Mitspieler anklicken.${limit}`;
+  return t("mpRules.send") + (n ? ` ${t("mpRules.sendLimit", { n })}` : "");
 }
 
 /** Hinweis über den Rundeneinstellungen: was gilt wann, wer stellt ein */
 export function roundNote(round, isHost) {
-  if (round?.status === "running") {
-    return isHost
-      ? `Runde ${round.number} läuft. Änderungen gelten erst, wenn du eine neue Runde startest.`
-      : `Runde ${round.number} läuft. Der Host kann die Einstellungen für die nächste Runde ändern.`;
-  }
-  if (round) {
-    return isHost
-      ? `Runde ${round.number} ist vorbei. Stelle die nächste Runde ein und starte sie für alle.`
-      : `Runde ${round.number} ist vorbei. Warte, bis der Host die nächste Runde startet.`;
-  }
-  return isHost
-    ? "Stelle die Runde ein und starte sie für alle."
-    : "Der Host stellt die Runde ein und startet sie für alle.";
+  const who = isHost ? "Host" : "Guest";
+  if (round?.status === "running") return t(`roundNote.running${who}`, { n: round.number });
+  if (round) return t(`roundNote.over${who}`, { n: round.number });
+  return t(`roundNote.new${who}`);
 }

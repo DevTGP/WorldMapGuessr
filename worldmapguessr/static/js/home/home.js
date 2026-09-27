@@ -7,6 +7,7 @@
 import { identity } from "../lobby/identity.js";
 import { confirmDialog } from "../lobby/confirm.js";
 import { LEVELS, MODE } from "../menu/presets.js";
+import { fmt, t } from "../i18n/index.js";
 
 const ROTATE_DEG_PER_S = 4; // Karte dreht sich im Hintergrund langsam weiter
 
@@ -86,7 +87,7 @@ export class Home {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       data = await res.json();
     } catch (err) {
-      console.warn("Laufende Spiele nicht geladen:", err.message);
+      console.warn("home: /lobbies/mine", err.message);
       this.list.classList.remove("loading");
       return;
     }
@@ -112,7 +113,7 @@ export class Home {
     const r = g.round;
     const pct = r ? Math.round((100 * r.placed) / Math.max(1, r.total)) : 0;
     const config = { ...g.config, kinds: new Set(g.config.kinds ?? []), excluded: new Set(g.config.excluded ?? []) };
-    const mode = MODE[g.config.mode] ? `${MODE[g.config.mode].title} ${LEVELS[g.config.level] ?? ""}`.trim() : "Eigene Einstellungen";
+    const mode = MODE[g.config.mode] ? `${MODE[g.config.mode].title} ${LEVELS[g.config.level] ?? ""}`.trim() : t("mode.custom");
     li.innerHTML = `
       <span class="game-icon">${g.solo ? ICON_SOLO : ICON_LOBBY}</span>
       <div class="game-main">
@@ -126,31 +127,39 @@ export class Home {
         <button type="button" class="btn btn-icon" data-act="remove">${ICON_TRASH}</button>
       </div>`;
     const title = li.querySelector(".game-title");
-    title.append(g.solo ? "Einzelspiel" : "Lobby ");
+    title.append(g.solo ? t("game.solo") : `${t("lobby.title")} `);
     if (!g.solo) title.append(Object.assign(document.createElement("code"), { textContent: g.code }));
-    if (current) title.append(tag("gerade offen", true));
-    if (!g.solo && g.isHost) title.append(tag("Host"));
-    if (g.private) title.append(tag("Passwort"));
+    if (current) title.append(tag(t("home.tagOpen"), true));
+    if (!g.solo && g.isHost) title.append(tag(t("lobby.host")));
+    if (g.private) title.append(tag(t("lobby.password")));
+    // ruht auf dem Server, wird beim Öffnen wiederhergestellt
+    if (g.active === false) title.append(Object.assign(tag(t("home.tagInactive")), { title: t("home.tagInactiveTitle") }));
     li.querySelector(".game-sub").textContent = `${mode} · ${this.mapLabel(config)}`;
 
     const meta = li.querySelector(".game-meta");
     const parts = [];
-    if (!r) parts.push("noch keine Runde");
+    if (!r) parts.push(t("home.noRound"));
     else {
-      const status = r.status === "won" ? '<span class="won">geschafft</span>'
-        : r.status === "lost" ? '<span class="lost">verloren</span>' : "";
-      parts.push(`Runde ${r.number}${status ? ` ${status}` : ""}`, `${r.placed} / ${r.total} eingesetzt`,
-        `${r.lives} / ${r.livesMax} Leben`);
+      const status = r.status === "won" ? `<span class="won">${t("home.won")}</span>`
+        : r.status === "lost" ? `<span class="lost">${t("home.lost")}</span>` : "";
+      parts.push(`${t("home.round", { n: r.number })}${status ? ` ${status}` : ""}`,
+        t("home.placed", { placed: r.placed, total: r.total }), t("home.lives", { n: r.lives, max: r.livesMax }));
+      // Punkte: Einzelspiel die eigenen, Lobby Team (und die eigenen)
+      if (typeof r.points === "number") {
+        parts.push(g.solo || typeof r.myPoints !== "number"
+          ? t("home.points", { pts: fmt(r.points) })
+          : t("home.pointsLobby", { pts: fmt(r.points), mine: fmt(r.myPoints) }));
+      }
     }
-    if (!g.solo) parts.push(`${g.online} von ${g.players} online`);
-    parts.push(`verfällt ${untilText(g.expiresAt)}`);
+    if (!g.solo) parts.push(t("home.online", { n: g.online, of: g.players }));
+    parts.push(untilText(g.expiresAt));
     meta.innerHTML = parts.join(" · ");
 
     const resume = li.querySelector('[data-act="resume"]');
-    resume.textContent = current ? "Zurück" : !r || r.status !== "running" ? "Öffnen" : "Fortsetzen";
+    resume.textContent = t(current ? "common.back" : !r || r.status !== "running" ? "home.open" : "home.resume");
     resume.addEventListener("click", () => this.on.resume(g.code));
     const remove = li.querySelector('[data-act="remove"]');
-    const what = g.solo ? "Einzelspiel löschen" : g.isHost ? "Lobby beenden (für alle)" : "Lobby verlassen";
+    const what = t(g.solo ? "home.deleteSolo" : g.isHost ? "home.endLobby" : "lobby.leave");
     remove.title = what;
     remove.setAttribute("aria-label", what);
     remove.addEventListener("click", () => this._remove(g));
@@ -161,22 +170,16 @@ export class Home {
     const others = g.players - 1;
     let opts;
     if (g.solo) {
-      opts = { title: "Einzelspiel löschen?", text: "Die Runde und ihr Fortschritt werden gelöscht.", confirm: "Löschen", danger: true };
+      opts = { title: t("home.deleteSoloTitle"), text: t("home.deleteSoloText"), confirm: t("home.delete"), danger: true };
     } else if (g.isHost) {
       opts = {
-        title: `Lobby ${g.code} beenden?`,
-        text: others > 0
-          ? `Du bist Host: Die Lobby wird für alle gelöscht (${others} ${others === 1 ? "weiterer Spieler" : "weitere Spieler"}). Der Link funktioniert danach nicht mehr.`
-          : "Du bist Host: Die Lobby wird gelöscht. Der Link funktioniert danach nicht mehr.",
-        confirm: "Lobby beenden",
+        title: t("home.endLobbyTitle", { code: g.code }),
+        text: others > 0 ? t("home.endLobbyTextOthers", { n: others }) : t("home.endLobbyText"),
+        confirm: t("lobby.close"),
         danger: true,
       };
     } else {
-      opts = {
-        title: `Lobby ${g.code} verlassen?`,
-        text: "Deine Items gehen zurück in den Vorrat. Über den Link kannst du später als neuer Spieler wieder beitreten.",
-        confirm: "Verlassen",
-      };
+      opts = { title: t("home.leaveTitle", { code: g.code }), text: t("home.leaveText"), confirm: t("leave.confirm") };
     }
     if (!(await confirmDialog(opts))) return;
     const me = identity.get(g.code);
@@ -188,7 +191,7 @@ export class Home {
       });
       if (!res.ok && res.status !== 400) throw new Error(`HTTP ${res.status}`);
     } catch (err) {
-      alert(`Das hat nicht geklappt (${err.message}). Bitte später noch einmal versuchen.`);
+      alert(t("error.generic", { error: err.message }));
       return;
     }
     identity.clear(g.code); // auch wenn es sie schon nicht mehr gab
@@ -201,10 +204,10 @@ function tag(text, accent = false) {
   return Object.assign(document.createElement("span"), { className: `tag${accent ? " accent" : ""}`, textContent: text });
 }
 
-/** "in 23 h", "in 3 Tagen", "in 12 min" (expiresAt: Unix-Sekunden) */
+/** "verfällt in 23 h" … (expiresAt: Unix-Sekunden) */
 function untilText(expiresAt) {
   const s = Math.max(0, expiresAt - Date.now() / 1000);
-  if (s < 3600) return `in ${Math.max(1, Math.round(s / 60))} min`;
-  if (s < 48 * 3600) return `in ${Math.round(s / 3600)} h`;
-  return `in ${Math.round(s / 86400)} Tagen`;
+  if (s < 3600) return t("home.expiresMin", { n: Math.max(1, Math.round(s / 60)) });
+  if (s < 48 * 3600) return t("home.expiresH", { n: Math.round(s / 3600) });
+  return t("home.expiresDays", { n: Math.round(s / 86400) });
 }

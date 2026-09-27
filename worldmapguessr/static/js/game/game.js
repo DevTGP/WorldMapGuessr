@@ -11,6 +11,8 @@ import { Lives } from "./lives.js";
 import { RefillMeter } from "./refill-meter.js";
 import { TimerMeter } from "./timer-meter.js";
 import { Feed } from "../ui/feed.js";
+import { renderScore } from "./score-view.js";
+import { t } from "../i18n/index.js";
 
 const DBLCLICK_REARM_MS = 400;
 /**
@@ -148,7 +150,7 @@ export class Game {
   _updateProgress() {
     this.progressEl.textContent = `${this.correct}/${this.total}`;
     this.progressFill.style.width = `${this.total ? (100 * this.correct) / this.total : 0}%`;
-    this.progressWrap.setAttribute("aria-label", `Eingesetzt: ${this.correct} von ${this.total} Items`);
+    this.progressWrap.setAttribute("aria-label", t("hud.progressLabel", { placed: this.correct, total: this.total }));
   }
 
   /** Nachschub-Zähler und Vorrat vom Server (Lobby: Treffer aller zählen) */
@@ -167,7 +169,7 @@ export class Game {
   /** Kein Zurücklegen: Hinweis statt Aktion. true = blockiert */
   _noReturn() {
     if (!this.config?.noReturn || !this.held.active) return false;
-    this.toast(`Zurücklegen ist aus – ${this.held.piece.name} muss eingesetzt werden${this.remote?.solo ? "" : " (oder gesendet)"}`, "hint");
+    this.toast(t(this.remote?.solo ? "game.noReturnSolo" : "game.noReturnLobby", { item: this.held.piece.name }), "hint");
     return true;
   }
 
@@ -254,24 +256,16 @@ export class Game {
     this.over = true;
     this.timerMeter.hide();
     this.cancelHeld();
-    const lives = `${this.lives.value} von ${this.lives.max}`;
-    let title, text;
+    const vars = { placed: this.correct, total: this.total, lives: this.lives.value, max: this.lives.max };
     const empty = !won && reason === "empty";
-    if (this.remote.solo) {
-      title = won ? "Runde geschafft" : empty ? "Inventar leer" : "Keine Leben mehr";
-      text = won
-        ? `Alle ${this.total} Items sitzen – mit ${lives} Leben übrig.`
-        : `${empty ? "Keine Items mehr im Inventar, obwohl der Vorrat noch welche hatte. " : ""}` +
-          `${this.correct} von ${this.total} Items richtig eingesetzt.`;
-    } else {
-      title = won ? "Gemeinsam geschafft" : empty ? "Alle Inventare leer" : "Keine Leben mehr";
-      text = won
-        ? `Die Lobby hat alle ${this.total} Items eingesetzt – mit ${lives} gemeinsamen Leben übrig.`
-        : `Die Lobby hat ${this.correct} von ${this.total} Items eingesetzt.`;
-      text += this.remote.client.isHost
-        ? " Starte die nächste Runde, wenn alle bereit sind."
-        : " Der Host startet die nächste Runde.";
-    }
+    const solo = this.remote.solo;
+    const outcome = won ? "won" : empty ? "empty" : "lives";
+    const title = t(`end.${solo ? "solo" : "lobby"}.${outcome}.title`);
+    let text = t(`end.${solo ? "solo" : "lobby"}.${outcome}`, vars);
+    if (!solo) text += ` ${t(this.remote.client.isHost ? "end.nextHost" : "end.nextGuest")}`;
+    const client = this.remote.client;
+    renderScore(document.getElementById("dlg-score"), client.state?.round,
+      { solo, me: client.me?.id, players: client.state?.players ?? [] });
     document.getElementById("dlg-title").textContent = title;
     document.getElementById("dlg-text").textContent = text;
     this.dialog.showModal();

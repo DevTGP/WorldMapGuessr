@@ -1,0 +1,67 @@
+{# Einstellungen (nur dieses Gerät) – Logik: static/js/settings/settings-dialog.js #}
+<dialog class="settings-dialog" id="settings" aria-labelledby="settings-title">
+  <form method="dialog" class="settings-card">
+    <header class="settings-head">
+      <div>
+        <p class="eyebrow">{{ t('settings.eyebrow') }}</p>
+        <h2 id="settings-title">{{ t('settings.title') }}</h2>
+      </div>
+      <button type="submit" class="menu-close" aria-label="{{ t('common.close') }}" title="{{ t('common.closeEsc') }}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </header>
+    <div class="settings-body">
+      <h3 class="set-section">{{ t('settings.display') }}</h3>
+      <div class="set-field" id="set-scheme">
+        <span class="quality-label">{{ t('settings.scheme') }}<small>{{ t('settings.schemeHint') }}</small></span>
+        <div class="scheme-options" role="radiogroup" aria-label="{{ t('settings.scheme') }}"></div>
+      </div>
+      <div class="set-field quality-field" id="set-quality">
+        <span class="quality-label">{{ t('settings.quality') }}<small>{{ t('settings.qualityHint') }}</small></span>
+        <div class="quality-bar" role="radiogroup" aria-label="{{ t('settings.quality') }}"></div>
+      </div>
+      <div class="set-field" id="set-projection">
+        <span class="quality-label">{{ t('settings.projection') }}<small id="set-projection-hint"></small></span>
+        <div class="quality-bar two" role="radiogroup" aria-label="{{ t('settings.projection') }}"></div>
+      </div>
+      <div class="set-field" id="set-relief">
+        <span class="quality-label">{{ t('settings.relief') }}<small>{{ t('settings.reliefHint') }}</small></span>
+        <div class="quality-bar" role="radiogroup" aria-label="{{ t('settings.relief') }}"></div>
+      </div>
+      <label class="field toggle set-toggle" for="set-water">
+        <span>{{ t('settings.water') }}<small>{{ t('settings.waterHint') }}</small></span>
+        <input id="set-water" type="checkbox" role="switch">
+      </label>
+      <h3 class="set-section">{{ t('settings.controls') }}</h3>
+      <div class="set-field range-field">
+        <label for="set-zoomSpeed">{{ t('settings.zoomSpeed') }}<small>{{ t('settings.zoomSpeedHint') }}</small></label>
+        <div class="range-row"><input id="set-zoomSpeed" type="range"><output id="set-zoomSpeed-val"></output></div>
+      </div>
+      <div class="set-field range-field">
+        <label for="set-moveSpeed">{{ t('settings.moveSpeed') }}<small>{{ t('settings.moveSpeedHint') }}</small></label>
+        <div class="range-row"><input id="set-moveSpeed" type="range"><output id="set-moveSpeed-val"></output></div>
+      </div>
+      <details class="set-field controls-help">
+        <summary>{{ t('settings.keys') }}</summary>
+        <dl class="keys">
+          {% for key in ["move", "zoom", "shift", "step", "fullscreen", "grid", "mouse", "dblclick", "pick", "return", "arrows"] %}
+          <dt>{{ t('keys.' ~ key ~ '.k') | safe }}</dt><dd>{{ t('keys.' ~ key ~ '.d') | safe }}</dd>
+          {% endfor %}
+        </dl>
+      </details>
+      <h3 class="set-section">{{ t('settings.general') }}</h3>
+      <div class="set-field">
+        <label for="set-name">{{ t('settings.name') }}<small>{{ t('settings.nameHint') }}</small></label>
+        <input id="set-name" type="text" autocomplete="nickname" placeholder="{{ t('player.default') }}">
+      </div>
+      <div class="set-field" id="set-lang">
+        <span class="quality-label">{{ t('settings.lang') }}<small>{{ t('settings.langHint') }}</small></span>
+        <div class="quality-bar" role="radiogroup" aria-label="{{ t('settings.lang') }}"></div>
+      </div>
+    </div>
+    <footer class="settings-foot">
+      <button type="button" class="btn" id="settings-reset">{{ t('settings.reset') }}</button>
+      <button type="submit" class="btn btn-primary">{{ t('common.done') }}</button>
+    </footer>
+  </form>
+</dialog>

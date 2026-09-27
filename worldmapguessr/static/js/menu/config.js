@@ -2,6 +2,7 @@
 // (das Menü merkt sich die letzte Auswahl, solange die Seite offen ist).
 
 import { DEFAULT_LEVEL, DEFAULT_MODE, applyPreset } from "./presets.js";
+import { t } from "../i18n/index.js";
 
 export const LIMITS = {
   lives: { min: 1, max: 30 },
@@ -16,14 +17,14 @@ export const LIMITS = {
 
 /** Item-Gruppen im Menü (je eine Karte zum An-/Abwählen); config.kinds enthält Gruppen-IDs */
 export const GROUPS = [
-  { id: "continent", title: "Kontinente", preview: ["AF", "SA", "OC"] },
-  { id: "country-eu", title: "Staaten Europas", short: "Europa", preview: ["ITA", "DEU", "NOR"] },
-  { id: "country-na", title: "Staaten Nordamerikas", short: "Nordamerika", preview: ["USA", "MEX", "CUB"] },
-  { id: "country-sa", title: "Staaten Südamerikas", short: "Südamerika", preview: ["BRA", "ARG", "COL"] },
-  { id: "country-af", title: "Staaten Afrikas", short: "Afrika", preview: ["EGY", "ZAF", "MDG"] },
-  { id: "country-as", title: "Staaten Asiens", short: "Asien", preview: ["CHN", "IND", "JPN"] },
-  { id: "country-oc", title: "Staaten Ozeaniens", short: "Ozeanien", preview: ["AUS", "NZL", "PNG"] },
-];
+  { id: "continent", preview: ["AF", "SA", "OC"] },
+  { id: "country-eu", preview: ["ITA", "DEU", "NOR"] },
+  { id: "country-na", preview: ["USA", "MEX", "CUB"] },
+  { id: "country-sa", preview: ["BRA", "ARG", "COL"] },
+  { id: "country-af", preview: ["EGY", "ZAF", "MDG"] },
+  { id: "country-as", preview: ["CHN", "IND", "JPN"] },
+  { id: "country-oc", preview: ["AUS", "NZL", "PNG"] },
+].map((g) => ({ ...g, title: t(`group.${g.id}`), short: g.id === "continent" ? undefined : t(`group.${g.id}.short`) }));
 export const GROUP_LABELS = Object.fromEntries(GROUPS.map((g) => [g.id, g]));
 
 /**

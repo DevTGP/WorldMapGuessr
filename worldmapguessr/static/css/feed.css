@@ -91,6 +91,8 @@
 .msg.chat.mine { background: var(--panel-line); }
 .msg .item { font-weight: 600; }
 .msg .who { font-weight: 600; color: hsl(var(--hue, 210) 60% var(--who-l)); }
+.msg .pts { margin-left: 6px; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.9em; color: var(--good); white-space: nowrap; }
+.msg .pts.neg { color: var(--bad); }
 .msg.good .item { color: var(--good); }
 .msg.bad .item { color: var(--bad); }
 .msg.old { opacity: 0.62; }

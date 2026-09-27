@@ -22,6 +22,7 @@ import { LoadingScreen, yielder } from "./ui/loading-screen.js";
 import { Home } from "./home/home.js";
 import { askLobbyCode } from "./home/code-dialog.js";
 import { SettingsDialog } from "./settings/settings-dialog.js";
+import { serverError, t } from "./i18n/index.js";
 
 const WMG = window.WMG ?? {};
 const NEW_GAME_URL = "/?neu"; // Startseite direkt mit dem Spielmenü öffnen (nach einem Wechsel mit Neuladen)
@@ -29,19 +30,19 @@ const NEW_GAME_URL = "/?neu"; // Startseite direkt mit dem Spielmenü öffnen (n
 // Ladephasen mit Gewicht ≈ typischem Zeitanteil (Download hängt von der Leitung ab). Geladen wird nur
 // die grobe Stufe; feinere Kacheln und Items kommen beim Hineinzoomen nach.
 const loading = new LoadingScreen(document.getElementById("loading"), [
-  { id: "download", label: "Kartendaten herunterladen", weight: 55 },
-  { id: "shapes", label: "Umrisse vorbereiten", weight: 10 },
-  { id: "icons", label: "Items vorbereiten", weight: 30 },
-  { id: "start", label: "Karte zeichnen", weight: 5 },
-]);
+  { id: "download", weight: 55 },
+  { id: "shapes", weight: 10 },
+  { id: "icons", weight: 30 },
+  { id: "start", weight: 5 },
+].map((p) => ({ ...p, label: t(`loading.${p.id}`) })));
 
 /** Icons für das Menü vorab berechnen – mit Fortschritt statt einer langen Pause beim Menüaufbau */
 async function prepareIcons(features) {
   const tick = yielder();
-  loading.enter("icons", `0 / ${features.length} Items`);
+  loading.enter("icons", t("loading.itemsOf", { i: 0, n: features.length }));
   for (let i = 0; i < features.length; i++) {
     prepareRowIcon(features[i]);
-    if (await tick()) loading.report((i + 1) / features.length, `${i + 1} / ${features.length} Items`);
+    if (await tick()) loading.report((i + 1) / features.length, t("loading.itemsOf", { i: i + 1, n: features.length }));
   }
 }
 
@@ -108,7 +109,7 @@ createMap({
     if (newGame) openNewGame(ctx);
   })
   .catch((err) => {
-    loading.fail(`${err.message} – bitte Verbindung prüfen und neu laden.`);
+    loading.fail(t("loading.failed", { error: err.message }));
     console.error(err);
   });
 
@@ -128,7 +129,7 @@ function openNewGame(ctx) {
     location.href = NEW_GAME_URL;
     return;
   }
-  ctx.menu.open({ canCancel: true, back: "Zurück", onDismiss: () => ctx.home.show() });
+  ctx.menu.open({ canCancel: true, back: t("common.back"), onDismiss: () => ctx.home.show() });
 }
 
 /** Laufendes Spiel öffnen: das verbundene ohne Neuladen, sonst verbinden (bzw. Seite neu laden) */
@@ -149,7 +150,7 @@ function openGame(code, ctx) {
 
 /** Einstellungen des laufenden Spiels (Einzelspiel oder Lobby) */
 function openGameMenu(ctx) {
-  ctx.menu.open({ canCancel: ctx.game.running, back: "Hauptmenü", onBack: () => showHome(ctx) });
+  ctx.menu.open({ canCancel: ctx.game.running, back: t("home.title"), onBack: () => showHome(ctx) });
 }
 
 // ---------- Server ----------
@@ -182,11 +183,11 @@ async function startSolo(config, ctx) {
   let lobby;
   try {
     lobby = await newLobby({
-      name: identity.name || "Spieler", config: toWire(config), solo: true, ttl: ctx.menu.ttl.value,
+      name: identity.name || t("player.default"), config: toWire(config), solo: true, ttl: ctx.menu.ttl.value,
       sendEvery: MODE[config.mode]?.sendEvery,
     });
   } catch (err) {
-    return alert(`Die Runde konnte nicht gestartet werden (${err.message}).`);
+    return alert(t("error.startRound", { error: err.message }));
   }
   ctx.home.hide();
   history.replaceState(null, "", lobby.url);
@@ -196,9 +197,9 @@ async function startSolo(config, ctx) {
 /** Neue Mehrspieler-Lobby mit der aktuellen Menü-Konfiguration */
 async function createLobby(config, ttl, ctx) {
   const who = await askPlayer({
-    title: "Lobby erstellen",
-    text: "Du wirst Host. Die aktuellen Einstellungen werden übernommen; Passwort und Spielerzahl stellst du danach in der Lobby ein.",
-    submit: "Lobby erstellen",
+    title: t("menu.createLobby"),
+    text: t("create.text"),
+    submit: t("menu.createLobby"),
     name: identity.name,
     cancelable: true,
   });
@@ -207,7 +208,7 @@ async function createLobby(config, ttl, ctx) {
   try {
     lobby = await newLobby({ name: who.name, config: toWire(config), ttl, sendEvery: MODE[config.mode]?.sendEvery });
   } catch {
-    return alert("Die Lobby konnte nicht erstellt werden.");
+    return alert(t("error.createLobby"));
   }
   identity.name = lobby.player.name;
   ctx.menu.dialog.close();
@@ -226,10 +227,10 @@ async function startLobby(code, ctx, { autoStart = false } = {}) {
   const info = await lobbyInfo(code);
   if (!info) {
     identity.clear(code);
-    return showLobbyGone("Diese Lobby gibt es nicht (mehr). Lobbys verfallen nach der eingestellten Zeit ohne Aktivität.");
+    return showLobbyGone(t("gone.notFound"));
   }
   if (info.solo && !identity.get(code)) {
-    return showLobbyGone("Das ist die Einzelspieler-Runde eines anderen Spielers. Beitreten geht erst, wenn sie zur Lobby gemacht wird.", "Einzelspiel");
+    return showLobbyGone(t("err.solo"), t("game.solo"));
   }
   ctx.code = info.code;
 
@@ -258,12 +259,12 @@ async function startLobby(code, ctx, { autoStart = false } = {}) {
       if (!state.round) client.startRound();
     }
     const solo = !!state.settings.solo;
-    document.getElementById("dlg-menu").textContent = solo ? "Anpassen" : "Lobby";
-    again.textContent = solo ? "Nochmal" : "Neue Runde für alle";
+    document.getElementById("dlg-menu").textContent = t(solo ? "end.adjust" : "lobby.title");
+    again.textContent = t(solo ? "end.again" : "end.againAll");
     const online = state.players.filter((p) => p.online).length;
-    badge.querySelector("b").textContent = solo ? "Einzelspiel" : code;
-    badge.querySelector("span").textContent = solo ? "" : `${online} Spieler`;
-    badge.title = solo ? "Einstellungen dieses Spiels" : "Lobby öffnen";
+    badge.querySelector("b").textContent = solo ? t("game.solo") : code;
+    badge.querySelector("span").textContent = solo ? "" : t("unit.players", { n: online });
+    badge.title = t(solo ? "hud.gameSettings" : "hud.openLobby");
     badge.classList.toggle("solo", solo);
     // Neue Runde vom Host (oder laufende Runde beim ersten Beitritt) → mitspielen
     if (state.round && state.round.number !== remote.number && menu.isOpen) menu.dialog.close();
@@ -282,10 +283,11 @@ async function startLobby(code, ctx, { autoStart = false } = {}) {
     else location.href = "/";
   };
   client.addEventListener("left", () => gone());
-  client.addEventListener("closed", ({ detail }) => gone(client.isHost ? null : detail.message, "Lobby beendet"));
+  client.addEventListener("kicked", () => gone(t("gone.kicked"), t("gone.kickedTitle")));
+  client.addEventListener("closed", () => gone(client.isHost ? null : t("gone.closed"), t("gone.closedTitle")));
   client.addEventListener("connection", ({ detail }) => {
     badge.classList.toggle("offline", !detail.connected);
-    if (!detail.connected) badge.title = "Verbindung getrennt – verbinde neu …";
+    if (!detail.connected) badge.title = t("hud.reconnecting");
   });
 
   // Beitritt: bekannte Spieler (ID + Token im Browser) direkt, sonst Name/Passwort abfragen
@@ -293,9 +295,9 @@ async function startLobby(code, ctx, { autoStart = false } = {}) {
   let join = {};
   if (!known) {
     const who = await askPlayer({
-      title: `Lobby ${code} beitreten`,
-      text: info.private ? "Diese Lobby ist privat." : "",
-      submit: "Beitreten",
+      title: t("join.title", { code }),
+      text: info.private ? t("join.private") : "",
+      submit: t("join.submit"),
       askPassword: info.private,
       name: identity.name,
     });
@@ -308,16 +310,16 @@ async function startLobby(code, ctx, { autoStart = false } = {}) {
     if (err.code === "password" || err.code === "full") {
       if (err.code === "password") identity.clear(code);
       const who = await askPlayer({
-        title: `Lobby ${code} beitreten`,
-        submit: "Beitreten",
+        title: t("join.title", { code }),
+        submit: t("join.submit"),
         askPassword: err.code === "password",
         name: identity.name,
-        error: err.message,
+        error: serverError(err),
       });
       identity.name = who.name;
       client.connect(who);
     } else {
-      showLobbyGone(err.message);
+      showLobbyGone(serverError(err));
     }
   });
   client.connect(join);

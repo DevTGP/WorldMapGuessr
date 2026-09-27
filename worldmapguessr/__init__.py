@@ -5,6 +5,8 @@ import os
 from flask import Flask
 from flask_sock import Sock
 
+from .compression import gzip_response, precompress_in_background, send_compressed
+from .i18n import template_context
 from .difficulty import difficulty_map
 from .item_events import ItemEventRecorder
 from .item_store import seed_items
@@ -31,6 +33,8 @@ def create_app(test_config: dict | None = None) -> Flask:
         MONGODB_DB=os.environ.get("MONGODB_DB", ""),
         # Einmalige Übernahme alter Statistik in eine leere MongoDB; None → instance/items.json
         ITEM_IMPORT_PATH=os.environ.get("WMG_ITEM_IMPORT") or None,
+        # gzip-Fassungen der statischen Dateien beim Start im Hintergrund erzeugen (compression.py)
+        PRECOMPRESS=True,
     )
     if test_config:
         app.config.update(test_config)
@@ -43,12 +47,12 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.extensions["item_store"] = store
     app.extensions["storage"] = storage
 
-    # Lobby-Runden: Item-Statistik zählt der Server (Browser zählen nur im Einzelspiel)
+    # Jede Runde läuft auf dem Server (auch das Einzelspiel): er zählt die Item-Statistik
     lobby_store = LobbyStore(lobby_persistence, catalog=catalog(map_index),
                              on_stat=ItemEventRecorder(store), difficulty=lambda: difficulty_map(store))
     lobby_hub = LobbyHub(lobby_store)
     if app.config["LOBBY_EXPIRY_THREAD"]:  # in Tests aus: dort wird hub.tick() direkt aufgerufen
-        lobby_hub.start_expiry()
+        lobby_hub.start_maintenance()
         lobby_hub.start_ticker()
     app.extensions["lobby_store"] = lobby_store
     app.extensions["lobby_hub"] = lobby_hub
@@ -60,4 +64,14 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(api.bp)
     app.register_blueprint(lobby_api.bp)
     lobby_ws.register(Sock(app))
+    # Sprache (de/en): t() und Wörterbuch in allen Vorlagen
+    app.context_processor(template_context)
+
+    # Statische Dateien (JS, CSS …) komprimiert ausliefern
+    def static(filename):
+        return send_compressed(app.static_folder, filename, max_age=app.get_send_file_max_age(filename))
+    app.view_functions["static"] = static
+    if app.config["PRECOMPRESS"]:
+        precompress_in_background(app.static_folder)
+    app.after_request(gzip_response)
     return app

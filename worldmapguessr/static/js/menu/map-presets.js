@@ -8,17 +8,14 @@
 // (config.excluded); describeMap() erkennt daraus das Preset. Passt keins, ist es eine „Eigene Auswahl“.
 
 import { GROUPS } from "./config.js";
+import { t } from "../i18n/index.js";
 
 /** Kleinstaat: Staat mit weniger Fläche (Natural Earth, inkl. aller Inseln) */
 export const SMALL_KM2 = 1100;
 const EARTH_R_KM = 6371.0088;
 
-export const MAP_PRESETS = [
-  { id: "continents", title: "Kontinente", blurb: "Die sieben Kontinente" },
-  { id: "countries", title: "Länder", blurb: "Staaten – nach Kontinent" },
-  { id: "all", title: "Alles", blurb: "Kontinente und alle Staaten" },
-  { id: "regions", title: "Bundesländer", blurb: "Deutschland, Österreich, Schweiz, USA …", soon: true },
-];
+export const MAP_PRESETS = ["continents", "countries", "all", "regions"]
+  .map((id) => ({ id, title: t(`mapPreset.${id}`), blurb: t(`mapPreset.${id}.blurb`), soon: id === "regions" }));
 
 export const COUNTRY_GROUPS = GROUPS.filter((g) => g.id.startsWith("country-"));
 const COUNTRY_IDS = COUNTRY_GROUPS.map((g) => g.id);
@@ -57,18 +54,18 @@ export function describeMap(config, features) {
   const continents = COUNTRY_IDS.filter((g) => config.kinds.has(g));
   const small = excluded.length === 0;
   const smallOnly = !small && excluded.length === smallKeys.length && excluded.every(isSmall);
-  const custom = { preset: "custom", continents, small: true, label: "Eigene Auswahl" };
-  if (!kinds.length) return { ...custom, label: "Keine Items" };
+  const custom = { preset: "custom", continents, small: true, label: t("map.custom") };
+  if (!kinds.length) return { ...custom, label: t("map.none") };
   if (!small && !smallOnly) return custom;
-  const without = small ? "" : " ohne Kleinstaaten";
+  const without = small ? "" : ` ${t("map.withoutSmall")}`;
   if (kinds.length === 1 && kinds[0] === "continent") {
-    return small ? { preset: "continents", continents, small: true, label: "Kontinente" } : custom;
+    return small ? { preset: "continents", continents, small: true, label: t("mapPreset.continents") } : custom;
   }
   if (kinds.every((g) => COUNTRY_IDS.includes(g))) {
     const names = continents.length === COUNTRY_IDS.length ? ""
       : ` · ${COUNTRY_GROUPS.filter((g) => config.kinds.has(g.id)).map((g) => g.short).join(", ")}`;
-    return { preset: "countries", continents, small, label: `Länder${names}${without}` };
+    return { preset: "countries", continents, small, label: `${t("mapPreset.countries")}${names}${without}` };
   }
-  if (allGroups.every((g) => config.kinds.has(g))) return { preset: "all", continents, small, label: `Alles${without}` };
+  if (allGroups.every((g) => config.kinds.has(g))) return { preset: "all", continents, small, label: `${t("mapPreset.all")}${without}` };
   return custom;
 }

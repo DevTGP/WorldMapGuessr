@@ -1,6 +1,8 @@
-"""Lobbys: im Speicher gehalten, jede Änderung sofort persistiert (JSON-Datei oder MongoDB,
-siehe persistence.py). Eine Lobby (samt laufender Runde) verfällt erst nach ihrer eingestellten Zeit ohne
-Aktivität (settings.ttl, 1 h … 7 d, Standard 1 d) – bis dahin lässt sich jede Runde fortsetzen.
+"""Lobbys: aktive im Speicher, jede Änderung sofort persistiert (JSON-Datei oder MongoDB, siehe persistence.py).
+Nach INACTIVE_AFTER ohne Aktivität und ohne verbundene Spieler wird eine Lobby inaktiv: Sie verlässt den Speicher
+(hibernate), bleibt aber gespeichert und wird beim nächsten Zugriff (Beitreten, Aktion) unverändert
+wiederhergestellt. Gelöscht wird sie erst nach ihrer eingestellten Zeit ohne Aktivität (settings.ttl, 1 h … 7 d,
+Standard 1 d) – bis dahin lässt sich jede Runde fortsetzen.
 
 Einzelspiel = Solo-Lobby (settings.solo): gleiche Runde wie im Mehrspieler, aber niemand kann beitreten.
 „Mitspieler einladen“ wandelt sie in eine normale Lobby um (solo → False), die Runde läuft weiter."""
@@ -15,23 +17,30 @@ import time
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import round as rounds
+from . import scoring
 from .codes import new_code, normalize
 from .persistence import JsonLobbyPersistence
 from .settings import (DEFAULT_ALLOW_SEND, DEFAULT_CONFIG, DEFAULT_SEND_EVERY, DEFAULT_TTL, clean_bool,
                        clean_config, clean_max_players, clean_name, clean_send_every, clean_ttl)
 
 LOBBY_TTL = DEFAULT_TTL  # Sekunden ohne Aktivität für Lobbys ohne eigene Einstellung (ältere)
+INACTIVE_AFTER = 600     # Sekunden ohne Aktivität (und ohne Verbindung), bis eine Lobby den Speicher verlässt
 CHAT_KEEP = 50         # so viele Chat-Nachrichten je Lobby bleiben erhalten
 CHAT_MAX_LEN = 200
 
 
 class LobbyError(Exception):
-    """Fehler mit maschinenlesbarem Code für den Client."""
+    """Fehler mit maschinenlesbarem Code für den Client. message: deutscher Text (Log, Rückfall);
+    der Browser übersetzt über den Code (i18n err.<code>), params: Werte für diesen Text."""
 
-    def __init__(self, code: str, message: str):
+    def __init__(self, code: str, message: str, params: dict | None = None):
         super().__init__(message)
         self.code = code
         self.message = message
+        self.params = params or {}
+
+    def payload(self) -> dict:
+        return {"code": self.code, "message": self.message, **({"params": self.params} if self.params else {})}
 
 
 def _hash_token(token: str) -> str:
@@ -54,21 +63,46 @@ class LobbyStore:
         self.ttl = ttl  # None = je Lobby (settings.ttl); sonst fest für alle (Tests)
         self.clock = clock
         self.lock = threading.RLock()
-        self._lobbies: dict[str, dict] = persistence.load_all()
-        now = clock()
-        for lobby in self._lobbies.values():  # ältere Lobbys: Konfiguration ins aktuelle Format (Item-Gruppen)
-            lobby["settings"]["config"] = clean_config(lobby["settings"]["config"])
-            # Nach dem Start ist noch niemand verbunden: Timer anhalten, bis jemand kommt
-            rounds.pause_timer(lobby.get("round"), now, True)
+        self._lobbies: dict[str, dict] = {}                    # aktiv (im Speicher)
+        self._inactive: dict[str, dict] = persistence.index()  # inaktiv: code → {lastActive, ttl}
         self.expire()
 
     # ---------- Lesen ----------
     def get(self, code: str) -> dict | None:
+        """Lobby (aktiv) oder None; eine inaktive wird dabei wiederhergestellt."""
+        code = normalize(code)
         with self.lock:
-            return self._lobbies.get(normalize(code))
+            lobby = self._lobbies.get(code)
+            if lobby is None and code in self._inactive:
+                lobby = self._restore(code)
+            return lobby
+
+    def peek(self, code: str) -> dict | None:
+        """Lobby lesen, ohne eine inaktive wiederherzustellen (Übersicht, Beitrittsdialog)."""
+        code = normalize(code)
+        with self.lock:
+            lobby = self._lobbies.get(code)
+            if lobby is None and code in self._inactive:
+                lobby = self.persistence.load(code)
+            return lobby
+
+    def is_active(self, code: str) -> bool:
+        return normalize(code) in self._lobbies
+
+    def _restore(self, code: str) -> dict | None:
+        lobby = self.persistence.load(code)
+        self._inactive.pop(code, None)
+        if not lobby:
+            return None
+        # ältere Lobbys: Konfiguration ins aktuelle Format (Item-Gruppen)
+        lobby["settings"]["config"] = clean_config(lobby["settings"]["config"])
+        # Noch ist niemand verbunden: Timer anhalten, bis jemand kommt
+        rounds.pause_timer(lobby.get("round"), self.clock(), True)
+        self._lobbies[code] = lobby
+        return lobby
 
     def public_info(self, code: str) -> dict | None:
-        lobby = self.get(code)
+        lobby = self.peek(code)
         if not lobby:
             return None
         return {
@@ -81,8 +115,8 @@ class LobbyStore:
     def summary(self, code, player_id, token, online=0) -> dict | None:
         """Kurzüberblick einer Lobby für das Hauptmenü („Laufende Spiele“) – nur für Mitglieder
         (gültiger Token), sonst None. online: Zahl der verbundenen Spieler (vom Hub)."""
-        lobby = self.get(code)
-        if not lobby or not self.authenticate(lobby["code"], player_id, token):
+        lobby = self.peek(code)
+        if not lobby or not _check_token(lobby, player_id, token):
             return None
         s, rnd = lobby["settings"], lobby["round"]
         cfg = rnd["config"] if rnd else s["config"]
@@ -97,7 +131,10 @@ class LobbyStore:
             "round": {
                 "number": rnd["number"], "status": rnd["status"], "placed": len(rnd["placed"]),
                 "total": rnd["total"], "lives": rnd["lives"], "livesMax": rnd["livesMax"],
+                "points": scoring.view(rnd)["total"],
+                "myPoints": rnd.get("scores", {}).get(player_id, {}).get("points", 0),
             } if rnd else None,
+            "active": self.is_active(lobby["code"]),
             "lastActive": lobby["lastActive"],
             "expiresAt": lobby["lastActive"] + self.ttl_of(lobby),
         }
@@ -108,7 +145,7 @@ class LobbyStore:
         """Neue Lobby; der Ersteller wird Host. solo: Einzelspiel (niemand kann beitreten).
         Gibt (lobby, player_with_token) zurück."""
         with self.lock:
-            code = new_code(self._lobbies)
+            code = new_code(self._lobbies.keys() | self._inactive.keys())
             now = self.clock()
             player, token = self._new_player(player_name, now)
             lobby = {
@@ -135,12 +172,9 @@ class LobbyStore:
     def authenticate(self, code, player_id, token) -> dict | None:
         """Bekannter Spieler mit gültigem Token (Wiederbeitritt) oder None."""
         lobby = self.get(code)
-        if not lobby or not player_id or not token:
+        if not lobby:
             return None
-        player = lobby["players"].get(player_id)
-        if player and secrets.compare_digest(player["tokenHash"], _hash_token(token)):
-            return player
-        return None
+        return _check_token(lobby, player_id, token)
 
     def join(self, code, *, name, password="", online_count=0) -> tuple[dict, str]:
         """Neuer Spieler tritt bei. Prüft Passwort und Spielerlimit."""
@@ -213,7 +247,9 @@ class LobbyStore:
             lobby = self._require(code)
             if not lobby["round"]:
                 return False
-            joined = rounds.join(lobby["round"], player_id)
+            joined = rounds.join(lobby["round"], player_id, now=self.clock())
+            if not joined and player_id in lobby["round"].get("hands", {}):
+                scoring.start_pace(lobby["round"], player_id, self.clock())  # wieder da: Tempo zählt neu
             if joined:
                 self.touch(code)
             return joined
@@ -224,9 +260,10 @@ class LobbyStore:
             if not lobby["round"]:
                 raise LobbyError("no_round", "Es läuft keine Runde.")
             try:
-                result = rounds.place(lobby["round"], player_id, str(key), bool(correct), list(online))
+                result = rounds.place(lobby["round"], player_id, str(key), bool(correct), list(online),
+                                      now=self.clock())
             except rounds.RoundError as err:
-                raise LobbyError(err.code, err.message) from None
+                raise LobbyError(err.code, err.message, err.params) from None
             self.touch(code)
             return result
 
@@ -243,7 +280,7 @@ class LobbyStore:
             try:
                 rounds.give(lobby["round"], player_id, str(to), str(key), self.send_every(lobby))
             except rounds.RoundError as err:
-                raise LobbyError(err.code, err.message) from None
+                raise LobbyError(err.code, err.message, err.params) from None
             self.touch(code)
 
     @staticmethod
@@ -291,6 +328,17 @@ class LobbyStore:
             self.touch(code)
             return msg
 
+    def log_notice(self, code, notice: dict):
+        """Hinweis für alle in der Nachrichtenleiste (steht im Chat-Verlauf, system = Art, z. B. "kick")."""
+        with self.lock:
+            lobby = self._require(code)
+            seq = lobby.get("chatSeq", 0) + 1
+            lobby["chatSeq"] = seq
+            chat = lobby.setdefault("chat", [])
+            chat.append({"seq": seq, "system": notice.pop("type"), **notice, "t": self.clock()})
+            del chat[:-CHAT_KEEP]
+            self.touch(code)
+
     def return_hand(self, code, player_id, online=()) -> int:
         """Teile eines Spielers zurück in den Vorrat (Verlassen, lange getrennt)."""
         with self.lock:
@@ -310,8 +358,7 @@ class LobbyStore:
             lobby = self._require(code)
             lobby["players"].pop(player_id, None)
             if not lobby["players"]:
-                del self._lobbies[lobby["code"]]
-                self.persistence.delete(lobby["code"])
+                self._delete(lobby["code"])
                 return None
             if lobby["host"] == player_id:
                 candidates = [p for p in lobby["players"] if p in online] or list(lobby["players"])
@@ -324,8 +371,7 @@ class LobbyStore:
         with self.lock:
             lobby = self._require(code)
             self._require_host(lobby, player_id)
-            del self._lobbies[lobby["code"]]
-            self.persistence.delete(lobby["code"])
+            self._delete(lobby["code"])
 
     def set_host(self, code, player_id):
         with self.lock:
@@ -350,18 +396,38 @@ class LobbyStore:
         return self.ttl if self.ttl is not None else lobby["settings"].get("ttl", LOBBY_TTL)
 
     def expire(self) -> list[str]:
-        """Lobbys löschen, die länger als ihre Verfallszeit untätig sind."""
+        """Lobbys löschen (aktive und inaktive), die länger als ihre Verfallszeit untätig sind."""
         with self.lock:
             now = self.clock()
             gone = [c for c, l in self._lobbies.items() if l["lastActive"] < now - self.ttl_of(l)]
+            gone += [c for c, m in self._inactive.items()
+                     if m["lastActive"] < now - (self.ttl if self.ttl is not None else m.get("ttl") or LOBBY_TTL)]
             for c in gone:
-                del self._lobbies[c]
-                self.persistence.delete(c)
+                self._delete(c)
             return gone
+
+    def hibernate(self, online_codes=()) -> list[str]:
+        """Lobbys ohne Verbindung und ohne Aktivität seit INACTIVE_AFTER aus dem Speicher nehmen (inaktiv).
+        Sie sind gespeichert und kommen beim nächsten Zugriff zurück (get)."""
+        with self.lock:
+            now = self.clock()
+            online = set(online_codes)
+            idle = [c for c, l in self._lobbies.items() if c not in online and l["lastActive"] < now - INACTIVE_AFTER]
+            for c in idle:
+                lobby = self._lobbies.pop(c)
+                rounds.pause_timer(lobby.get("round"), now, True)
+                self.persistence.save(lobby)
+                self._inactive[c] = {"lastActive": lobby["lastActive"], "ttl": lobby["settings"].get("ttl")}
+            return idle
+
+    def _delete(self, code):
+        self._lobbies.pop(code, None)
+        self._inactive.pop(code, None)
+        self.persistence.delete(code)
 
     # ---------- intern ----------
     def _require(self, code) -> dict:
-        lobby = self._lobbies.get(normalize(code))
+        lobby = self.get(code)
         if not lobby:
             raise LobbyError("not_found", "Diese Lobby gibt es nicht (mehr).")
         return lobby
@@ -381,3 +447,13 @@ class LobbyStore:
             "joined": now,
         }
         return player, token
+
+
+def _check_token(lobby, player_id, token) -> dict | None:
+    """Spieler der Lobby mit passendem Token oder None"""
+    if not player_id or not token:
+        return None
+    player = lobby["players"].get(player_id)
+    if player and secrets.compare_digest(player["tokenHash"], _hash_token(token)):
+        return player
+    return None

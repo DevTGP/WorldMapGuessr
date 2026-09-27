@@ -1,5 +1,7 @@
 // Dialog für Namen (und ggf. Passwort): beim Beitreten und beim Erstellen einer Lobby.
 
+import { t } from "../i18n/index.js";
+
 /**
  * @param {{title: string, text?: string, submit: string, askPassword?: boolean, name?: string,
  *          error?: string, cancelable?: boolean}} opts
@@ -48,7 +50,7 @@ export function askPlayer({ title, text = "", submit, askPassword = false, name 
 }
 
 /** Unheilbarer Fehler (Lobby weg) – mit Weg zurück zum Einzelspiel */
-export function showLobbyGone(message, title = "Lobby nicht verfügbar") {
+export function showLobbyGone(message, title = t("gone.title")) {
   const dialog = document.getElementById("lobby-gone");
   document.querySelectorAll("dialog[open]").forEach((d) => d !== dialog && d.close());
   dialog.querySelector("h2").textContent = title;

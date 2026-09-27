@@ -52,6 +52,12 @@ const MAX_ANCHOR_LAT = 78;
 
 const pieces = JSON.parse(fs.readFileSync("tmp/pieces.geojson"));
 const { cells, items } = JSON.parse(fs.readFileSync("tmp/cells.json"));
+// Englische Namen (Oberfläche auf Englisch): Staaten aus world-countries, Kontinente fest
+const CONTINENTS_EN = { AF: "Africa", AN: "Antarctica", AS: "Asia", EU: "Europe", NA: "North America", SA: "South America", OC: "Oceania" };
+const COUNTRIES_EN = Object.fromEntries(JSON.parse(fs.readFileSync("node_modules/world-countries/countries.json"))
+  .map((c) => [c.cca3, c.name.common]));
+COUNTRIES_EN.XKX ??= "Kosovo";
+const nameEn = (it) => (it.kind === "continent" ? CONTINENTS_EN[it.id] : COUNTRIES_EN[it.id]) ?? it.name;
 const itemKeys = Object.keys(items);
 
 // ---------- Topologie + Gewichte ----------
@@ -326,7 +332,7 @@ const itemList = itemKeys.map((key) => {
   const [lon, lat] = geoCentroid({ type: "Polygon", coordinates: largest });
   const anchor = [+lon.toFixed(5), +Math.max(-MAX_ANCHOR_LAT, Math.min(MAX_ANCHOR_LAT, lat)).toFixed(5)];
   const it = items[key];
-  return { key, ...it, anchor, area: geoArea(full), centerLon: anchor[0] };
+  return { key, ...it, nameEn: nameEn(it), anchor, area: geoArea(full), centerLon: anchor[0] };
 });
 
 /** Umriss kodieren: [q, Polygone]. Gehen bei der Rundung auf 1/q Grad Ringe verloren (Kleinststaaten),
@@ -414,6 +420,7 @@ const index = {
 const hash = crypto.createHash("sha1");
 for (const z of Object.keys(tileIndex)) for (const k of Object.keys(tileIndex[z]).sort()) hash.update(fs.readFileSync(`${OUT}/tiles/z${z}/${k}.json`));
 hash.update(JSON.stringify(i0));
+hash.update(JSON.stringify(itemList.map((it) => [it.key, it.name, it.nameEn])));
 index.version = hash.digest("hex").slice(0, 10);
 const indexBytes = writeJson(`${OUT}/index.json`, index);
 

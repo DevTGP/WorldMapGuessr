@@ -4,6 +4,7 @@ Im Menü wählt man einen **Modus** und eine **Schwierigkeit** (Sehr einfach …
 Regelwerte; unter „Erweiterte Einstellungen“ lassen sie sich einzeln ändern – dann gilt „Eigene
 Einstellungen“, ein Klick auf Modus oder Stufe setzt wieder die Voreinstellung. Quelle der Werte:
 `worldmapguessr/static/js/menu/presets.js`.
+Schwerere Modi und Stufen geben mehr Punkte (Multiplikator ×1 … ×2, siehe [punkte.md](punkte.md)).
 
 ## Modi
 

@@ -1,7 +1,7 @@
 // Einstellungs-Popup (Hauptmenü und im Spiel über ⚙). Alles gilt sofort und nur auf diesem Gerät.
 //   Darstellung: Farbschema, Kartenqualität, Projektion, Relief, Flüsse und Seen
 //   Steuerung:   Zoom- und Bewegungsempfindlichkeit, Tastenübersicht
-//   Spieler:     Name
+//   Allgemein:   Name, Sprache (Cookie, Wechsel lädt die Seite neu)
 
 import { DEFAULT_QUALITY, quality } from "../map/quality.js";
 import { SCHEMES } from "../map/schemes.js";
@@ -9,10 +9,12 @@ import { PROJECTIONS } from "../map/projections.js";
 import { identity } from "../lobby/identity.js";
 import { PREF_LIMITS, prefs } from "./prefs.js";
 import { createQualityField } from "./quality-field.js";
+import { langSetting, setLang, t } from "../i18n/index.js";
 
 const NAME_MAX = 24; // wie der Server (lobbies/settings.py clean_name)
 const RANGES = ["zoomSpeed", "moveSpeed"];
-const RELIEF = [["off", "Aus"], ["light", "Leicht"], ["strong", "Stark"]];
+const RELIEF = ["off", "light", "strong"].map((id) => [id, t(`relief.${id}`)]);
+const LANGS = [["auto", t("settings.langAuto")], ["de", "Deutsch"], ["en", "English"]];
 
 export class SettingsDialog {
   constructor() {
@@ -26,6 +28,7 @@ export class SettingsDialog {
       Object.entries(PROJECTIONS).map(([id, p]) => [id, p.label]),
       (id) => { document.getElementById("set-projection-hint").textContent = PROJECTIONS[id].blurb; });
     this._segmented(document.getElementById("set-relief"), "relief", RELIEF);
+    this._segmented(document.getElementById("set-lang"), null, LANGS);
     const water = document.getElementById("set-water");
     water.addEventListener("change", () => prefs.set("water", water.checked));
     this.syncs.push(() => { water.checked = prefs.get("water"); });
@@ -61,22 +64,24 @@ export class SettingsDialog {
     for (const fn of this.syncs) fn();
   }
 
-  /** Knopfleiste für eine Auswahl-Einstellung (wie die Kartenqualität) */
+  /** Knopfleiste für eine Auswahl-Einstellung (wie die Kartenqualität); key null = Sprache (Cookie) */
   _segmented(root, key, options, onPick = null) {
     const bar = root.querySelector(".quality-bar");
+    const get = () => (key ? prefs.get(key) : langSetting());
+    const set = (id) => (key ? prefs.set(key, id) : setLang(id));
     const buttons = options.map(([id, label]) => {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "level";
       btn.setAttribute("role", "radio");
       btn.textContent = label;
-      btn.addEventListener("click", () => { prefs.set(key, id); sync(); });
+      btn.addEventListener("click", () => { set(id); sync(); });
       bar.append(btn);
       return [id, btn];
     });
     const sync = () => {
-      for (const [id, btn] of buttons) btn.setAttribute("aria-checked", String(id === prefs.get(key)));
-      onPick?.(prefs.get(key));
+      for (const [id, btn] of buttons) btn.setAttribute("aria-checked", String(id === get()));
+      onPick?.(get());
     };
     this.syncs.push(sync);
   }

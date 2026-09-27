@@ -1,5 +1,7 @@
 // Zahlen-Stepper: [−] Zahl [+], mit Tastatur (Pfeile) und direkter Eingabe.
 
+import { t } from "../i18n/index.js";
+
 /**
  * @param {{id: string, label: string, hint?: string, value: number, min: number, max: number,
  *          step?: number, unit?: string, onChange: (v: number) => void}} opts
@@ -11,9 +13,9 @@ export function createStepper({ id, label, hint, value, min, max, step = 1, unit
   root.innerHTML = `
     <label for="${id}">${label}${hint ? `<small>${hint}</small>` : ""}</label>
     <div class="stepper-control">
-      <button type="button" class="step" data-d="-1" aria-label="${label} verringern">−</button>
+      <button type="button" class="step" data-d="-1" aria-label="${t("stepper.less", { label })}">−</button>
       <input id="${id}" type="number" inputmode="numeric" min="${min}" max="${max}" step="${step}">${unit ? `<span class="unit">${unit}</span>` : ""}
-      <button type="button" class="step" data-d="1" aria-label="${label} erhöhen">+</button>
+      <button type="button" class="step" data-d="1" aria-label="${t("stepper.more", { label })}">+</button>
     </div>`;
   const input = root.querySelector("input");
   const minus = root.querySelector('[data-d="-1"]');

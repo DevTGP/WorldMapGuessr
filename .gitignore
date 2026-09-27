@@ -10,3 +10,6 @@ instance/
 .run
 
 .env
+# vorkomprimierte Dateien (worldmapguessr/compression.py, beim Start bzw. Docker-Build erzeugt)
+*.gz
+*.gz.*.tmp

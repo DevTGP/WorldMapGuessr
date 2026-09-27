@@ -1,5 +1,6 @@
-"""Wohin Lobbys geschrieben werden. LobbyStore hält alle Lobbys im Speicher (ein Server-Prozess)
-und schreibt jede Änderung sofort durch – als JSON-Datei oder in MongoDB."""
+"""Wohin Lobbys geschrieben werden – als JSON-Datei oder in MongoDB. LobbyStore hält nur aktive Lobbys im
+Speicher und schreibt jede Änderung sofort durch; inaktive (ruhende) Lobbys liegen nur hier und werden bei
+Bedarf geladen (load). Für Verfall und freie Codes reicht der Überblick (index: lastActive und ttl je Lobby)."""
 from __future__ import annotations
 
 import json
@@ -20,6 +21,15 @@ class JsonLobbyPersistence:
             with self.path.open(encoding="utf-8") as f:
                 self._all = json.load(f).get("lobbies", {})
         return self._all
+
+    def index(self) -> dict[str, dict]:
+        """{code: {lastActive, ttl}} aller gespeicherten Lobbys"""
+        if not self._all:
+            self.load_all()
+        return {c: _meta(l) for c, l in self._all.items()}
+
+    def load(self, code: str) -> dict | None:
+        return self._all.get(code)
 
     def save(self, lobby: dict):
         self._all[lobby["code"]] = lobby
@@ -54,8 +64,21 @@ class MongoLobbyPersistence:
             lobbies[doc["code"]] = doc
         return lobbies
 
+    def index(self) -> dict[str, dict]:
+        return {d["code"]: _meta(d) for d in self.col.find({}, {"code": 1, "lastActive": 1, "settings.ttl": 1})}
+
+    def load(self, code: str) -> dict | None:
+        doc = self.col.find_one({"_id": code})
+        if doc:
+            doc.pop("_id", None)
+        return doc
+
     def save(self, lobby: dict):
         self.col.replace_one({"_id": lobby["code"]}, {"_id": lobby["code"], **lobby}, upsert=True)
 
     def delete(self, code: str):
         self.col.delete_one({"_id": code})
+
+
+def _meta(lobby: dict) -> dict:
+    return {"lastActive": lobby.get("lastActive", 0), "ttl": (lobby.get("settings") or {}).get("ttl")}

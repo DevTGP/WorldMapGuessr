@@ -1,5 +1,7 @@
 // Sortierung der Statistik-Tabelle.
 
+import { locale } from "../i18n/index.js";
+
 /** Trefferquote 0…1 oder null, wenn es noch keinen Einsetzversuch gab */
 export function hitRate(item) {
   const attempts = item.correct + item.incorrect;
@@ -11,7 +13,7 @@ export function placeRate(item) {
   return item.spawned ? item.correct / item.spawned : null;
 }
 
-const collator = new Intl.Collator("de", { sensitivity: "base", numeric: true });
+const collator = new Intl.Collator(locale, { sensitivity: "base", numeric: true });
 
 /** Wert, nach dem eine Spalte sortiert wird */
 function value(item, key) {

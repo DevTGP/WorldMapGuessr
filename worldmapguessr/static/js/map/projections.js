@@ -6,13 +6,14 @@
 //   equal    Equal Earth (Šavrič/Patterson/Jenny 2018): flächentreu – alle Länder im richtigen Größenverhältnis
 
 import { prefs } from "../settings/prefs.js";
+import { t } from "../i18n/index.js";
 
 const M = Math.sqrt(3) / 2, A1 = 1.340264, A2 = -0.081106, A3 = 0.000893, A4 = 0.003796;
 
 export const PROJECTIONS = {
   natural: {
     label: "Natural Earth",
-    blurb: "vertraute Formen, Flächen zu den Polen hin größer",
+    blurb: t("projection.natural.blurb"),
     d3: () => d3.geoNaturalEarth1(),
     fx(phi) {
       const phi2 = phi * phi, phi4 = phi2 * phi2;
@@ -24,8 +25,8 @@ export const PROJECTIONS = {
     },
   },
   equal: {
-    label: "Flächentreu",
-    blurb: "Equal Earth: alle Flächen im echten Verhältnis",
+    label: t("projection.equal"),
+    blurb: t("projection.equal.blurb"),
     d3: () => d3.geoEqualEarth(),
     // wie d3-geo equalEarthRaw
     fx(phi) {

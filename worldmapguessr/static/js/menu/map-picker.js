@@ -4,11 +4,11 @@
 
 import { ItemPicker } from "./item-picker.js";
 import { COUNTRY_GROUPS, MAP_PRESETS, SMALL_KM2, applyMap, describeMap, isSmall } from "./map-presets.js";
+import { fmt, locale, t } from "../i18n/index.js";
 
 const PREVIEW_W = 148;
 const PREVIEW_H = 74;
 const PREVIEW_STEP_PX = 0.6; // Punkte näher als so viele Pixel am vorigen werden übersprungen
-const fmt = new Intl.NumberFormat("de-DE");
 
 export class MapPicker {
   /**
@@ -37,7 +37,7 @@ export class MapPicker {
         '<span class="map-blurb"></span><span class="map-count"></span>';
       btn.querySelector(".map-title").textContent = p.title;
       btn.querySelector(".map-blurb").textContent = p.blurb;
-      btn.querySelector(".map-count").textContent = p.soon ? "kommt bald" : `${count} Items`;
+      btn.querySelector(".map-count").textContent = p.soon ? t("map.soon") : t("unit.items", { n: count });
       if (p.soon || !count) {
         btn.disabled = true;
         btn.dataset.lockedByLimit = "1"; // bleibt gesperrt, auch wenn das Menü entsperrt wird
@@ -51,7 +51,7 @@ export class MapPicker {
     // Kontinente der Länder-Auswahl
     this.chips = new Map();
     const chips = root.querySelector(".continent-chips");
-    const all = this._chip("Alle", this.features.filter((f) => f.kind === "country").length, () => {
+    const all = this._chip(t("common.all"), this.features.filter((f) => f.kind === "country").length, () => {
       this.sel.continents = new Set(COUNTRY_GROUPS.map((g) => g.id));
       this._pick("countries");
     });
@@ -78,9 +78,9 @@ export class MapPicker {
       this._pick(cur === "all" ? "all" : "countries");
     });
     root.querySelector("#map-small-hint").textContent =
-      `${this.small.length} Staaten unter ${fmt.format(SMALL_KM2)} km²`;
+      t("map.smallHint", { n: this.small.length, km2: fmt(SMALL_KM2) });
     root.querySelector("#map-small-field").title = this.small.map((f) => f.properties.name)
-      .sort((a, b) => a.localeCompare(b, "de")).join(", ");
+      .sort((a, b) => a.localeCompare(b, locale)).join(", ");
 
     // Einzelauswahl
     this.picker = new ItemPicker(root.querySelector("#picker-list"), groups, () => this._edited());
@@ -122,7 +122,7 @@ export class MapPicker {
     this.smallToggle.disabled = this.readOnly || !(countries || d.preset === "all");
     this.customBadge.hidden = d.preset !== "custom";
     const pool = this.features.filter((f) => this.config.kinds.has(f.group) && !this.config.excluded.has(f.key)).length;
-    this.summary.textContent = `${d.label} · ${pool} Items`;
+    this.summary.textContent = `${d.label} · ${t("unit.items", { n: pool })}`;
     this._drawPreviews(d);
   }
 
@@ -178,7 +178,7 @@ export class MapPicker {
       const cfg = id === d.preset ? this.config : applyMap({}, this.features, { preset: id, ...this.sel });
       const on = preset.soon ? () => false : (f) => cfg.kinds.has(f.group) && !cfg.excluded.has(f.key);
       drawPreview(btn.querySelector("canvas"), this.features, id === "continents" || id === "all", on, colors, id !== "continents");
-      btn.querySelector(".map-count").textContent = preset.soon ? "kommt bald" : `${this._count(id)} Items`;
+      btn.querySelector(".map-count").textContent = preset.soon ? t("map.soon") : t("unit.items", { n: this._count(id) });
     }
   }
 }

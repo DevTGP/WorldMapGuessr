@@ -1,6 +1,8 @@
 // Lebensanzeige: kompakt als Herz + „9/10“ (bis MAX_HEARTS wären einzelne Herzen möglich).
 // Wenige Leben übrig → Zahl rot.
 
+import { t } from "../i18n/index.js";
+
 const HEART = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="heart" d="M12 20.3s-7.4-4.5-9.2-9.1C1.5 7.9 3.4 4.6 6.8 4.6c2.1 0 3.7 1.2 5.2 3 1.5-1.8 3.1-3 5.2-3 3.4 0 5.3 3.3 4 6.6-1.8 4.6-9.2 9.1-9.2 9.1z"/></svg>';
 
 const MAX_HEARTS = 0; // 0 = immer kompakt
@@ -61,6 +63,6 @@ export class Lives {
   _label() {
     if (this.compact) this.countEl.textContent = `${this.value}/${this.max}`;
     this.container.classList.toggle("low", this.value <= Math.max(1, Math.round(this.max * LOW_SHARE)));
-    this.container.setAttribute("aria-label", `${this.title ?? "Leben"}: ${this.value} von ${this.max}`);
+    this.container.setAttribute("aria-label", t("lives.label", { title: this.title ?? t("hud.lives"), n: this.value, max: this.max }));
   }
 }
