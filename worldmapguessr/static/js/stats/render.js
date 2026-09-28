@@ -29,6 +29,14 @@ function rateCell(r) {
 
 const dec = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
+/** Ø eingesetzte Items der Lobby, bis das Item sitzt bzw. verloren geht (Anzahl gemessener Spawns im Titel) */
+function durationCell(d, n) {
+  if (d == null) return cell("—", "num muted");
+  const td = cell(dec.format(d), "num");
+  td.title = t("stats.durationTitle", { n });
+  return td;
+}
+
 /** Schwierigkeit 0…10: Zahl + Balken (grün → rot) */
 function difficultyCell(d) {
   if (d == null) return cell("—", "num muted");
@@ -62,6 +70,7 @@ export function renderRows(tbody, items) {
       cell(int.format(it.incorrect), "num"),
       rateCell(placeRate(it)),
       rateCell(hitRate(it)),
+      durationCell(it.duration, it.waitedCount),
       cell(updated, updated === "—" ? "muted" : ""),
       uid,
     );
@@ -71,8 +80,12 @@ export function renderRows(tbody, items) {
 
 /** Summen über die (gefilterten) Items */
 export function totals(items) {
-  const sum = (k) => items.reduce((s, i) => s + i[k], 0);
-  return { spawned: sum("spawned"), correct: sum("correct"), incorrect: sum("incorrect") };
+  const sum = (k) => items.reduce((s, i) => s + (i[k] ?? 0), 0);
+  const waitedCount = sum("waitedCount");
+  return {
+    spawned: sum("spawned"), correct: sum("correct"), incorrect: sum("incorrect"), waitedCount,
+    duration: waitedCount ? sum("waited") / waitedCount : null,
+  };
 }
 
 export function renderSummary(el, items) {
@@ -92,6 +105,7 @@ export function renderTotals(items) {
   $("t-place-rate").textContent = place === null ? "—" : pct.format(place);
   $("t-place-bar").style.width = `${place === null ? 0 : Math.min(100, Math.round(place * 100))}%`;
   $("t-hit-rate").textContent = hit === null ? "—" : pct.format(hit);
+  $("t-duration").textContent = sum.duration === null ? "—" : dec.format(sum.duration);
   const withD = items.filter((i) => typeof i.difficulty === "number");
   $("t-difficulty").textContent = withD.length
     ? dec.format(withD.reduce((s, i) => s + i.difficulty, 0) / withD.length) : "—";
@@ -112,6 +126,7 @@ export function renderFoot(tfoot, items) {
     cell(int.format(sum.incorrect), "num"),
     rateCell(placeRate(sum)),
     rateCell(hitRate(sum)),
+    durationCell(sum.duration, sum.waitedCount),
     cell(""),
     cell(""),
   );

@@ -7,18 +7,22 @@ from worldmapguessr.difficulty import item_difficulty, order_by_difficulty
 from worldmapguessr.lobbies import round as rounds
 
 
-def item(spawned, correct, incorrect):
-    return {"spawned": spawned, "correct": correct, "incorrect": incorrect}
+def item(spawned, correct, incorrect, waited=0, waited_count=0):
+    return {"spawned": spawned, "correct": correct, "incorrect": incorrect, "waited": waited,
+            "waitedCount": waited_count}
 
 
 @pytest.mark.parametrize("stats, expected", [
     ((0, 0, 0), 5.0),        # keine Daten → mittel
     ((10, 10, 0), 0.0),      # alles eingesetzt, nie daneben
     ((10, 0, 10), 10.0),     # nichts eingesetzt
-    ((10, 5, 5), 5.0),       # 75 % · 0,5 + 25 % · 0,5 = 0,5 → 5
-    ((10, 8, 2), 2.0),       # 75 % · 0,8 + 25 % · 0,8 = 0,8 → 2
-    ((10, 4, 0), 4.5),       # Einsetzquote 0,4, Trefferquote 1 → 0,55 → 4,5
-    ((4, 0, 0), 10.0),       # gespawnt, nie versucht → nur Einsetzquote
+    ((10, 5, 5), 5.0),       # je 0,5 schwer → 5
+    ((10, 8, 2), 2.0),       # je 0,2 → 2
+    ((10, 4, 0), 2.4),       # ohne Dauer: (20 % · 0,6 + 30 % · 0) / 50 % = 0,24 → 2,4
+    ((4, 0, 0), 10.0),       # gespawnt, nie versucht → nur Platzierungsrate
+    ((10, 10, 0, 50, 10), 2.5),   # Dauer Ø 5 → 5 / (5 + 5) = 0,5 · 50 % → 2,5
+    ((10, 5, 5, 100, 10), 5.8),   # 20 % · 0,5 + 30 % · 0,5 + 50 % · 10/15 = 0,583 → 5,8
+    ((0, 0, 0, 0, 4), 0.0),       # nur Dauer, immer sofort gesetzt → 0
     ((0, 2, 2), 5.0),        # (Altdaten) ohne Spawns → nur Trefferquote
     ((2, 5, 0), 0.0),        # Einsetzquote über 100 % wird begrenzt
 ])

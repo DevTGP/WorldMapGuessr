@@ -52,7 +52,7 @@ class LobbyStore:
                  difficulty=None):
         """persistence: JsonLobbyPersistence/MongoLobbyPersistence oder ein Dateipfad (→ JSON).
         catalog: {Gruppe: [Feature-Key]} – alle Items, aus denen eine Runde gebaut wird.
-        on_stat(key, event): Item-Statistik der Lobby-Runden (spawned/correct/incorrect), vom Server gezählt.
+        on_stat(key, event, amount): Item-Statistik der Runden (spawned/correct/incorrect/waited), vom Server gezählt.
         difficulty(): {key: 0…10} – aktuelle Item-Schwierigkeit für die Austeil-Reihenfolge."""
         self.catalog = catalog or {}
         self.on_stat = on_stat
@@ -229,7 +229,11 @@ class LobbyStore:
         with self.lock:
             lobby = self._require(code)
             self._require_host(lobby, player_id)
-            number = (lobby["round"] or {}).get("number", 0) + 1
+            old = lobby["round"]
+            if old and old.get("status") == rounds.RUNNING:
+                rounds.settle(old)  # Abbruch: offene Items zählen als verloren (Statistik „waited“)
+            self._emit_stats(old)
+            number = (old or {}).get("number", 0) + 1
             # Reihenfolge fürs Verteilen: wer am längsten in der Lobby ist, zuerst
             players = sorted((p for p in online if p in lobby["players"]),
                              key=lambda p: lobby["players"][p]["joined"]) or [player_id]
@@ -385,12 +389,15 @@ class LobbyStore:
         with self.lock:
             lobby = self._lobbies.get(normalize(code))
             if lobby:
-                # Statistik-Ereignisse der Runde weiterreichen (werden nicht mit der Lobby gespeichert)
-                for key, event in rounds.take_stats(lobby["round"]):
-                    if self.on_stat:
-                        self.on_stat(key, event)
+                self._emit_stats(lobby["round"])
                 lobby["lastActive"] = self.clock()
                 self.persistence.save(lobby)
+
+    def _emit_stats(self, rnd) -> None:
+        """Statistik-Ereignisse der Runde weiterreichen (werden nicht mit der Lobby gespeichert)"""
+        for key, event, amount in rounds.take_stats(rnd):
+            if self.on_stat:
+                self.on_stat(key, event, amount)
 
     def ttl_of(self, lobby) -> int:
         return self.ttl if self.ttl is not None else lobby["settings"].get("ttl", LOBBY_TTL)
@@ -421,6 +428,10 @@ class LobbyStore:
             return idle
 
     def _delete(self, code):
+        lobby = self._lobbies.get(code)
+        if lobby and lobby.get("round"):
+            rounds.settle(lobby["round"])
+            self._emit_stats(lobby["round"])
         self._lobbies.pop(code, None)
         self._inactive.pop(code, None)
         self.persistence.delete(code)

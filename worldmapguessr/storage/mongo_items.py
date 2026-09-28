@@ -1,6 +1,6 @@
 """Item-Statistik in MongoDB (Collection "items"). Gleiche Schnittstelle wie item_store.ItemStore.
 
-Dokument: {_id: uid, uid, kind, code, name, spawned, correct, incorrect, created, updated}
+Dokument: {_id: uid, uid, kind, code, name, spawned, correct, incorrect, waited, waitedCount, created, updated}
 Zähler werden atomar mit $inc erhöht – sicher auch bei mehreren Server-Prozessen.
 """
 from __future__ import annotations
@@ -11,7 +11,7 @@ from pymongo import ASCENDING, ReturnDocument
 from pymongo.collection import Collection
 from pymongo.errors import DuplicateKeyError
 
-from ..item_store import EVENTS, InvalidEvent, UnknownItem, _now
+from ..item_store import COUNTERS, UnknownItem, _now, increments
 
 NO_ID = {"_id": 0}
 
@@ -45,7 +45,7 @@ class MongoItemStore:
                         "$set": {"name": name},
                         "$setOnInsert": {
                             "_id": uid, "uid": uid, "kind": kind, "code": code,
-                            **{e: 0 for e in EVENTS}, "created": now, "updated": now,
+                            **{e: 0 for e in COUNTERS}, "created": now, "updated": now,
                         },
                     },
                     upsert=True, projection=NO_ID, return_document=ReturnDocument.AFTER,
@@ -54,12 +54,10 @@ class MongoItemStore:
                 continue
         return self.col.find_one({"kind": kind, "code": code}, NO_ID)
 
-    def record(self, uid: str, event: str) -> dict:
-        if event not in EVENTS:
-            raise InvalidEvent(event)
+    def record(self, uid: str, event: str, amount: int = 1) -> dict:
         doc = self.col.find_one_and_update(
             {"_id": uid},
-            {"$inc": {event: 1}, "$set": {"updated": _now()}},
+            {"$inc": increments(event, amount), "$set": {"updated": _now()}},
             projection=NO_ID, return_document=ReturnDocument.AFTER,
         )
         if doc is None:
@@ -81,10 +79,10 @@ class MongoItemStore:
                 stats["skipped"] += 1
                 continue
             doc = {k: item.get(k) for k in ("uid", "kind", "code", "name", "created", "updated")}
-            doc.update({e: int(item.get(e, 0)) for e in EVENTS})
+            doc.update({e: int(item.get(e, 0)) for e in COUNTERS})
             other = self.col.find_one({"kind": item["kind"], "code": item["code"]})
             if other:
-                for e in EVENTS:
+                for e in COUNTERS:
                     doc[e] += int(other.get(e, 0))
                 self.col.delete_one({"_id": other["_id"]})
                 stats["merged"] += 1

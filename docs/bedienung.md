@@ -16,7 +16,7 @@ Popup im Hauptmenü und im Spiel über ⚙; gilt sofort und nur auf diesem Gerä
 
 | Bereich | Einstellung | Werte |
 |---|---|---|
-| Darstellung | Farbschema (`map/schemes.js`) | **A Nachtatlas** (dunkles Land, Fortschritt Olivgrau → Sand → Creme), **B Papierkarte** (Standard; Salbei → Grün → Tannengrün), **C Kontinentfarben** (jeder Kontinent bekommt beim Einsetzen seinen Farbton) |
+| Darstellung | Farbschema (`map/schemes.js`) | **A Nachtatlas** (Standard; dunkles Land, Fortschritt Olivgrau → Sand → Creme), **B Papierkarte** (Salbei → Grün → Tannengrün), **C Kontinentfarben** (jeder Kontinent bekommt beim Einsetzen seinen Farbton) |
 | | Kartenqualität | Niedrig / Mittel (Standard) / Hoch – siehe [kartendaten.md](kartendaten.md#detailstufen-lod) |
 | | Projektion (`map/projections.js`) | Natural Earth (Standard) oder Flächentreu (Equal Earth: Afrika : Europa 3,07 statt 2,27) |
 | | Relief | Aus / Leicht (Standard) / Stark (`map/relief.js`) |

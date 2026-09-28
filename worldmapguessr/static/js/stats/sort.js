@@ -42,4 +42,4 @@ export function sortItems(items, key, dir) {
 }
 
 /** Standard-Richtung beim ersten Klick: Zahlen absteigend, Text aufsteigend */
-export const NUMERIC_KEYS = new Set(["difficulty", "spawned", "correct", "incorrect", "placeRate", "rate", "updated"]);
+export const NUMERIC_KEYS = new Set(["difficulty", "spawned", "correct", "incorrect", "placeRate", "rate", "duration", "updated"]);

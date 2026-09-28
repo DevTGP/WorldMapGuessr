@@ -33,17 +33,22 @@ Rundenzustand (JSON-serialisierbar, wird mit der Lobby gespeichert):
  timer: {nextAt, graceUntil, pausedAt} | None, takeCursor, events, log: [event], last: event}
 Zusätzlich: endspurt (bool), lostReason, Punkte (scoring.py): scores {playerId: {points, hits, misses}},
 pace {playerId: Zeit der letzten Aktion}, diff {key: Schwierigkeit zu Rundenbeginn}, bonus (Rundenende),
-pausedAt/resumedAt (Pause des Einzelspiels, auch ohne Timer – für das Tempo).
+pausedAt/resumedAt (Pause des Einzelspiels, auch ohne Timer – für das Tempo), spawnAt {key: eingesetzte
+Items beim Austeilen} (Statistik „waited“).
 Ereignis: {seq, type: placed|miss|refill|gift|take|join|endspurt|empty, player?, key?, count?, to?, items?, lost?,
  points? (placed/miss: Punkte des Spielers)}
  refill: to = {playerId: n}; take: items = [{player, key}]; miss: lost = Item ging zurück in den Vorrat;
  join: count = Items für den Neuen, lives = zusätzliche Leben
 `events` zählt Ereignisse hoch; `log` hält die letzten LOG_SIZE, der Client zeigt jedes (seq) genau einmal.
 
-Item-Statistik (spawned/correct/incorrect) zählt in der Lobby allein der Server: jedes Austeilen aus
-dem Vorrat an einen Spieler = spawned, jeder angenommene Einsetzversuch = correct bzw. incorrect.
-Senden zwischen Spielern und Zurücklegen in den Vorrat zählen nicht. Die Ereignisse sammeln sich in
-rnd[STATS] und werden vom LobbyStore mit take_stats() abgeholt (nicht gespeichert).
+Item-Statistik zählt allein der Server: jedes Austeilen aus dem Vorrat an einen Spieler = spawned, jeder
+angenommene Einsetzversuch = correct bzw. incorrect. Senden zwischen Spielern und Zurücklegen in den Vorrat
+zählen nicht.
+Dazu „waited“: wie viele Items die Lobby (alle Spieler) richtig eingesetzt hat, während dieses Item im Spiel war –
+vom Austeilen (spawnAt: Zahl der eingesetzten Items in diesem Moment) bis es selbst richtig sitzt oder verloren
+geht (zurück in den Vorrat: Timer, Fehlwurf, Verlassen/Entfernen; Rundenende; Neustart). Senden ändert nichts.
+Die Ereignisse sammeln sich in rnd[STATS] als (key, event, Anzahl) und werden vom LobbyStore mit take_stats()
+abgeholt (nicht gespeichert).
 """
 from __future__ import annotations
 
@@ -57,7 +62,7 @@ RUNNING, WON, LOST = "running", "won", "lost"
 PER_PLAYER = 2      # Start-Items und Leben je weiterem Spieler
 MAX_LIVES = 99
 LOG_SIZE = 40
-STATS = "_stats"  # vorübergehende Liste [(key, event)] für die Item-Statistik
+STATS = "_stats"  # vorübergehende Liste [(key, event, Anzahl)] für die Item-Statistik
 
 
 class RoundError(Exception):
@@ -144,17 +149,37 @@ def _deal(rnd: dict, online: list[str], count: int) -> dict[str, int]:
         key = rnd["pool"].pop(0)
         rnd["hands"].setdefault(pid, []).append(key)
         rnd["dealt"][pid] = rnd["dealt"].get(pid, 0) + 1
-        _count(rnd, key, "spawned")
+        _spawned(rnd, key)
         to[pid] = to.get(pid, 0) + 1
         given += 1
     return to
 
 
-def _count(rnd: dict, key: str, event: str) -> None:
-    rnd.setdefault(STATS, []).append((key, event))
+def _count(rnd: dict, key: str, event: str, amount: int = 1) -> None:
+    rnd.setdefault(STATS, []).append((key, event, amount))
 
 
-def take_stats(rnd: dict | None) -> list[tuple[str, str]]:
+def _spawned(rnd: dict, key: str) -> None:
+    """Item aus dem Vorrat ausgeteilt: zählen und festhalten, wie viele Items da schon eingesetzt waren."""
+    _count(rnd, key, "spawned")
+    rnd.setdefault("spawnAt", {})[key] = len(rnd["placed"])
+
+
+def _waited(rnd: dict, key: str) -> None:
+    """Item sitzt oder ist verloren: eingesetzte Items der Lobby seit seinem Austeilen zählen.
+    Items aus älteren gespeicherten Runden (ohne spawnAt) zählen nicht."""
+    at = rnd.get("spawnAt", {}).pop(key, None)
+    if at is not None:
+        _count(rnd, key, "waited", len(rnd["placed"]) - at)
+
+
+def settle(rnd: dict | None) -> None:
+    """Rundenende oder Abbruch (Neustart, Lobby gelöscht): alle noch offenen Items gelten als verloren."""
+    for key in list((rnd or {}).get("spawnAt", {})):
+        _waited(rnd, key)
+
+
+def take_stats(rnd: dict | None) -> list[tuple[str, str, int]]:
     """Gesammelte Statistik-Ereignisse abholen (und aus der Runde entfernen)."""
     return rnd.pop(STATS, []) if rnd else []
 
@@ -181,7 +206,7 @@ def join(rnd: dict, pid: str, now: float | None = None) -> bool:
         key = rnd["pool"].pop(0)
         hand.append(key)
         rnd["dealt"][pid] = rnd["dealt"].get(pid, 0) + 1
-        _count(rnd, key, "spawned")
+        _spawned(rnd, key)
         count += 1
     lives = min(MAX_LIVES, rnd["livesMax"] + PER_PLAYER) - rnd["livesMax"]
     rnd["livesMax"] += lives
@@ -208,6 +233,7 @@ def place(rnd: dict, pid: str, key: str, correct: bool, online: list[str], now: 
         if lost:
             hand.remove(key)
             rnd["pool"].insert(random.randint(0, len(rnd["pool"])), key)
+            _waited(rnd, key)
         points = scoring.miss(rnd, pid, now)
         _event(rnd, type="miss", player=pid, key=key, lost=lost, points=points)
         if rnd["lives"] == 0:
@@ -217,6 +243,7 @@ def place(rnd: dict, pid: str, key: str, correct: bool, online: list[str], now: 
         return {"refill": 0, "points": points}
 
     hand.remove(key)
+    _waited(rnd, key)  # eingesetzte Items vor diesem – ohne es selbst
     rnd["placed"].append(key)
     rnd["placedBy"][key] = pid
     rnd["sinceRefill"] += 1
@@ -225,6 +252,7 @@ def place(rnd: dict, pid: str, key: str, correct: bool, online: list[str], now: 
     if len(rnd["placed"]) == rnd["total"]:
         rnd["status"] = WON
         scoring.finish(rnd)
+        settle(rnd)
         return {"refill": 0, "points": points}
 
     refill = 0
@@ -279,6 +307,7 @@ def return_hand(rnd: dict, pid: str, online: list[str], rng: random.Random | Non
     rng = rng or random.Random()
     for key in hand:
         rnd["pool"].insert(rng.randint(0, len(rnd["pool"])), key)
+        _waited(rnd, key)
     _rescue(rnd, online)
     return len(hand)
 
@@ -317,6 +346,7 @@ def take(rnd: dict, online: list[str], count: int, rng: random.Random | None = N
         misses = 0
         key = hand.pop(0)
         rnd["pool"].insert(rng.randint(0, len(rnd["pool"])), key)
+        _waited(rnd, key)
         taken.append({"player": pid, "key": key})
     if taken:
         _event(rnd, type="take", player=None, items=taken)
@@ -388,6 +418,7 @@ def _lose(rnd: dict, reason: str) -> None:
     rnd["status"] = LOST
     rnd["lostReason"] = reason
     scoring.finish(rnd)
+    settle(rnd)
 
 
 def _check_endspurt(rnd: dict) -> None:

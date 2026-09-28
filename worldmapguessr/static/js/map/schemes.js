@@ -44,7 +44,7 @@ export const SCHEMES = {
     relief: { light: [["soft-light", 1]], strong: [["soft-light", 1], ["soft-light", 0.8]] },
   },
 };
-export const DEFAULT_SCHEME = "b";
+export const DEFAULT_SCHEME = "a";
 
 /** Aktuelles Schema */
 export function scheme() { return SCHEMES[prefs.get("scheme")] ?? SCHEMES[DEFAULT_SCHEME]; }

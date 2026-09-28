@@ -1,5 +1,7 @@
 """Item-Statistik als JSON-Datei: jedes Spielteil hat eine UID und Zähler für
-spawned (ins Inventar gelegt), correct und incorrect (Einsetzversuche)."""
+spawned (ins Inventar gelegt), correct und incorrect (Einsetzversuche) sowie waited/waitedCount:
+Summe der Items, die die Lobby zwischen Austeilen und Einsetzen (bzw. Verlust) eingesetzt hat, und wie viele
+Spawns darin stecken (Ereignis "waited" mit Anzahl, siehe lobbies/round.py)."""
 from __future__ import annotations
 
 import json
@@ -10,7 +12,8 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-EVENTS = ("spawned", "correct", "incorrect")
+EVENTS = ("spawned", "correct", "incorrect", "waited")
+COUNTERS = ("spawned", "correct", "incorrect", "waited", "waitedCount")
 SCHEMA_VERSION = 1
 
 
@@ -24,6 +27,17 @@ class UnknownItem(KeyError):
 
 class InvalidEvent(ValueError):
     pass
+
+
+def increments(event: str, amount: int = 1) -> dict[str, int]:
+    """Zähler-Änderungen eines Ereignisses; "waited" zählt amount dazu und einen Spawn in waitedCount."""
+    if event not in EVENTS:
+        raise InvalidEvent(event)
+    if event == "waited":
+        if isinstance(amount, bool) or not isinstance(amount, int) or amount < 0:
+            raise InvalidEvent(f"waited: {amount!r}")
+        return {"waited": amount, "waitedCount": 1}
+    return {event: 1}
 
 
 class ItemStore:
@@ -60,7 +74,7 @@ class ItemStore:
                 "kind": kind,
                 "code": code,
                 "name": name,
-                **{e: 0 for e in EVENTS},
+                **{e: 0 for e in COUNTERS},
                 "created": now,
                 "updated": now,
             }
@@ -68,12 +82,12 @@ class ItemStore:
             self._save()
             return dict(item)
 
-    def record(self, uid: str, event: str) -> dict:
-        if event not in EVENTS:
-            raise InvalidEvent(event)
+    def record(self, uid: str, event: str, amount: int = 1) -> dict:
+        inc = increments(event, amount)
         with self._lock:
             item = self._item(uid)
-            item[event] += 1
+            for k, v in inc.items():
+                item[k] = item.get(k, 0) + v
             item["updated"] = _now()
             self._save()
             return dict(item)

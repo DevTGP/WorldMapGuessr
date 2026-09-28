@@ -229,3 +229,43 @@ def test_log_keeps_recent_events_and_refill_names_receivers():
     kinds = [e["type"] for e in rnd["log"]]
     assert kinds[:3] == ["placed", "placed", "refill"] and rnd["log"][2]["to"] == {"a": 2, "b": 2}
     assert [e["seq"] for e in rnd["log"]] == list(range(1, len(kinds) + 1))
+
+
+def waited(rnd):
+    return {k: n for k, e, n in rounds.take_stats(rnd) if e == "waited"}
+
+
+def test_waited_counts_lobby_placements_since_spawn():
+    rnd = new(lives=5, refillEvery=9)  # a, b je 2 Items, kein Nachschub
+    rounds.take_stats(rnd)
+    a1, a2 = rnd["hands"]["a"]
+    b1, b2 = rnd["hands"]["b"]
+    rounds.place(rnd, "b", b1, True, ["a", "b"])           # 0 davor
+    rounds.place(rnd, "a", a1, False, ["a", "b"])          # Fehlwurf behält das Item: nichts
+    rounds.give(rnd, "b", "a", b2)                         # Senden ändert nichts
+    rounds.place(rnd, "a", b2, True, ["a", "b"])           # 1 davor (b1)
+    rounds.place(rnd, "a", a1, True, ["a", "b"])           # 2 davor (b1, b2) – auch Treffer anderer zählen
+    assert waited(rnd) == {b1: 0, b2: 1, a1: 2}
+    assert a2 in rnd["spawnAt"] and rnd["spawnAt"][a2] == 0
+
+
+def test_waited_counts_lost_items_until_they_are_lost():
+    rnd = new(online=("a",), startItems=4, lives=9, refillEvery=9, missLoses=True, timer=10, grace=0, timerTake=1)
+    rounds.take_stats(rnd)
+    k1, k2, k3, k4 = rnd["hands"]["a"]
+    rounds.place(rnd, "a", k1, True, ["a"])
+    rounds.place(rnd, "a", k2, False, ["a"])      # Fehlwurf gibt das Item ab: 1 davor
+    rounds.tick(rnd, 10, ["a"], random.Random(1))  # Timer nimmt das älteste (k3): 1 davor
+    assert waited(rnd) == {k1: 0, k2: 1, k3: 1}
+    rounds.return_hand(rnd, "a", [])              # Verlassen: k4
+    assert waited(rnd) == {k4: 1}
+
+
+def test_round_end_settles_open_items():
+    rnd = new(online=("a",), startItems=3, lives=1, refillEvery=9)
+    rounds.take_stats(rnd)
+    k1, k2, k3 = rnd["hands"]["a"]
+    rounds.place(rnd, "a", k1, True, ["a"])
+    rounds.place(rnd, "a", k2, False, ["a"])      # letztes Leben → verloren, k2 und k3 offen
+    assert rnd["status"] == rounds.LOST
+    assert waited(rnd) == {k1: 0, k2: 1, k3: 1} and rnd["spawnAt"] == {}

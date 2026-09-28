@@ -27,6 +27,8 @@ def test_items_ensure_record_and_errors(db):
     assert (doc["spawned"], doc["correct"], doc["incorrect"]) == (1, 1, 0)
     assert store.get(a["uid"])["correct"] == 1
     assert [i["code"] for i in store.list("country")] == ["DEU"]
+    doc = store.record(a["uid"], "waited", 7)
+    assert (doc["waited"], doc["waitedCount"]) == (7, 1)
     with pytest.raises(InvalidEvent):
         store.record(a["uid"], "x")
     with pytest.raises(UnknownItem):

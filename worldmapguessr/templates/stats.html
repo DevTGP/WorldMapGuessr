@@ -26,6 +26,7 @@
     <div class="total"><span>{{ t('stats.incorrect') }}</span><b id="t-incorrect">–</b></div>
     <div class="total accent"><span>{{ t('stats.placeRate') }}</span><b id="t-place-rate">–</b><i class="bar"><i id="t-place-bar"></i></i></div>
     <div class="total"><span>{{ t('stats.hitRate') }}</span><b id="t-hit-rate">–</b><small>{{ t('stats.hitRateHint') }}</small></div>
+    <div class="total"><span>{{ t('stats.duration') }}</span><b id="t-duration">–</b><small>{{ t('stats.durationHint') }}</small></div>
     <div class="total"><span>{{ t('stats.avgDifficulty') }}</span><b id="t-difficulty">–</b><small>{{ t('stats.difficultyScale') }}</small></div>
   </section>
   <p class="how">{{ t('stats.how') | safe }}</p>
@@ -55,6 +56,7 @@
           <th data-key="incorrect" scope="col" class="num">{{ t('stats.incorrect') }}</th>
           <th data-key="placeRate" scope="col" class="num" title="{{ t('stats.placeRate') }}">{{ t('stats.placeRate') }}</th>
           <th data-key="rate" scope="col" class="num" title="{{ t('stats.hitRateTitle') }}">{{ t('stats.hitRate') }}</th>
+          <th data-key="duration" scope="col" class="num" title="{{ t('stats.durationHint') }}">{{ t('stats.duration') }}</th>
           <th data-key="updated" scope="col">{{ t('stats.col.updated') }}</th>
           <th data-key="uid" scope="col">UID</th>
         </tr>

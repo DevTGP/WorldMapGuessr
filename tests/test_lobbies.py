@@ -250,7 +250,14 @@ def test_give_item_to_online_player_and_host_can_disable(store):
 # ---------- Item-Statistik (zählt in Lobbys nur der Server) ----------
 def test_stats_counted_by_server_only_for_deals_and_accepted_placements(tmp_path):
     events = []
-    store = LobbyStore(tmp_path / "l.json", catalog=CATALOG, on_stat=lambda k, e: events.append((k, e)))
+    waited = []
+
+    def on_stat(key, event, amount=1):
+        if event == "waited":
+            waited.append((key, event, amount))
+        else:
+            events.append((key, event))
+    store = LobbyStore(tmp_path / "l.json", catalog=CATALOG, on_stat=on_stat)
     hub, code, h, g = two_players(store)
     spawned = [k for k, e in events if e == "spawned"]
     assert len(spawned) == 6 and set(spawned) == set(hand_of(h)) | set(hand_of(g))
@@ -269,6 +276,8 @@ def test_stats_counted_by_server_only_for_deals_and_accepted_placements(tmp_path
     hub.handle(code, g, {"type": "place", "key": right2, "correct": True})
     assert events[:3] == [(wrong, "incorrect"), (right1, "correct"), (right2, "correct")]
     assert [e for _, e in events[3:]] == ["spawned"] * 4
+    # waited: eingesetzte Items der Lobby vor dem eigenen Treffer (seit dem Austeilen)
+    assert waited == [(right1, "waited", 0), (right2, "waited", 1)]
     # nichts davon landet in der gespeicherten Lobby
     assert "_stats" not in store.get(code)["round"]
 
@@ -564,3 +573,21 @@ def test_inactive_lobby_deleted_after_ttl(tmp_path):
     clock.t += 3600
     assert hub.maintain()["expired"] == [code]
     assert store.peek(code) is None and LobbyStore(store.persistence).peek(code) is None
+
+
+def test_restart_counts_open_items_as_waited(tmp_path):
+    waited = []
+    store = LobbyStore(tmp_path / "l.json", catalog=CATALOG,
+                       on_stat=lambda key, event, amount=1: event == "waited" and waited.append(key))
+    hub, code, h, g = two_players(store)
+    open_items = set(hand_of(h)) | set(hand_of(g))
+    hub.handle(code, h, {"type": "start"})   # Neustart bricht die laufende Runde ab
+    assert set(waited) == open_items
+
+
+def test_api_waited_event_and_duration(client):
+    uid = client.get("/api/items?kind=continent").get_json()["items"][0]["uid"]
+    client.post(f"/api/items/{uid}/events", json={"event": "waited", "value": 6})
+    item = client.post(f"/api/items/{uid}/events", json={"event": "waited", "value": 2}).get_json()
+    assert (item["waited"], item["waitedCount"], item["duration"]) == (8, 2, 4.0)
+    assert client.post(f"/api/items/{uid}/events", json={"event": "waited", "value": -1}).status_code == 400

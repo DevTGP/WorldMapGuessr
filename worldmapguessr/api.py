@@ -50,10 +50,11 @@ def get_item(uid):
 
 @bp.post("/items/<uid>/events")
 def record_event(uid):
-    """Ereignis zählen. Body: {"event": "spawned" | "correct" | "incorrect"}"""
+    """Ereignis zählen. Body: {"event": "spawned" | "correct" | "incorrect"} oder
+    {"event": "waited", "value": n} (n Items der Lobby eingesetzt, bevor dieses saß bzw. verloren ging)"""
     body = request.get_json(silent=True) or {}
     try:
-        return jsonify(with_difficulty(_store().record(uid, body.get("event"))))
+        return jsonify(with_difficulty(_store().record(uid, body.get("event"), body.get("value", 1))))
     except UnknownItem:
         return jsonify(error="Unbekanntes Item", uid=uid), 404
     except InvalidEvent:
