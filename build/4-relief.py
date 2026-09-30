@@ -1,13 +1,11 @@
 """Schritt 4: Geländeschummerung (Relief) als Graustufen-Kacheln für den Browser.
 
-Quelle: Natural Earth „Shaded Relief“ (gemeinfrei) in der Fassung aus dem PyPI-Paket basemap-data
-(shadedrelief.jpg, 10800 × 5400, gleichabständig; Farbverlauf nach Höhe mit Schummerung). Die
-naturalearthdata.com-Downloads sind hier nicht erreichbar, PyPI schon.
-
-Aus dem Bild wird nur die Schummerung gewonnen: Helligkeit geteilt durch ihr weichgezeichnetes Mittel (nur über
-Land gemittelt) – der großräumige Farbverlauf fällt weg, Hänge und Täler bleiben. 128 = neutral, heller =
-sonnige Hänge, dunkler = Schattenseiten. Meer und alles außerhalb der Landflächen (tmp/pieces.geojson aus
-Schritt 1) ist neutral; der Browser legt das Bild mit „hard-light“ über die Landfarben.
+Quelle: Natural Earth „Shaded Relief, High Res“ (SR_HR, gemeinfrei; 21600 × 10800, gleichabständig) – eine
+reine Graustufen-Schummerung ohne Höhenfarben, von Natural Earths S3-Spiegel (naturalearth.s3.amazonaws.com;
+naturalearthdata.com selbst ist aus der Build-Umgebung nicht erreichbar). Ebenes Gelände (und Meer) hat dort
+den Grauwert FLAT; Abweichungen davon werden mit GAIN um 128 (= neutral) gelegt: heller = sonnige Hänge,
+dunkler = Schattenseiten. Alles außerhalb der Landflächen (tmp/pieces.geojson aus Schritt 1) ist neutral; der
+Browser legt das Bild mit „hard-light“ bzw. „soft-light“ über die Landfarben.
 
 Ausgabe: static/data/map/relief/r{r}/{x}_{y}.jpg – Stufe r hat 2^(r+1) × 2^r Kacheln à 512 px (r0: 1024 px Welt
 … r3: 8192 px). Rein neutrale Kacheln (Meer) fehlen. index.json bekommt "relief" und eine neue Version.
@@ -17,35 +15,33 @@ import io
 import json
 import os
 import shutil
-import subprocess
-import sys
+import urllib.request
 import zipfile
 
 import numpy as np
 from PIL import Image, ImageDraw
 from scipy import ndimage
 
-SRC = "tmp/src/shadedrelief.jpg"
-WHEEL = "basemap_data-2.0.0-py3-none-any.whl"
+SRC_URL = "https://naturalearth.s3.amazonaws.com/10m_raster/SR_HR.zip"
+SRC = "tmp/src/SR_HR/SR_HR.tif"
 OUT = "../worldmapguessr/static/data/map"
 TILE = 512
 LEVELS = 4          # r0 … r3
-SIGMA = 6           # Weichzeichner in Quellpixeln (≈ 0,2°): größere Formen gelten als Farbverlauf
-GAIN = 2.5          # Kontrast der Schummerung
-EDGE_PX = 2         # Küstensaum der Quelle (heller Schein) ausblenden
+FLAT = 206          # Grauwert der Quelle für ebenes Gelände
+GAIN = 1.5          # Kontrast der Schummerung
+EDGE_PX = 1         # Küstensaum: Maske so viele Pixel schrumpfen und weich auslaufen lassen
 QUALITY = 80
 
 
 def source():
     if not os.path.exists(SRC):
         os.makedirs("tmp/src", exist_ok=True)
-        print("Lade basemap-data (PyPI) …")
-        subprocess.run([sys.executable, "-m", "pip", "download", "basemap-data==2.0.0", "--no-deps", "-d", "tmp/src"],
-                       check=True)
-        with zipfile.ZipFile(f"tmp/src/{WHEEL}") as zf, open(SRC, "wb") as fh:
-            fh.write(zf.read("mpl_toolkits/basemap_data/shadedrelief.jpg"))
+        print("lade", SRC_URL)
+        urllib.request.urlretrieve(SRC_URL, "tmp/src/SR_HR.zip")
+        with zipfile.ZipFile("tmp/src/SR_HR.zip") as zf:
+            zf.extractall("tmp/src/SR_HR")
     Image.MAX_IMAGE_PIXELS = None
-    return Image.open(SRC).convert("RGB")
+    return Image.open(SRC).convert("L")
 
 
 def land_mask(w, h):
@@ -65,14 +61,10 @@ def land_mask(w, h):
 
 def shading(img):
     a = np.asarray(img).astype(np.float32)
-    lum = 0.299 * a[..., 0] + 0.587 * a[..., 1] + 0.114 * a[..., 2]
     m = land_mask(*img.size)
-    mean = ndimage.gaussian_filter(lum * m, SIGMA) / np.maximum(ndimage.gaussian_filter(m, SIGMA), 1e-3)
-    ratio = lum / np.maximum(mean, 1)
-    # Küste: Maske schrumpfen und weich auslaufen lassen (die Quelle hat dort einen hellen Schein)
     inner = ndimage.binary_erosion(m > 0.5, iterations=EDGE_PX).astype(np.float32)
     weight = np.clip(ndimage.gaussian_filter(inner, 1.0) * 1.5, 0, 1)
-    shade = 128 + (ratio - 1) * 128 * GAIN * weight
+    shade = 128 + (a - FLAT) * GAIN * weight
     return Image.fromarray(np.clip(shade, 0, 255).astype(np.uint8), "L")
 
 
