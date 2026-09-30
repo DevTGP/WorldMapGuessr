@@ -43,5 +43,6 @@ enthalten (Neuladen, gesendete Items).
 <http://127.0.0.1:5000/stats> (im Hauptmenü „Statistik“), in der Sprache der Seite (Namen auf Englisch aus `nameEn`).
 
 - Tabelle aller Items, sortierbar per Klick auf den Spaltenkopf (zweiter Klick kehrt die Richtung um), Filter Art (Kontinente/Staaten) und Kontinent (kombinierbar), Suche nach Name oder Code. Schmale Spalten ohne „Zuletzt“ und UID (beides steht in den Rohdaten).
-- Oben Kacheln mit den Summen (Spawns, Eingesetzt, Fehlplatziert), den Quoten **Eingesetzt / Spawns** und **Trefferquote**, **Ø bis platziert** (über alle gemessenen Spawns) sowie **Ø Schwierigkeit** – jeweils für den aktuellen Filter; dieselben Summen stehen als letzte Tabellenzeile.
+- Die Seite füllt genau das Fenster: Kopf und Filter oben, die Summenleiste unten fest; dazwischen scrollt nur die Tabelle (Spaltenköpfe und Summenzeile bleiben stehen). Auf kleinen Bildschirmen scrollt die ganze Seite, die Summenleiste bleibt unten angeheftet.
+- Unten Kacheln mit den Summen (Spawns, Eingesetzt, Fehlplatziert), den Quoten **Eingesetzt / Spawns** und **Trefferquote**, **Ø bis platziert** (über alle gemessenen Spawns) sowie **Ø Schwierigkeit** – jeweils für den aktuellen Filter; dieselben Summen stehen als letzte Tabellenzeile.
 - Darunter die Rohdaten als JSON (gefiltert und sortiert wie die Tabelle, unverändert wie von der API).

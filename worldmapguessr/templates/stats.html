@@ -20,15 +20,6 @@
     <button class="btn" id="refresh" type="button">{{ t('home.refresh') }}</button>
   </header>
 
-  <section class="totals" aria-label="{{ t('stats.totals') }}">
-    <div class="total"><span>{{ t('stats.spawned') }}</span><b id="t-spawned">–</b></div>
-    <div class="total"><span>{{ t('stats.correct') }}</span><b id="t-correct">–</b></div>
-    <div class="total"><span>{{ t('stats.incorrect') }}</span><b id="t-incorrect">–</b></div>
-    <div class="total accent"><span>{{ t('stats.placeRate') }}</span><b id="t-place-rate">–</b><i class="bar"><i id="t-place-bar"></i></i></div>
-    <div class="total"><span>{{ t('stats.hitRate') }}</span><b id="t-hit-rate">–</b><small>{{ t('stats.hitRateHint') }}</small></div>
-    <div class="total"><span>{{ t('stats.duration') }}</span><b id="t-duration">–</b><small>{{ t('stats.durationHint') }}</small></div>
-    <div class="total"><span>{{ t('stats.avgDifficulty') }}</span><b id="t-difficulty">–</b><small>{{ t('stats.difficultyScale') }}</small></div>
-  </section>
 
   <div class="toolbar">
     <div class="segmented" id="kind" role="radiogroup" aria-label="{{ t('stats.kind') }}">
@@ -45,6 +36,7 @@
     </label>
   </div>
 
+  <div class="scroll">
   <div class="table-wrap">
     <table id="table">
       <thead>
@@ -72,6 +64,17 @@
     <p><a id="api-link" href="{{ request.script_root }}/api/items" target="_blank" rel="noopener">{{ t('stats.api') }}</a></p>
     <pre id="json"></pre>
   </details>
+  </div>
+
+  <footer class="totals" aria-label="{{ t('stats.totals') }}">
+    <div class="total"><span>{{ t('stats.spawned') }}</span><b id="t-spawned">–</b></div>
+    <div class="total"><span>{{ t('stats.correct') }}</span><b id="t-correct">–</b></div>
+    <div class="total"><span>{{ t('stats.incorrect') }}</span><b id="t-incorrect">–</b></div>
+    <div class="total accent"><span>{{ t('stats.placeRate') }}</span><b id="t-place-rate">–</b><i class="bar"><i id="t-place-bar"></i></i></div>
+    <div class="total"><span>{{ t('stats.hitRate') }}</span><b id="t-hit-rate">–</b><small>{{ t('stats.hitRateHint') }}</small></div>
+    <div class="total"><span>{{ t('stats.duration') }}</span><b id="t-duration">–</b><small>{{ t('stats.durationHint') }}</small></div>
+    <div class="total"><span>{{ t('stats.avgDifficulty') }}</span><b id="t-difficulty">–</b><small>{{ t('stats.difficultyScale') }}</small></div>
+  </footer>
 </main>
 
 <script>
