@@ -1,66 +1,71 @@
-// Namen eingesetzter Items auf der Karte (Kontinente, Staaten, später Bundesländer) – im Stil der
-// Paradox-Karten (Victoria 3): Versalien einer Antiqua, gesperrt, entlang der Form des Items gebogen und so
-// groß, wie das Item es hergibt.
+// Namen eingesetzter Items auf der Karte (Kontinente, Staaten, Bundesländer) – im Stil der Paradox-Karten
+// (Victoria 3): Versalien einer Antiqua, gesperrt, entlang der Form des Items gebogen, so groß, wie das Item
+// es hergibt – und fest auf der Erde: Ein Name wird einmal ausgelegt und wächst beim Zoomen mit der Karte,
+// er springt nicht und wird nicht kleiner. Zu klein zum Lesen wird er ausgeblendet (kleine Länder zeigen ihren
+// Namen erst beim Hineinzoomen), sehr groß blendet er aus (ganz nah sieht man die Landschaft).
 //
-// Je Item wird sein größter Teil in eine kleine Maske gerastert (nur der sichtbare Ausschnitt). Die
-// Hauptachse der Fläche gibt die Richtung, die Mitten der Querschnitte entlang dieser Achse die Biegung
-// (quadratisch ausgeglichen, Biegung begrenzt). Die Schrift füllt einen festen Anteil der Länge: Die Höhe
-// begrenzt die Dicke des Items, den Rest füllt die Sperrung. Jeder Buchstabe muss in der Maske liegen und
-// darf keinen anderen Namen berühren – sonst wird die Schrift kleiner. Passt der gebogene Name gar nicht,
-// bleibt die gerade Beschriftung am „Pol der Unerreichbarkeit“ (ggf. zweizeilig). Reihenfolge der Vergabe:
-// Kontinente vor Staaten vor Bundesländern, innerhalb einer Ebene größere Items zuerst.
-//
-// Das Rechnen kostet etwas – es läuft nur im Stillstand. Während die Karte bewegt wird, bleiben die zuletzt
-// gewählten Namen stehen: Jeder Buchstabe hängt an seinem Punkt in Länge/Breite, die Schrift wächst mit dem
-// Zoom mit.
+// Auslegen je Item in einer eigenen Bezugsansicht (Projektion auf das Item gedreht, Item ≈ REF_PX groß):
+// Hauptteil und nahe Inseln werden in eine Maske gerastert; die Hauptachse der Fläche gibt die Richtung, die
+// Mitten der längsten Querschnitte die Mittellinie (quadratisch ausgeglichen, Biegung begrenzt). Die Schrift
+// füllt einen festen Anteil der Länge: Die Höhe begrenzt die Dicke des Items, den Rest füllt die Sperrung.
+// Toleranz wie in den Paradox-Spielen: Der Name darf über Meer, Buchten und Nachbarn laufen, solange
+// insgesamt mindestens MIN_INSIDE seiner Fläche im Item liegt und jeder Buchstabe nahe am Item bleibt.
+// Die Kandidaten (Größen, quer verschobene Linien) je Item werden zwischengespeichert; welche Namen stehen,
+// entscheidet ein Überschneidungstest in einer gemeinsamen Weltansicht – nur, wenn sich die eingesetzten
+// Items ändern, nicht beim Bewegen. Vorrang: Staaten (größere zuerst), Bundesländer untereinander,
+// Kontinente nur, wo sie keinen Staatsnamen berühren.
 
 import { stageColor, stopsFor } from "./schemes.js";
+import { makeProjection, projectionId } from "./projections.js";
 
-const KIND_RANK = { continent: 0, country: 1, state: 2 };
 export const LABEL_FONT = '"Cinzel", "Cormorant SC", Georgia, "Times New Roman", serif';
 const WEIGHT = { continent: 600, country: 700, state: 600 };
-/** Schriftgröße (px) je Ebene: [kleinste, größte] */
-const FONT_PX = { continent: [11, 26], country: [9, 46], state: [8.5, 26] };
+/** Sichtbar ab / bis zu dieser Schriftgröße auf dem Bildschirm (px), dazwischen weich ein- und ausgeblendet */
+const VISIBLE_PX = { continent: [10, 90], country: [7.5, 170], state: [7, 140] };
+const FADE = 0.3; // Anteil der Grenze, über den ein- bzw. ausgeblendet wird
 /** Sperrung (Anteil der Schriftgröße) je Ebene: [kleinste, größte] */
 const TRACK = { continent: [0.3, 1.1], country: [0.08, 0.9], state: [0.06, 0.5] };
-/** Anteil der Achsenlänge, den ein gebogener Name füllt */
-const FILL = 0.74;
+/** Anteil der Achsenlänge, den ein Name füllt */
+const FILL = 0.8;
 /** Schrifthöhe höchstens dieser Anteil der Dicke des Items */
-const THICK = 0.52;
+const THICK = 0.7;
 /** Größte Biegung: Pfeilhöhe des Bogens / Länge */
 const MAX_BEND = 0.16;
 /** Steiler als so (Grad) steht kein Name */
 const MAX_ANGLE = 65;
-/** Passt der Name auf der Mittellinie nicht, wird sie quer verschoben (Anteile der Dicke) */
-const SHIFTS = [0, 0.18, -0.18, 0.34, -0.34];
 /** Ab diesem Verhältnis der Hauptachsen folgt der Name der Form, darunter liegt er waagerecht */
 const ELONGATED = 1.35;
-/** Längste Seite der Maske in Zellen */
-const MASK_CELLS = 110;
+/** Passt der Name auf der Mittellinie nicht, wird sie quer verschoben (Anteile der Dicke) */
+const SHIFTS = [0, 0.18, -0.18, 0.34, -0.34];
+/** Kleinere Größen, die probiert werden (Faktor je Schritt, Schritte) */
+const SHRINK = 0.86, SHRINK_STEPS = 7;
+/** Toleranz: so viel der Buchstabenfläche muss insgesamt im Item liegen … */
+const MIN_INSIDE = 0.6;
+/** … und kein Buchstabe weiter als so viele Schrifthöhen vom Item entfernt */
+const MAX_OUT = 0.6;
+/** Bezugsansicht: Größe des Items (px) und Rasterzelle der Maske (px) */
+const REF_PX = 260, CELL_PX = 2;
+/** Inseln gehören zum Namen, wenn sie höchstens so viele „Durchmesser“ des Hauptteils entfernt liegen */
+const NEAR = 1.2;
 /** Höhe der Versalien (Anteil der Schriftgröße), für den Buchstabenrahmen */
 const CAP = 0.74;
-/** Gerade Beschriftung: Schrittweite und Zeilenhöhe */
-const FONT_STEP = 1.5;
-const LINE_HEIGHT = 1.15;
-/** Abstand zwischen zwei Namen (px) */
-const GAP_PX = 3;
-/** Kontinentnamen entfallen, wenn der Kontinent mehr als so viele Bildschirmgrößen überspannt */
-const CONTINENT_MAX_SCREENS = 1.6;
-/** Rand des Textrahmens, der noch im Item liegen muss (px) */
-const INSET_PX = 1;
+/** Gemeinsame Weltansicht für den Überschneidungstest: Maßstab und Abstand (Anteil der Schriftgröße) */
+const WORLD_SCALE = 1000, GAP = 0.25;
 
 export class LabelLayer {
   /** @param {(key: string) => object|undefined} itemOf */
   constructor(itemOf) {
     this.itemOf = itemOf;
-    /** [{kind: "arc", glyphs: [{ch, ll, ang}], …} | {kind: "lines", lines, …}] */
+    /** [{item, glyphs: [{ch, ll, dir}], em, color, halo}] – em: Schriftgröße je Einheit Kartenmaßstab */
     this.layout = [];
     this.layoutKey = "";
+    /** Kandidaten je Item (unabhängig von der Ansicht) */
+    this.cands = new Map();
     this._canvas = null;
   }
 
   /** Neu auslegen (z. B. wenn die Schrift nachgeladen wurde) */
-  invalidate() { this.layoutKey = ""; }
+  invalidate() { this.layoutKey = ""; this.cands.clear(); }
 
   /**
    * Namen zeichnen
@@ -74,72 +79,73 @@ export class LabelLayer {
    */
   draw(ctx, projection, size, placed, stageOf, scheme, moving) {
     const keys = [...placed];
-    const [tx, ty] = projection.translate();
-    const key = `${keys.join(",")}|${projection.scale()}|${tx}|${ty}|${projection.rotate()[0]}|${size.w}x${size.h}|${scheme.label}`;
-    if (!moving && key !== this.layoutKey) {
-      this.layout = this._layout(ctx, projection, size, keys, stageOf, scheme);
+    const key = `${keys.join(",")}|${projectionId()}|${scheme.label}`;
+    if (key !== this.layoutKey && (!moving || !this.layout.length)) {
+      if (this._projection !== projectionId()) { this.cands.clear(); this._projection = projectionId(); }
+      this.layout = this._layout(ctx, keys, stageOf, scheme);
       this.layoutKey = key;
     }
     const scale = projection.scale();
+    // sichtbare Bundesländer eines Staates: dessen Name tritt zurück
+    const statesShown = new Set();
+    for (const l of this.layout) {
+      if (l.item.kind === "state" && visibility("state", l.em * scale) > 0.5) statesShown.add(l.item.properties.country);
+    }
     ctx.save();
     const base = ctx.getTransform();
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.lineJoin = "round";
     for (const l of this.layout) {
-      const px = l.px * (scale / l.scale);
+      const px = l.em * scale;
+      let alpha = visibility(l.item.kind, px);
+      if (alpha <= 0.02) continue;
+      if (l.item.kind === "country" && statesShown.has(l.item.id)) alpha *= 0.3;
       ctx.font = fontFor(l.item.kind, px);
       ctx.lineWidth = Math.min(4, Math.max(2, px / 5));
       ctx.strokeStyle = l.halo;
       ctx.fillStyle = l.color;
-      ctx.globalAlpha = l.alpha;
-      if (l.type === "arc") {
-        for (const g of l.glyphs) {
-          const p = projection(g.ll);
-          if (!p) continue;
-          ctx.setTransform(base); // Grundtransformation (Pixeldichte) behalten
-          ctx.translate(p[0], p[1]);
-          ctx.rotate(g.ang);
-          ctx.strokeText(g.ch, 0, 0);
-          ctx.fillText(g.ch, 0, 0);
-        }
-        ctx.setTransform(base);
-      } else {
-        const p = projection(l.item.labelPoint);
-        if (!p) continue;
-        const lh = px * LINE_HEIGHT;
-        l.lines.forEach((text, i) => {
-          const y = p[1] + (i - (l.lines.length - 1) / 2) * lh;
-          ctx.strokeText(text, p[0], y);
-          ctx.fillText(text, p[0], y);
-        });
+      // große Namen liegen wie gedruckt auf der Karte, kleine bleiben kräftig
+      ctx.globalAlpha = alpha * (px > 22 ? 0.72 : px > 14 ? 0.84 : 0.95);
+      for (const g of l.glyphs) {
+        const p = projection(g.ll), q = projection(g.dir);
+        if (!p || !q || p[0] < -px * 2 || p[1] < -px * 2 || p[0] > size.w + px * 2 || p[1] > size.h + px * 2) continue;
+        ctx.setTransform(base); // Grundtransformation (Pixeldichte) behalten
+        ctx.translate(p[0], p[1]);
+        ctx.rotate(Math.atan2(q[1] - p[1], q[0] - p[0]));
+        ctx.strokeText(g.ch, 0, 0);
+        ctx.fillText(g.ch, 0, 0);
       }
+      ctx.setTransform(base);
     }
     ctx.restore();
   }
 
-  _layout(ctx, projection, { w, h }, keys, stageOf, scheme) {
-    const scale = projection.scale();
-    const items = keys.map((k) => this.itemOf(k)).filter((f) => f && KIND_RANK[f.kind] !== undefined)
-      .sort((a, b) => KIND_RANK[a.kind] - KIND_RANK[b.kind] || b.geom.area - a.geom.area);
-    const taken = []; // belegte Rahmen [x0, y0, x1, y1]
+  _layout(ctx, keys, stageOf, scheme) {
+    const rank = { country: 0, state: 1, continent: 2 };
+    const items = keys.map((k) => this.itemOf(k)).filter((f) => f && rank[f.kind] !== undefined)
+      .sort((a, b) => rank[a.kind] - rank[b.kind] || b.geom.area - a.geom.area);
+    const world = makeProjection().rotate([0, 0]).translate([0, 0]).scale(WORLD_SCALE);
+    const taken = { country: [], state: [], continent: [] };
+    // gegen welche Namen eine Ebene geprüft wird
+    const against = { country: ["country"], state: ["state"], continent: ["country", "continent"] };
     const out = [];
     ctx.save();
     for (const f of items) {
-      const extent = Math.sqrt(f.geom.area) * scale;
-      if (extent < 12) continue; // winzig: kein Platz für einen Namen
-      if (f.kind === "continent" && extent > CONTINENT_MAX_SCREENS * Math.max(w, h)) continue;
+      let cands = this.cands.get(f.key);
+      if (!cands) { cands = this._candidates(ctx, f); this.cands.set(f.key, cands); }
+      const pick = cands.find((c) => {
+        c.boxes ??= worldBoxes(c, world);
+        return !against[f.kind].some((k) => taken[k].some((b) => c.boxes.some((x) => overlaps(b, x))));
+      });
+      if (!pick) continue;
+      taken[f.kind].push(...pick.boxes);
       labelPointOf(f);
-      const placed = this._arc(ctx, projection, f, taken, w, h) ?? this._straight(ctx, projection, f, taken, w, h);
-      if (!placed) continue;
-      taken.push(...placed.boxes);
       const bg = d3.rgb(stageColor(stopsFor(scheme, f.kind === "continent" ? f.key : `continent:${f.properties.region}`),
         stageOf(f.key) + (f.kind === "continent" && this._placedUnder(f, keys) ? 1 : 0)));
       const dark = luminance(bg) > 0.42;
       out.push({
-        ...placed, item: f, scale,
-        // große Namen liegen wie gedruckt auf der Karte, kleine bleiben kräftig
-        alpha: placed.px > 22 ? 0.72 : placed.px > 14 ? 0.84 : 0.95,
+        item: f, glyphs: pick.glyphs, em: pick.em,
         color: dark ? "rgb(28, 24, 20)" : "rgb(250, 244, 230)",
         halo: dark ? "rgba(255, 250, 238, 0.45)" : "rgba(10, 12, 16, 0.55)",
       });
@@ -157,116 +163,173 @@ export class LabelLayer {
     });
   }
 
-  /** Gebogener Name entlang der Form; null, wenn er nicht passt */
-  _arc(ctx, projection, f, taken, w, h) {
-    const mask = this._mask(projection, f, w, h);
-    if (!mask) return null;
-    const shape = analyse(mask);
-    if (!shape) return null;
+  /** Mögliche Namen eines Items, bevorzugte zuerst: [{glyphs, em}] */
+  _candidates(ctx, f) {
+    const geom = mainParts(f);
+    if (!geom) return [];
+    const lon0 = d3.geoCentroid(geom)[0];
+    const proj = makeProjection().rotate([-lon0, 0]).translate([0, 0]).scale(1);
+    const [[a0, b0], [a1, b1]] = d3.geoPath(proj).bounds(geom);
+    const ext = Math.max(a1 - a0, b1 - b0);
+    if (!(ext > 0)) return [];
+    const scale = REF_PX / ext;
+    proj.scale(scale);
+    const mask = this._mask(proj, geom);
+    const shape = mask && analyse(mask);
+    if (!shape) return [];
     const text = [...displayName(f)];
-    if (text.length < 2) return null;
-    const [minPx, maxPx] = FONT_PX[f.kind];
+    if (text.length < 2) return [];
     const [minTr, maxTr] = TRACK[f.kind];
     ctx.font = fontFor(f.kind, 100);
     const adv100 = text.map((ch) => ctx.measureText(ch).width);
     const w100 = adv100.reduce((a, b) => a + b, 0);
     const gaps = text.length - 1;
     const target = FILL * shape.length;
-    // Kleine Items: lieber fast die ganze Länge füllen als gar kein Name
-    const fill = target / (w100 / 100 + gaps * minTr), most = (0.95 * shape.length) / (w100 / 100 + gaps * minTr);
-    let px = Math.min(maxPx, THICK * shape.thick, Math.max(fill, Math.min(most, minPx)));
-    for (; px >= minPx; px *= 0.86) {
+    let px = Math.min(THICK * shape.thick, target / (w100 / 100 + gaps * minTr));
+    const out = [];
+    for (let step = 0; step < SHRINK_STEPS; step++, px *= SHRINK) {
       const track = Math.min(maxTr, Math.max(minTr, (target - (w100 * px) / 100) / (gaps * px)));
       const advances = adv100.map((a) => (a * px) / 100);
       for (const shift of SHIFTS) {
         const glyphs = placeOnCurve(shape.curve(shift), advances, track * px);
-        if (!glyphs) break;
-        const boxes = glyphBoxes(glyphs, text, advances, (CAP * px) / 2, mask, taken);
-        if (!boxes) continue;
-        const out = [];
+        if (!glyphs || !fits(glyphs, text, advances, (CAP * px) / 2, mask)) continue;
+        const geo = [];
         for (let i = 0; i < glyphs.length; i++) {
           if (text[i] === " ") continue;
-          const ll = projection.invert([glyphs[i].x, glyphs[i].y]);
-          if (!ll || !Number.isFinite(ll[0])) return null;
-          out.push({ ch: text[i], ll, ang: glyphs[i].ang });
+          const g = glyphs[i];
+          const ll = proj.invert([g.x, g.y]);
+          const dir = proj.invert([g.x + Math.cos(g.ang) * px * 0.25, g.y + Math.sin(g.ang) * px * 0.25]);
+          if (!ll || !dir || !Number.isFinite(ll[0]) || !Number.isFinite(dir[0])) { geo.length = 0; break; }
+          geo.push({ ch: text[i], ll, dir, hw: advances[i] / 2 / scale });
         }
-        return { type: "arc", glyphs: out, px, boxes };
+        if (geo.length) out.push({ glyphs: geo, em: px / scale });
+        break; // je Größe die erste passende Linie
       }
     }
-    return null;
+    return out;
   }
 
-  /** Größter Teil des Items als Maske im sichtbaren Ausschnitt */
-  _mask(projection, f, w, h) {
-    const [[bx0, by0], [bx1, by1]] = d3.geoPath(projection).bounds(f.labelPoly);
-    if (bx1 < 0 || by1 < 0 || bx0 > w || by0 > h) return null;
-    // Ganze Fläche, solange sie nicht viel größer als das Bild ist – so steht der Name fest und darf über
-    // den Rand ragen; sonst nur der sichtbare Ausschnitt
-    const whole = bx1 - bx0 <= 1.5 * w && by1 - by0 <= 1.5 * h;
-    const x0 = whole ? bx0 : Math.max(bx0, 0), y0 = whole ? by0 : Math.max(by0, 0);
-    const x1 = whole ? bx1 : Math.min(bx1, w), y1 = whole ? by1 : Math.min(by1, h);
-    if (!(x1 - x0 > 10 && y1 - y0 > 6)) return null;
-    const cell = Math.max(1, Math.max(x1 - x0, y1 - y0) / MASK_CELLS);
-    const cw = Math.ceil((x1 - x0) / cell), ch = Math.ceil((y1 - y0) / cell);
+  /** Item in der Bezugsansicht als Maske (1 = im Item) samt Abstand zum Item (in Zellen) */
+  _mask(proj, geom) {
+    const [[bx0, by0], [bx1, by1]] = d3.geoPath(proj).bounds(geom);
+    const pad = 0.15 * REF_PX;
+    const x0 = bx0 - pad, y0 = by0 - pad;
+    const cw = Math.ceil((bx1 - bx0 + 2 * pad) / CELL_PX), ch = Math.ceil((by1 - by0 + 2 * pad) / CELL_PX);
     const canvas = this._canvas ??= document.createElement("canvas");
     if (canvas.width < cw) canvas.width = cw;
     if (canvas.height < ch) canvas.height = ch;
     const g = canvas.getContext("2d", { willReadFrequently: true });
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, cw, ch);
-    g.setTransform(1 / cell, 0, 0, 1 / cell, -x0 / cell, -y0 / cell);
+    g.setTransform(1 / CELL_PX, 0, 0, 1 / CELL_PX, -x0 / CELL_PX, -y0 / CELL_PX);
     g.beginPath();
-    d3.geoPath(projection, g)(f.labelPoly);
+    d3.geoPath(proj, g)(geom);
     g.fillStyle = "#000";
     g.fill();
     const data = g.getImageData(0, 0, cw, ch).data;
     const m = new Uint8Array(cw * ch);
     for (let i = 0; i < m.length; i++) m[i] = data[i * 4 + 3] > 127 ? 1 : 0;
+    const dist = distanceField(m, cw, ch);
+    const cell = CELL_PX;
+    const idx = (x, y) => {
+      const i = Math.floor((x - x0) / cell), j = Math.floor((y - y0) / cell);
+      return i >= 0 && j >= 0 && i < cw && j < ch ? j * cw + i : -1;
+    };
     return {
       m, cw, ch, x0, y0, cell,
-      at(x, y) {
-        const i = Math.floor((x - x0) / cell), j = Math.floor((y - y0) / cell);
-        return i >= 0 && j >= 0 && i < cw && j < ch && m[j * cw + i] === 1;
-      },
+      at(x, y) { const i = idx(x, y); return i >= 0 && m[i] === 1; },
+      /** Abstand zum Item in px (außerhalb der Maske: unendlich) */
+      dist(x, y) { const i = idx(x, y); return i < 0 ? Infinity : dist[i] * cell; },
     };
-  }
-
-  /** Gerade Beschriftung: größte Schrift (ein- oder zweizeilig), deren Rahmen im Item liegt und frei ist */
-  _straight(ctx, projection, f, taken, w, h) {
-    const p = projection(f.labelPoint);
-    if (!p || p[0] < -50 || p[1] < -50 || p[0] > w + 50 || p[1] > h + 50) return null;
-    const [x, y] = p;
-    const [min] = FONT_PX[f.kind];
-    const max = Math.max(min, FONT_PX[f.kind][0] + 4);
-    const name = displayName(f);
-    const variants = [[name], ...splitTwo(name)];
-    for (let px = max; px >= min; px -= FONT_STEP) {
-      ctx.font = fontFor(f.kind, px);
-      for (const lines of variants) {
-        const tw = Math.max(...lines.map((s) => ctx.measureText(s).width));
-        const th = lines.length * px * LINE_HEIGHT;
-        const box = [x - tw / 2, y - th / 2, x + tw / 2, y + th / 2];
-        if (box[2] < 0 || box[3] < 0 || box[0] > w || box[1] > h) return null; // außerhalb des Bildes
-        if (taken.some((b) => overlaps(b, box))) continue;
-        if (!insideBox(projection, f, box)) continue;
-        return { type: "lines", lines, px, boxes: [box] };
-      }
-    }
-    return null;
   }
 }
 
 function fontFor(kind, px) {
-  return `${WEIGHT[kind]} ${px}px ${LABEL_FONT}`;
+  return `${WEIGHT[kind]} ${px.toFixed(2)}px ${LABEL_FONT}`;
 }
 
 function displayName(f) {
   return f.properties.name.toLocaleUpperCase();
 }
 
+/** 0 … 1: Sichtbarkeit eines Namens dieser Ebene bei dieser Schriftgröße */
+function visibility(kind, px) {
+  const [lo, hi] = VISIBLE_PX[kind];
+  const a = Math.min(1, Math.max(0, (px - lo) / (lo * FADE)));
+  const b = Math.min(1, Math.max(0, (hi * (1 + FADE) - px) / (hi * FADE)));
+  return a * b;
+}
+
+/**
+ * Hauptteil des Items samt naher Inseln (Griechenland mit Kreta und den Kykladen; die USA ohne Alaska und
+ * Hawaii) als MultiPolygon
+ */
+function mainParts(f) {
+  const g = f.fitGeometry ?? f.geometry;
+  const polys = g.type === "Polygon" ? [g.coordinates] : g.coordinates;
+  const parts = polys.map((c) => {
+    const p = { type: "Polygon", coordinates: c };
+    const a = d3.geoArea(p);
+    return a < 2 * Math.PI ? { c, a, center: d3.geoCentroid(p) } : null;
+  }).filter(Boolean);
+  if (!parts.length) return null;
+  const main = parts.reduce((m, p) => (p.a > m.a ? p : m));
+  const reach = NEAR * 2 * Math.sqrt(main.a / Math.PI);
+  const near = parts.filter((p) => p === main || d3.geoDistance(p.center, main.center) <= reach + 2 * Math.sqrt(p.a / Math.PI));
+  return { type: "MultiPolygon", coordinates: near.map((p) => p.c) };
+}
+
+/** Abstand jeder Zelle zur nächsten Zelle im Item (Zellen; Chamfer 3-4) */
+function distanceField(m, cw, ch) {
+  const INF = 1e9, d = new Float32Array(cw * ch);
+  for (let i = 0; i < d.length; i++) d[i] = m[i] ? 0 : INF;
+  const at = (i, j) => (i < 0 || j < 0 || i >= cw || j >= ch ? INF : d[j * cw + i]);
+  for (let j = 0; j < ch; j++) for (let i = 0; i < cw; i++) {
+    const k = j * cw + i;
+    d[k] = Math.min(d[k], at(i - 1, j) + 1, at(i, j - 1) + 1, at(i - 1, j - 1) + 1.4, at(i + 1, j - 1) + 1.4);
+  }
+  for (let j = ch - 1; j >= 0; j--) for (let i = cw - 1; i >= 0; i--) {
+    const k = j * cw + i;
+    d[k] = Math.min(d[k], at(i + 1, j) + 1, at(i, j + 1) + 1, at(i + 1, j + 1) + 1.4, at(i - 1, j + 1) + 1.4);
+  }
+  return d;
+}
+
+/** Toleranztest: genug der Buchstaben im Item, keiner zu weit weg */
+function fits(glyphs, text, advances, hh, mask) {
+  let inside = 0, total = 0;
+  for (let i = 0; i < glyphs.length; i++) {
+    if (text[i] === " ") continue;
+    const g = glyphs[i];
+    const c = Math.cos(g.ang), s = Math.sin(g.ang), hw = advances[i] / 2;
+    if (mask.dist(g.x, g.y) > MAX_OUT * 2 * hh) return false;
+    for (const u of [-hw, 0, hw]) for (const v of [-hh, 0, hh]) {
+      total++;
+      if (mask.at(g.x + u * c - v * s, g.y + u * s + v * c)) inside++;
+    }
+  }
+  return total > 0 && inside / total >= MIN_INSIDE;
+}
+
+/** Buchstabenrahmen in der gemeinsamen Weltansicht (für den Überschneidungstest) */
+function worldBoxes(c, world) {
+  const boxes = [];
+  for (const g of c.glyphs) {
+    const p = world(g.ll), q = world(g.dir);
+    if (!p || !q) continue;
+    const ang = Math.atan2(q[1] - p[1], q[0] - p[0]);
+    const k = world.scale();
+    const hw = g.hw * k, hh = (CAP * c.em * k) / 2 + GAP * c.em * k;
+    const co = Math.abs(Math.cos(ang)), si = Math.abs(Math.sin(ang));
+    const ex = hw * co + hh * si, ey = hw * si + hh * co;
+    boxes.push([p[0] - ex, p[1] - ey, p[0] + ex, p[1] + ey]);
+  }
+  return boxes;
+}
+
 /**
  * Form der Maske: Hauptachse, Länge und Dicke des tragenden Abschnitts und die ausgeglichene Mittellinie
- * als Kurve in Bildschirm-Pixeln (64 Punkte, von links nach rechts).
+ * als Kurve in Pixeln der Bezugsansicht (65 Punkte, von links nach rechts), quer verschiebbar.
  */
 function analyse({ m, cw, ch, x0, y0, cell }) {
   let n = 0, sx = 0, sy = 0;
@@ -353,24 +416,6 @@ function analyse({ m, cw, ch, x0, y0, cell }) {
   return { curve, length: 2 * half * cell, thick: med * cell };
 }
 
-/** Rahmen der Buchstaben; null, wenn einer aus der Fläche ragt oder einen anderen Namen berührt */
-function glyphBoxes(glyphs, text, advances, hh, mask, taken) {
-  const boxes = [];
-  for (let i = 0; i < glyphs.length; i++) {
-    if (text[i] === " ") continue;
-    const g = glyphs[i];
-    const c = Math.cos(g.ang), s = Math.sin(g.ang), hw = advances[i] / 2;
-    const pts = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh], [0, 0]]
-      .map(([u, v]) => [g.x + u * c - v * s, g.y + u * s + v * c]);
-    if (!pts.every(([x, y]) => mask.at(x, y))) return null;
-    const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
-    const box = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
-    if (taken.some((b) => overlaps(b, box))) return null;
-    boxes.push(box);
-  }
-  return boxes;
-}
-
 /** Buchstabenmitten und -winkel entlang der Kurve, mittig; null, wenn der Name länger ist als die Kurve */
 function placeOnCurve(curve, advances, track) {
   const cum = [0];
@@ -411,39 +456,8 @@ function solve3(A, bv) {
   return M.map((r, i) => r[3] / r[i]);
 }
 
-/** Zweizeilige Varianten: an Leerzeichen bzw. Bindestrich, die Trennstelle nahe der Mitte zuerst */
-function splitTwo(name) {
-  const cuts = [];
-  for (let i = 1; i < name.length - 1; i++) {
-    if (name[i] === " ") cuts.push([name.slice(0, i), name.slice(i + 1)]);
-    else if (name[i] === "-") cuts.push([name.slice(0, i + 1), name.slice(i + 1)]);
-  }
-  return cuts.sort((a, b) => Math.abs(a[0].length - a[1].length) - Math.abs(b[0].length - b[1].length)).slice(0, 2);
-}
-
 function overlaps(a, b) {
-  return a[0] - GAP_PX < b[2] && b[0] - GAP_PX < a[2] && a[1] - GAP_PX < b[3] && b[1] - GAP_PX < a[3];
-}
-
-/** Liegen Ecken, Kantenmitten und Mitte des Rahmens im größten Teil des Items? */
-function insideBox(projection, f, [x0, y0, x1, y1]) {
-  x0 += INSET_PX; y0 += INSET_PX; x1 -= INSET_PX; y1 -= INSET_PX;
-  const xm = (x0 + x1) / 2, ym = (y0 + y1) / 2;
-  const pts = [[x0, y0], [xm, y0], [x1, y0], [x0, ym], [xm, ym], [x1, ym], [x0, y1], [xm, y1], [x1, y1]];
-  // lange Namen: zusätzliche Punkte entlang der Ober- und Unterkante
-  const extra = Math.floor((x1 - x0) / 40);
-  for (let i = 1; i <= extra; i++) {
-    const x = x0 + ((x1 - x0) * i) / (extra + 1);
-    pts.push([x, y0], [x, y1]);
-  }
-  for (const p of pts) {
-    const ll = projection.invert(p);
-    if (!ll || !Number.isFinite(ll[0])) return false;
-    const back = projection(ll);
-    if (!back || Math.hypot(back[0] - p[0], back[1] - p[1]) > 0.5) return false; // außerhalb der Weltkugel
-    if (!d3.geoContains(f.labelPoly, ll)) return false;
-  }
-  return true;
+  return a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
 }
 
 /** Relative Helligkeit (0 … 1) */
