@@ -1,4 +1,4 @@
-// Tastatursteuerung der Karte: WASD bzw. Pfeiltasten bewegen, Q/E zoomen – gleichmäßig, solange die Taste
+// Tastatursteuerung der Karte: WASD bzw. Pfeiltasten bewegen, R/T zoomen – gleichmäßig, solange die Taste
 // gedrückt ist; Shift beschleunigt. Empfindlichkeit aus den Einstellungen (settings/prefs.js).
 // Nicht aktiv, solange ein Dialog offen ist, in ein Feld getippt wird oder das Hauptmenü zu sehen ist.
 
@@ -15,8 +15,8 @@ const KEYS = {
   KeyS: [0, -1, 0], ArrowDown: [0, -1, 0],
   KeyA: [1, 0, 0], ArrowLeft: [1, 0, 0],
   KeyD: [-1, 0, 0], ArrowRight: [-1, 0, 0],
-  KeyE: [0, 0, 1],
-  KeyQ: [0, 0, -1],
+  KeyT: [0, 0, 1],
+  KeyR: [0, 0, -1],
 };
 
 export class KeyboardControl {

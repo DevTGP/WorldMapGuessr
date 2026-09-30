@@ -20,7 +20,7 @@ const DBLCLICK_REARM_MS = 400;
 export const ROTATE_STEP = 30;
 const WHEEL_PX_PER_STEP = 60;
 /** Tasten fürs Drehen (physische Position): R gegen, T im Uhrzeigersinn */
-const ROTATE_KEYS = { KeyR: -1, KeyT: 1 };
+const ROTATE_KEYS = { KeyQ: -1, KeyE: 1 };
 /**
  * Detail der Inventar-Icons, unabhängig von der Kartenqualität: Stufe so wählen, als wäre das Icon
  * ICON_DETAIL-mal so groß (je Bildschirm-Pixeldichte) – Punkte fallen erst unter ≈ 0,25 Geräte-px² weg.

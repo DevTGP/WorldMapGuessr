@@ -34,7 +34,7 @@ Popup im Hauptmenü und im Spiel über ⚙; gilt sofort und nur auf diesem Gerä
 ## Steuerung
 
 - Die Karte lässt sich wie ein Globus um die Längsachse drehen: seitlich ziehen, `A`/`D` bzw. `←`/`→` halten oder die Pfeile oben (45°-Schritte). Was in der Mitte liegt, ist am wenigsten verzerrt.
-- **Tastatur** (gleichmäßig, solange gedrückt; `Shift` = 2,5× schneller; nicht in Dialogen, Eingabefeldern und im Hauptmenü): `W` `A` `S` `D` bzw. Pfeiltasten bewegen, `Q`/`E` zoomen heraus/hinein, `+`/`−` Zoomschritt, `0` ganze Welt, `G` Gradnetz, `F` Vollbild (auch `Esc` beendet es). Tasten nach physischer Position (auch auf AZERTY).
+- **Tastatur** (gleichmäßig, solange gedrückt; `Shift` = 2,5× schneller; nicht in Dialogen, Eingabefeldern und im Hauptmenü): `W` `A` `S` `D` bzw. Pfeiltasten bewegen, `R`/`T` zoomen heraus/hinein, `+`/`−` Zoomschritt, `0` ganze Welt, `G` Gradnetz, `F` Vollbild (auch `Esc` beendet es). Tasten nach physischer Position (auch auf AZERTY).
 - Bei 100 % ist die Y-Achse fest (Ziehen dreht nur); erst nach dem Hineinzoomen lässt sich die Karte senkrecht verschieben.
 
 ## Ladebildschirm
@@ -48,7 +48,7 @@ Phasen: Kartendaten herunterladen (in MB, der Server gibt die Größe des Startp
 - Richtig: Das Item rastet ein, die Fläche wird eine Stufe heller, es gibt Punkte (siehe [punkte.md](punkte.md)).
 - Daneben: ein Leben weniger; das Item fliegt zurück ins Inventar (bzw. geht zurück in den Vorrat, wenn der Modus das vorsieht).
 - Zurücklegen ohne Strafe: Klick auf den Slot, `Esc` oder Rechtsklick (außer bei „Kein Zurücklegen“).
-- **Items gedreht** (Regel, siehe [spielmodi.md](spielmodi.md)): Items liegen in 30°-Schritten gedreht im Inventar (nie 0°; fest je Runde, Spieler und Item). Das gehaltene Item dreht man mit `R` (gegen den Uhrzeigersinn) / `T` (im Uhrzeigersinn) oder `Shift` + Mausrad um je 30°; zurückgelegt bleibt die neue Lage. Die Drehung ist nur eine Erschwernis: Eingesetzt wird unabhängig von ihr, beim Einrasten dreht sich das Item in die richtige Lage.
+- **Items gedreht** (Regel, siehe [spielmodi.md](spielmodi.md)): Items liegen in 30°-Schritten gedreht im Inventar (nie 0°; fest je Runde, Spieler und Item). Das gehaltene Item dreht man mit `Q` (gegen den Uhrzeigersinn) / `E` (im Uhrzeigersinn) oder `Shift` + Mausrad um je 30°; zurückgelegt bleibt die neue Lage. Die Drehung ist nur eine Erschwernis: Eingesetzt wird unabhängig von ihr, beim Einrasten dreht sich das Item in die richtige Lage.
 - Helligkeitsstufen: Das Land startet dunkel bzw. neutral. Jedes eingesetzte Item hellt seine Fläche um eine Stufe auf (additiv). Staats- und Kontinentgrenzen sind unsichtbar, sichtbar sind nur Küsten; eine Kontinentgrenze (Ural, Sinai, Panama …) erscheint, sobald einer der angrenzenden Kontinente eingesetzt ist.
 - Inventar: scrollt horizontal, wenn es voll wird; die Beschriftung zeigt die Anzahl. Über dem Inventar: Nachschub-Anzeige („Noch n Treffer bis +k Items“) und – mit Timer – der Countdown.
 

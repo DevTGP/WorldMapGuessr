@@ -60,7 +60,7 @@ export function bindMapControls(map) {
   fsBtn.addEventListener("click", toggleFullscreen);
   document.addEventListener("fullscreenchange", () => fsBtn.setAttribute("aria-pressed", String(!!document.fullscreenElement)));
 
-  // Bewegen (WASD, Pfeile) und Zoomen (Q/E), solange gedrückt – siehe map/keyboard.js
+  // Bewegen (WASD, Pfeile) und Zoomen (R/T), solange gedrückt – siehe map/keyboard.js
   new KeyboardControl(map);
 
   addEventListener("keydown", (e) => {
