@@ -45,7 +45,7 @@ Der Server führt die Runde (`lobbies/round.py`); der Browser prüft nur, ob ein
 - **Items senden:** Links steht ein Feld je Online-Mitspieler (Name, Anzahl seiner Items). Item aufnehmen, dann ein Feld anklicken → das Item liegt danach im Inventar des Mitspielers.
 - **Sendelimit:** Je N vom Server erhaltene Items darf ein Spieler 1 Item senden (0 = ohne Limit). Geschenkte Items zählen nicht mit. Der Server prüft (`send_limit`).
 - **Timer in der Lobby:** gemeinsamer fester Takt ab Rundenbeginn (Prüfung alle 0,5 s), nach der Schonfrist je Takt *Wegnahme* Items insgesamt – reihum, bei jedem Spieler sein ältestes Item.
-- **Rundenende:** Gewonnen (alles eingesetzt) oder verloren – der Dialog erscheint bei allen, mit Rangliste und Teamsumme ([punkte.md](punkte.md)). Nur der Host sieht „Neue Runde für alle“.
+- **Rundenende:** Gewonnen (alles eingesetzt) oder verloren – der Dialog erscheint bei allen, mit Rangliste und Teamsumme ([punkte.md](punkte.md)). Nur der Host sieht „Neue Runde für alle“. „Hauptmenü“ beendet das Spiel: Der Host beendet die Lobby für alle (im Einzelspiel ebenso), Gäste verlassen sie – ohne Rückfrage. „Lobby“ öffnet die Lobbyübersicht mit den Einstellungen der Runde.
 - Der Rundenzustand wird mit der Lobby gespeichert und übersteht einen Server-Neustart.
 
 ## Technik

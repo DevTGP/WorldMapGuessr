@@ -54,4 +54,4 @@ Phasen: Kartendaten herunterladen (in MB, der Server gibt die Größe des Startp
 
 - Oben rechts: Badge (Einzelspiel bzw. Lobby-Code und Spielerzahl → Spielmenü), Fortschritt „eingesetzt/gesamt“, Leben (Herz mit „9/10“, bei wenigen rot), Einstellungen, Menü.
 - **Nachrichtenleiste** unten rechts: Einsetzen und Fehlwürfe (in der Lobby aller Spieler, mit Namen in Spielerfarbe und Punkten), Nachschub, Senden, Wegnahme durch den Timer, Hinweise und in der Lobby der Chat. Ältere Meldungen werden nach 12 s blasser. Einklappbar (dann nur die neueste Meldung, Zähler für ungelesene); auf schmalen Bildschirmen standardmäßig eingeklappt.
-- **Rundenende-Dialog:** Ergebnis, Punkte (Einzelspiel: Aufschlüsselung; Lobby: Rangliste und Teamsumme), „Hauptmenü“, „Anpassen“ bzw. „Lobby“, „Nochmal“ bzw. „Neue Runde für alle“ (nur Host).
+- **Rundenende-Dialog:** Ergebnis, Punkte (Einzelspiel: Aufschlüsselung; Lobby: Rangliste und Teamsumme), „Hauptmenü“ (beendet das Spiel: Host bzw. Einzelspiel beendet die Lobby, Gäste verlassen sie), „Anpassen“ bzw. „Lobby“ (Lobbyübersicht mit Spielern und den Einstellungen der Runde), „Nochmal“ bzw. „Neue Runde für alle“ (nur Host).

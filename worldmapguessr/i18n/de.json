@@ -41,6 +41,8 @@
  "end.adjust": "Anpassen",
  "end.again": "Nochmal",
  "end.againAll": "Neue Runde für alle",
+ "end.homeClose": "Beendet diese Lobby (für alle) und öffnet das Hauptmenü",
+ "end.homeLeave": "Verlässt diese Lobby und öffnet das Hauptmenü",
  "end.lobby.empty": "Die Lobby hat {placed} von {total} Items eingesetzt.",
  "end.lobby.empty.title": "Alle Inventare leer",
  "end.lobby.lives": "Die Lobby hat {placed} von {total} Items eingesetzt.",

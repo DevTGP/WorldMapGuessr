@@ -98,8 +98,16 @@ createMap({
       roundDialog.close();
       openGameMenu(ctx);
     });
+    // Nach Sieg oder Niederlage ist das Spiel vorbei: Host (auch im Einzelspiel) beendet die Lobby, Gäste
+    // verlassen sie – danach geht es über „closed“/„left“ ins Hauptmenü (startLobby)
     document.getElementById("dlg-home").addEventListener("click", () => {
       roundDialog.close();
+      const client = ctx.client;
+      if (game.over && client?.connected) {
+        if (client.isHost) client.close();
+        else client.leave();
+        return;
+      }
       showHome(ctx);
     });
 
@@ -260,6 +268,7 @@ async function startLobby(code, ctx, { autoStart = false } = {}) {
     }
     const solo = !!state.settings.solo;
     document.getElementById("dlg-menu").textContent = t(solo ? "end.adjust" : "lobby.title");
+    document.getElementById("dlg-home").title = t(client.isHost ? "end.homeClose" : "end.homeLeave");
     again.textContent = t(solo ? "end.again" : "end.againAll");
     const online = state.players.filter((p) => p.online).length;
     badge.querySelector("b").textContent = solo ? t("game.solo") : code;

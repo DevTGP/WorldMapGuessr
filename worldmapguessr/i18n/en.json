@@ -41,6 +41,8 @@
  "end.adjust": "Adjust",
  "end.again": "Play again",
  "end.againAll": "New round for everyone",
+ "end.homeClose": "Ends this lobby (for everyone) and opens the main menu",
+ "end.homeLeave": "Leaves this lobby and opens the main menu",
  "end.lobby.empty": "The lobby placed {placed} of {total} items.",
  "end.lobby.empty.title": "All inventories empty",
  "end.lobby.lives": "The lobby placed {placed} of {total} items.",
