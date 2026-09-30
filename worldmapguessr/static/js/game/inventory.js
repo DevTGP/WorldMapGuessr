@@ -91,7 +91,7 @@ export class Inventory {
   _drawIcon(p) {
     const svg = this.iconSvg(p.id);
     svg.setAttribute("viewBox", `0 0 ${ICON_W} ${ICON_H}`);
-    svg.querySelector("path").setAttribute("d", iconPath(p.feature, ICON_W, ICON_H));
+    svg.querySelector("path").setAttribute("d", iconPath(p.feature, ICON_W, ICON_H, 3, p.rotation ?? 0));
   }
 
   slot(id) { return this.container.querySelector(`.slot[data-id="${id}"]`); }

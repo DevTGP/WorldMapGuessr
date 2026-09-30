@@ -13,6 +13,7 @@ Schwerere Modi und Stufen geben mehr Punkte (Multiplikator ×1 … ×2, siehe [p
 | Timer (Wegnahme) | – | – | – | ✓ | ✓ |
 | Zurücklegen | ✓ | ✓ | – | ✓ | – |
 | Fehlwurf gibt das Item ab (zurück in den Vorrat) | – | ✓ | ✓ | – | ✓ |
+| Items gedreht (30°-Schritte, nur Erschwernis) | – | – | – | – | – |
 | Fehlwurf kostet 1 Leben | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Inventar kann leer werden | nie | nie | nie | unter Mindesttempo | unter Mindesttempo |
 

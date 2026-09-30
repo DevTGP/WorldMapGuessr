@@ -40,6 +40,7 @@ DEFAULT_CONFIG = {
     "timerTake": 1,
     "noReturn": False,       # gehaltenes Item kann nicht zurück ins Inventar – es muss eingesetzt werden
     "missLoses": False,      # Fehlwurf: Item geht zurück in den Vorrat (außer im Endspurt)
+    "rotate": False,         # Items liegen gedreht im Inventar (30°-Schritte), nur Erschwernis – eingesetzt wird immer
     "kinds": list(KINDS),
     "excluded": [],
 }
@@ -60,7 +61,7 @@ def clean_config(raw) -> dict:
     # Nachschub immer positiv (mehr neue Items als Treffer) und Start mindestens bis zum ersten Nachschub
     cfg["refillEvery"] = min(cfg["refillEvery"], cfg["refillCount"] - 1)
     cfg["startItems"] = max(cfg["startItems"], cfg["refillEvery"])
-    for k in ("noReturn", "missLoses"):
+    for k in ("noReturn", "missLoses", "rotate"):
         cfg[k] = clean_bool(raw.get(k), DEFAULT_CONFIG[k])
     cfg["mode"] = raw.get("mode") if raw.get("mode") in MODES else DEFAULT_CONFIG["mode"]
     cfg["level"] = _int(raw.get("level"), *LEVELS, DEFAULT_CONFIG["level"])

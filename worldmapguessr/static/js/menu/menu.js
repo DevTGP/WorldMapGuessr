@@ -22,7 +22,7 @@ const MAX_TEMPO = 6; // Treffer pro Minute – darüber warnt „Erweitert“
 
 /** Hinweise unter den Reglern im Einzelspiel (die Lobby ersetzt sie, siehe lobby/rules-text.js) */
 export const SOLO_HINTS = Object.fromEntries(
-  ["lives", "startItems", "refillCount", "refillEvery", "difficulty", "timer", "grace", "timerTake", "noReturn", "missLoses"]
+  ["lives", "startItems", "refillCount", "refillEvery", "difficulty", "timer", "grace", "timerTake", "noReturn", "missLoses", "rotate"]
     .map((k) => [k, t(`hint.${k}`)]),
 );
 
@@ -231,6 +231,10 @@ export class Menu {
         id: "cfg-missLoses", label: t("rule.missLoses"), hint: SOLO_HINTS.missLoses, value: c.missLoses,
         onChange: (v) => this._custom("missLoses", v),
       }),
+      rotate: createToggle({
+        id: "cfg-rotate", label: t("rule.rotate"), hint: SOLO_HINTS.rotate, value: c.rotate,
+        onChange: (v) => this._custom("rotate", v),
+      }),
     };
     const fields = document.getElementById("rule-fields");
     const pair = (a, b) => {
@@ -244,7 +248,7 @@ export class Menu {
     sub.textContent = t("rule.timePressure");
     const s = this.steppers;
     fields.append(s.difficulty.el, s.lives.el, s.startItems.el, pair(s.refillCount, s.refillEvery),
-      sub, pair(s.timer, s.grace), s.timerTake.el, s.noReturn.el, s.missLoses.el);
+      sub, pair(s.timer, s.grace), s.timerTake.el, s.noReturn.el, s.missLoses.el, s.rotate.el);
   }
 
   _syncControls() {
@@ -315,6 +319,7 @@ function flagText(c) {
   const f = [];
   if (c.noReturn) f.push(t("flag.noReturn"));
   if (c.missLoses) f.push(t("flag.missLoses"));
+  if (c.rotate) f.push(t("flag.rotate"));
   return f.length ? ` · ${f.join(" · ")}` : "";
 }
 

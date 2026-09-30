@@ -12,9 +12,15 @@ import { RefillMeter } from "./refill-meter.js";
 import { TimerMeter } from "./timer-meter.js";
 import { Feed } from "../ui/feed.js";
 import { renderScore } from "./score-view.js";
+import { KeyboardControl } from "../map/keyboard.js";
 import { t } from "../i18n/index.js";
 
 const DBLCLICK_REARM_MS = 400;
+/** Rotation („Items gedreht“): Schrittweite in Grad; Mausrad-Weg (px) je Schritt */
+export const ROTATE_STEP = 30;
+const WHEEL_PX_PER_STEP = 60;
+/** Tasten fürs Drehen (physische Position): R gegen, T im Uhrzeigersinn */
+const ROTATE_KEYS = { KeyR: -1, KeyT: 1 };
 /**
  * Detail der Inventar-Icons, unabhängig von der Kartenqualität: Stufe so wählen, als wäre das Icon
  * ICON_DETAIL-mal so groß (je Bildschirm-Pixeldichte) – Punkte fallen erst unter ≈ 0,25 Geräte-px² weg.
@@ -64,7 +70,45 @@ export class Game {
     addEventListener("keydown", (e) => {
       if (e.target.closest?.("input, textarea")) return;
       if (e.key === "Escape" && this.held.active && !document.querySelector("dialog[open]")) this._putBack();
+      if (e.code in ROTATE_KEYS && this.held.active && KeyboardControl.active(e)) {
+        e.preventDefault();
+        this.rotateHeld(ROTATE_KEYS[e.code]);
+      }
     });
+    // Shift + Mausrad dreht das gehaltene Item (sonst zoomt das Mausrad, siehe map/gestures.js)
+    this._wheelAcc = 0;
+    map.onShiftWheel = (e) => {
+      if (!this.held.active || !this.config?.rotate) return false;
+      // Shift + Rad liefert je nach Browser deltaY oder (umgelenkt) deltaX
+      const d = (Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX) * (e.deltaMode === 1 ? 33 : e.deltaMode ? 800 : 1);
+      if (Math.sign(d) !== Math.sign(this._wheelAcc)) this._wheelAcc = 0;
+      this._wheelAcc += d;
+      if (Math.abs(this._wheelAcc) >= WHEEL_PX_PER_STEP) {
+        this.rotateHeld(Math.sign(this._wheelAcc));
+        this._wheelAcc = 0;
+      }
+      return true;
+    };
+  }
+
+  /** Gehaltenes Item um steps × 30° drehen (nur mit „Items gedreht“) */
+  rotateHeld(steps) {
+    if (!this.held.active || this.busy || this.over || !this.config?.rotate) return;
+    const p = this.held.piece;
+    p.rotation = (((p.rotation ?? 0) + steps * ROTATE_STEP) % 360 + 360) % 360;
+    this.held.rotate();
+  }
+
+  /**
+   * Anfangsdrehung eines Items (30°-Schritte, nie 0°): fest je Runde, Spieler und Item – nach Neuladen gleich.
+   * Ohne „Items gedreht“ 0.
+   */
+  _initialRotation(key) {
+    if (!this.config?.rotate) return 0;
+    const seed = `${this.remote?.number ?? 0}:${this.remote?.client?.me?.id ?? ""}:${key}`;
+    let h = 2166136261;
+    for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+    return (1 + ((h >>> 0) % (360 / ROTATE_STEP - 1))) * ROTATE_STEP;
   }
 
   /** Läuft gerade eine Runde (zum Zurückkehren aus dem Menü)? */
@@ -108,7 +152,10 @@ export class Game {
 
   /** Items ins Inventar legen (die Statistik zählt der Server) */
   addPieces(pieces) {
-    for (const p of pieces) this.pieces.set(p.id, p);
+    for (const p of pieces) {
+      p.rotation ??= this._initialRotation(p.id);
+      this.pieces.set(p.id, p);
+    }
     this.inventory.add(pieces);
     this._refineIcons(pieces);
   }
@@ -239,6 +286,7 @@ export class Game {
 
   async _flyBack(piece) {
     this.inventory.setState(piece.id, "flying");
+    this.inventory.redrawIcon(piece.id); // in der Hand gedreht → Icon in der neuen Lage
     this.inventory.reveal(piece.id);
     this._endHolding();
     await this.held.returnTo(this.inventory.iconSvg(piece.id));

@@ -101,6 +101,7 @@ export class Gestures {
 
   _wheel(e) {
     e.preventDefault();
+    if (e.shiftKey && this.map.onShiftWheel?.(e)) return; // Shift + Rad: gehaltenes Item drehen (game/game.js)
     const unit = e.deltaMode === 1 ? 0.05 : e.deltaMode ? 1 : 0.002;
     const factor = Math.pow(2, -e.deltaY * unit * (e.ctrlKey ? 5 : 1) * prefs.get("zoomSpeed"));
     this.map.markMoving();

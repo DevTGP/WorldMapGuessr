@@ -477,6 +477,8 @@ def test_config_keeps_refill_positive_and_start_reachable():
     assert c["refillEvery"] == 2 and c["startItems"] == 2          # C > E, S ≥ E
     assert c["mode"] == "hardcore" and c["level"] == 4 and c["missLoses"] is True
     assert clean_config({"mode": "egal"})["mode"] == "casual"
+    assert clean_config({})["rotate"] is False and clean_config({"rotate": True})["rotate"] is True
+    assert clean_config({"rotate": "ja"})["rotate"] is False
 
 
 # ---------- Hauptmenü: eigene Lobbys ----------

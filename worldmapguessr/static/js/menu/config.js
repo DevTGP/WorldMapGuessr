@@ -32,7 +32,8 @@ export const GROUP_LABELS = Object.fromEntries(GROUPS.map((g) => [g.id, g]));
  * mode/level (Voreinstellung; mode "custom" = unter „Erweitert“ geändert), lives, startItems (je für einen
  * Spieler), refillCount (neue Items) nach refillEvery Treffern, difficulty (Reihenfolge in %), timer/grace/
  * timerTake (fester Takt: alle timer s gehen timerTake Items zurück, 0 = aus, nach der Schonfrist),
- * noReturn (kein Zurücklegen), missLoses (Fehlwurf gibt das Item ab), kinds, excluded (Feature-Keys).
+ * noReturn (kein Zurücklegen), missLoses (Fehlwurf gibt das Item ab), rotate (Items gedreht, 30°-Schritte),
+ * kinds, excluded (Feature-Keys).
  */
 export function defaultConfig(kinds) {
   return applyPreset({ kinds: new Set(kinds), excluded: new Set() }, DEFAULT_MODE, DEFAULT_LEVEL);
@@ -55,7 +56,7 @@ export function toWire(c) {
   return {
     lives: c.lives, startItems: c.startItems, refillCount: c.refillCount, refillEvery: c.refillEvery,
     difficulty: c.difficulty, timer: c.timer, grace: c.grace, timerTake: c.timerTake, noReturn: !!c.noReturn,
-    missLoses: !!c.missLoses, mode: c.mode, level: c.level,
+    missLoses: !!c.missLoses, rotate: !!c.rotate, mode: c.mode, level: c.level,
     kinds: [...c.kinds], excluded: [...c.excluded].sort(),
   };
 }
@@ -63,7 +64,7 @@ export function toWire(c) {
 /** Vom Server: Arrays → Sets */
 export function fromWire(w) {
   return {
-    timer: 0, grace: 30, timerTake: 1, noReturn: false, missLoses: false, mode: "custom", level: 2, // ältere Lobbys
+    timer: 0, grace: 30, timerTake: 1, noReturn: false, missLoses: false, rotate: false, mode: "custom", level: 2, // ältere Lobbys
     ...w, kinds: new Set(w.kinds), excluded: new Set(w.excluded),
   };
 }

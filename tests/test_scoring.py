@@ -16,6 +16,7 @@ def test_multiplier_by_mode_level_and_custom():
     assert scoring.multiplier({"mode": "hardcore", "level": 4}) == 2.0  # 1,5 × 1,4 gekappt
     assert scoring.multiplier({"mode": "focus", "level": 2}) == 1.5
     assert scoring.multiplier({"mode": "custom", "timer": 30, "noReturn": True}) == 1.3
+    assert scoring.multiplier({"mode": "custom", "rotate": True}) == 1.2
 
 
 def test_tempo_bonus():

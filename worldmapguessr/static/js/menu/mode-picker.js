@@ -9,8 +9,11 @@ const FLAG_ICONS = {
   timer: '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2M10 3h4"/></svg>',
   noReturn: '<svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/><path d="M3 21L21 3"/></svg>',
   missLoses: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  rotate: '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 11-2.34-5.66"/><path d="M20 4v5h-5"/></svg>',
 };
-const FLAG_TITLES = { timer: t("flag.timer"), noReturn: t("rule.noReturn"), missLoses: t("rule.missLoses") };
+const FLAG_TITLES = {
+  timer: t("flag.timer"), noReturn: t("rule.noReturn"), missLoses: t("rule.missLoses"), rotate: t("rule.rotate"),
+};
 
 export class ModePicker {
   /**
@@ -25,7 +28,8 @@ export class ModePicker {
       btn.className = "mode-card";
       btn.setAttribute("role", "radio");
       btn.dataset.mode = m.id;
-      const flags = ["timer", "noReturn", "missLoses"].filter((f) => m[f])
+      // Rotation kann je Stufe verschieden sein: Symbol, sobald sie in einer Stufe an ist
+      const flags = ["timer", "noReturn", "missLoses", "rotate"].filter((f) => (Array.isArray(m[f]) ? m[f].some(Boolean) : m[f]))
         .map((f) => `<i title="${FLAG_TITLES[f]}">${FLAG_ICONS[f]}</i>`).join("");
       btn.innerHTML = `<span class="mode-title"></span><span class="mode-flags" aria-hidden="true">${flags}</span>` +
         '<span class="mode-blurb"></span>';

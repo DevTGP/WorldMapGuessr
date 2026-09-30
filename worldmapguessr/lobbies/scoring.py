@@ -27,14 +27,15 @@ LEVEL_FACTOR = [1.0, 1.1, 1.2, 1.3, 1.4]  # Sehr einfach … Sehr schwer
 
 
 def multiplier(config: dict) -> float:
-    """×1 … ×2 aus Modus und Stufe; eigene Einstellungen: aus den Regeln (Timer, kein Zurücklegen, Fehlwurf)."""
+    """×1 … ×2 aus Modus und Stufe; eigene Einstellungen: aus den Regeln (Timer, kein Zurücklegen, Fehlwurf,
+    Rotation)."""
     mode = config.get("mode")
     if mode in MODE_FACTOR:
         level = config.get("level", 2)
         factor = MODE_FACTOR[mode] * LEVEL_FACTOR[max(0, min(len(LEVEL_FACTOR) - 1, int(level)))]
     else:
         factor = 1 + 0.2 * bool(config.get("timer")) + 0.1 * bool(config.get("noReturn")) \
-            + 0.1 * bool(config.get("missLoses"))
+            + 0.1 * bool(config.get("missLoses")) + 0.2 * bool(config.get("rotate"))
     return round(min(MAX_MULT, factor), 2)
 
 

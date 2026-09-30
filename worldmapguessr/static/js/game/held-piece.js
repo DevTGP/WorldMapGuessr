@@ -1,5 +1,9 @@
 // Das Teil "in der Hand": folgt dem Mauszeiger in der aktuellen Kartenansicht
 // (gleiche Drehung, gleicher Zoom – sieht also genauso aus wie an seinem Zielort).
+// Mit „Items gedreht“ ist es zusätzlich um piece.rotation (Grad, im Uhrzeigersinn) um seinen Anker gedreht;
+// beim Einsetzen dreht es sich in die richtige Lage.
+//
+// Aufbau: <g> (Verschiebung/Flug) › <g class="rot"> (Drehung um den Anker) › Umriss + Ring
 
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const dur = (ms) => (reduceMotion ? 0 : ms);
@@ -32,11 +36,38 @@ export class HeldPiece {
   pick(piece, pointer) {
     this.cancel();
     this.piece = piece;
+    this._angle = piece.rotation ?? 0;
     this.pointer = pointer;
     this.g = this.layer.append("g").attr("data-piece", piece.id);
-    this.pathEl = this.g.append("path");
-    this.ringEl = this.g.append("circle").attr("class", "tiny-ring").attr("r", TINY_RING_R);
+    this.rotEl = this.g.append("g").attr("class", "rot");
+    this.pathEl = this.rotEl.append("path");
+    this.ringEl = this.rotEl.append("circle").attr("class", "tiny-ring").attr("r", TINY_RING_R);
     this._redraw();
+  }
+
+  /** Drehung übernehmen (piece.rotation) – kurz animiert, auf dem kürzesten Weg */
+  rotate() {
+    if (!this.g || this._flying) return;
+    const from = this._angle ?? 0;
+    let to = this.piece.rotation ?? 0;
+    while (to - from > 180) to -= 360;
+    while (to - from < -180) to += 360;
+    this._angle = to;
+    const [cx, cy] = this._anchorLocal();
+    this.rotEl.interrupt().transition().duration(dur(110)).ease(d3.easeCubicOut)
+      .attrTween("transform", () => (k) => `rotate(${from + (to - from) * k},${cx},${cy})`);
+  }
+
+  /** Anker des Teils in den Koordinaten des Umrisses (Kartenfläche) */
+  _anchorLocal() {
+    const r = this.map.canvas.getBoundingClientRect();
+    const [ax, ay] = this.map.toScreen(this.piece.geom.anchor);
+    return [ax - r.left, ay - r.top];
+  }
+
+  _applyRotation() {
+    const [cx, cy] = this._anchorLocal();
+    this.rotEl.interrupt().attr("transform", this._angle ? `rotate(${this._angle},${cx},${cy})` : null);
   }
 
   move(pointer) {
@@ -86,10 +117,17 @@ export class HeldPiece {
     return lonLat !== null && parts.some((p) => p.geometry.type === "Polygon" && d3.geoContains(p.geometry, lonLat));
   }
 
-  /** Auf die exakte Position einrasten lassen */
+  /** Auf die exakte Position einrasten lassen (und in die richtige Lage drehen) */
   snap() {
     const r = this.map.canvas.getBoundingClientRect();
-    return this._flyTo(`translate(${r.left},${r.top}) scale(1)`, 160);
+    const from = this._angle ?? 0;
+    const ms = from ? 240 : 160;
+    if (from) {
+      const [cx, cy] = this._anchorLocal();
+      this.rotEl.interrupt().transition().duration(dur(ms)).ease(d3.easeCubicInOut)
+        .attrTween("transform", () => (k) => `rotate(${from * (1 - k)},${cx},${cy})`);
+    }
+    return this._flyTo(`translate(${r.left},${r.top}) scale(1)`, ms);
   }
 
   /** In ein Mitspieler-Feld fliegen (Senden) */
@@ -101,7 +139,7 @@ export class HeldPiece {
   returnTo(targetSvg, ms = 450) {
     const r = targetSvg.getBoundingClientRect();
     this.ringEl.attr("hidden", true);
-    const b = this.pathEl.node().getBBox();
+    const b = this.g.node().getBBox(); // samt Drehung (wie das gedrehte Icon im Slot)
     const bw = Math.max(b.width, 1);
     const bh = Math.max(b.height, 1);
     const s = Math.min(r.width / bw, r.height / bh, 400);
@@ -128,6 +166,7 @@ export class HeldPiece {
     if (this.g) this.g.interrupt().remove();
     this.g = null;
     this.piece = null;
+    this._angle = 0;
     this._flying = false;
   }
 
@@ -148,6 +187,7 @@ export class HeldPiece {
       .attr("cx", ax - r.left)
       .attr("cy", ay - r.top)
       .attr("hidden", this._sizePx() < TINY_PX ? null : true);
+    this._applyRotation(); // Anker verschiebt sich mit der Ansicht
     this._follow();
   }
 

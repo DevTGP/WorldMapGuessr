@@ -23,7 +23,7 @@ in Lobbys. Jeder Spieler sammelt eigene Punkte; der Bonus am Rundenende gehört 
   | Tempo | 1,25 | | Schwer | 1,3 |
   | Hardcore | 1,5 | | Sehr schwer | 1,4 |
 
-  Modus × Stufe, höchstens 2. Eigene Einstellungen: 1 + 0,2 (Timer) + 0,1 (Kein Zurücklegen) + 0,1 (Fehlwurf kostet das Item).
+  Modus × Stufe, höchstens 2. Eigene Einstellungen: 1 + 0,2 (Timer) + 0,1 (Kein Zurücklegen) + 0,1 (Fehlwurf kostet das Item) + 0,2 (Items gedreht).
 - Beispiel: Hardcore, Normal (×1,8), Item-Schwierigkeit 6, nach 3 s eingesetzt → (100 + 120 + 50) × 1,8 = 486.
 
 ## Anzeige

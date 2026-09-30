@@ -15,13 +15,14 @@ const DOT_R = 1.4;
 /**
  * SVG-Pfad eines Features, eingepasst in w × h (viewBox "0 0 w h").
  * @param {object} feature  mit feature.geom.centerLon (und feature.parts, siehe geometry.js)
+ * @param {number} [angle]  Drehung in Grad im Uhrzeigersinn (Rotation im Spiel); eingepasst wird die gedrehte Form
  */
-export function iconPath(feature, w, h, pad = 3) {
-  // je Feature, Größe und Detailstufe nur einmal berechnen (Menü, Inventar, Lobby nutzen dieselben Icons)
+export function iconPath(feature, w, h, pad = 3, angle = 0) {
+  // je Feature, Größe, Drehung und Detailstufe nur einmal berechnen (Menü, Inventar, Lobby nutzen dieselben Icons)
   const cache = (feature._icons ??= new Map());
-  const key = `${w}x${h}x${pad}@${feature.level}:${projectionId()}`;
+  const key = `${w}x${h}x${pad}r${angle}@${feature.level}:${projectionId()}`;
   if (!cache.has(key)) {
-    const projection = iconProjection(feature, w, h, pad);
+    const projection = iconProjection(feature, w, h, pad, angle);
     const path = d3.geoPath(projection);
     const extra = missingIslands(feature, path);
     const parts = extra.length ? [...feature.parts, ...extra] : feature.parts;
@@ -40,12 +41,13 @@ export function iconScale(feature, w, h, pad = 3) {
  * Projektion des Icons: eingepasst auf die Startstufe (feature.fitGeometry), damit das Icon bei jeder
  * Detailstufe gleich groß und gleich ausgerichtet bleibt; was feinere Stufen außerhalb zeigen, wird abgeschnitten.
  */
-function iconProjection(feature, w, h, pad) {
+function iconProjection(feature, w, h, pad, angle = 0) {
   const fits = (feature._iconFit ??= new Map());
-  const key = `${w}x${h}x${pad}:${projectionId()}`;
+  const key = `${w}x${h}x${pad}r${angle}:${projectionId()}`;
   if (!fits.has(key)) {
     fits.set(key, makeProjection()
       .rotate([-feature.geom.centerLon, 0])
+      .angle(-angle) // d3: positiv = gegen den Uhrzeigersinn
       .fitExtent([[pad, pad], [w - pad, h - pad]], feature.fitGeometry ?? feature)
       .clipExtent([[0, 0], [w, h]]));
   }

@@ -32,6 +32,7 @@ export function ruleHints(config, players) {
     timerTake: many ? t("lobbyHint.timerTakeMany") : t("lobbyHint.timerTake"),
     noReturn: t("lobbyHint.noReturn"),
     missLoses: t("hint.missLoses"),
+    rotate: t("hint.rotate"),
   };
 }
 

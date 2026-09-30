@@ -73,6 +73,7 @@ export function presetValues(modeId, level) {
     timerTake: m.timer ? m.timerTake[level] : 1,
     noReturn: m.noReturn,
     missLoses: m.missLoses,
+    rotate: m.rotate ? m.rotate[level] : false,
   };
 }
 

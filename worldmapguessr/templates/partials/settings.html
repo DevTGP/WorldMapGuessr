@@ -44,7 +44,7 @@
       <details class="set-field controls-help">
         <summary>{{ t('settings.keys') }}</summary>
         <dl class="keys">
-          {% for key in ["move", "zoom", "shift", "step", "fullscreen", "grid", "mouse", "dblclick", "pick", "return", "arrows"] %}
+          {% for key in ["move", "zoom", "shift", "step", "fullscreen", "grid", "mouse", "dblclick", "pick", "rotate", "return", "arrows"] %}
           <dt>{{ t('keys.' ~ key ~ '.k') | safe }}</dt><dd>{{ t('keys.' ~ key ~ '.d') | safe }}</dd>
           {% endfor %}
         </dl>
