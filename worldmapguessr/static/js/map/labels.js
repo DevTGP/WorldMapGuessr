@@ -9,7 +9,9 @@
 // Mitten der längsten Querschnitte die Mittellinie (quadratisch ausgeglichen, Biegung begrenzt). Die Schrift
 // füllt einen festen Anteil der Länge: Die Höhe begrenzt die Dicke des Items, den Rest füllt die Sperrung.
 // Toleranz wie in den Paradox-Spielen: Der Name darf über Meer, Buchten und Nachbarn laufen, solange
-// insgesamt mindestens MIN_INSIDE seiner Fläche im Item liegt und jeder Buchstabe nahe am Item bleibt.
+// genug seiner Fläche in der Hülle (Land samt Meerengen) und auf eigenem Land liegt, wenig auf fremdem Land,
+// und jeder Buchstabe nahe an der Hülle bleibt. Inselstaaten (Griechenland, Italien …) bekommen eine weitere
+// Hülle, schräge Richtungen und dürfen über die Enden ihrer Form hinaus aufs Meer laufen.
 // Die Kandidaten (Größen, quer verschobene Linien) je Item werden zwischengespeichert; welche Namen stehen,
 // entscheidet ein Überschneidungstest in einer gemeinsamen Weltansicht – nur, wenn sich die eingesetzten
 // Items ändern, nicht beim Bewegen. Vorrang: Staaten (größere zuerst), Bundesländer untereinander,
@@ -27,6 +29,16 @@ const FADE = 0.3; // Anteil der Grenze, über den ein- bzw. ausgeblendet wird
 const TRACK = { continent: [0.3, 1.1], country: [0.08, 0.9], state: [0.06, 0.5] };
 /** Anteil der Achsenlänge, den ein Name füllt */
 const FILL = 0.8;
+/**
+ * Inselstaaten (Griechenland, Italien, Dänemark …): Je größer der Inselanteil (Fläche außerhalb des größten
+ * Teils), desto mehr Meer zählt zur Form, und desto weiter darf der Name über ihre Enden hinaus aufs Meer
+ * laufen (Paradox-Stil). Voll wirksam ab ISLANDS_FULL, unter ISLANDS_MIN gar nicht.
+ */
+const ISLANDS_MIN = 0.03, ISLANDS_FULL = 0.15;
+/** Hülle (Anteil von REF_PX): Meerengen und Buchten bis zu dieser Breite zählen zur Form – ohne / mit Inseln */
+const CLOSE = [0.04, 0.36];
+/** So viel länger als die Form darf der Name höchstens sein – ohne / mit Inseln */
+const OVERRUN = [1, 1.35];
 /** Schrifthöhe höchstens dieser Anteil der Dicke des Items */
 const THICK = 0.7;
 /** Größte Biegung: Pfeilhöhe des Bogens / Länge */
@@ -37,11 +49,21 @@ const MAX_ANGLE = 65;
 const ELONGATED = 1.35;
 /** Passt der Name auf der Mittellinie nicht, wird sie quer verschoben (Anteile der Dicke) */
 const SHIFTS = [0, 0.18, -0.18, 0.34, -0.34];
+/**
+ * Inselstaaten: außer der Hauptachse probierte Richtungen (Grad dazu) – lange Namen auf runden Inselgruppen
+ * laufen schräg; eine schräge Richtung gewinnt nur, wenn der Name dort um TURN_GAIN größer wird
+ */
+const TURNS = [-40, -20, 20, 40];
+const TURN_GAIN = 1.05;
+/** Kandidaten je Item höchstens */
+const MAX_CANDS = 10;
 /** Kleinere Größen, die probiert werden (Faktor je Schritt, Schritte) */
 const SHRINK = 0.86, SHRINK_STEPS = 7;
-/** Toleranz: so viel der Buchstabenfläche muss insgesamt im Item liegen … */
+/** Toleranz: so viel der Buchstabenfläche muss insgesamt in der Hülle des Items liegen, … */
 const MIN_INSIDE = 0.6;
-/** … und kein Buchstabe weiter als so viele Schrifthöhen vom Item entfernt */
+/** … so viel auf echtem Land, höchstens so viel auf Land anderer Staaten … */
+const MIN_LAND = 0.4, MAX_FOREIGN = 0.2;
+/** … und kein Buchstabe weiter als so viele Schrifthöhen von der Hülle entfernt */
 const MAX_OUT = 0.6;
 /** Bezugsansicht: Größe des Items (px) und Rasterzelle der Maske (px) */
 const REF_PX = 260, CELL_PX = 2;
@@ -61,6 +83,8 @@ export class LabelLayer {
     this.layoutKey = "";
     /** Kandidaten je Item (unabhängig von der Ansicht) */
     this.cands = new Map();
+    /** alle Items (für die Nachbarn in der Maske); setzt map.js */
+    this.items = () => [];
     this._canvas = null;
   }
 
@@ -165,8 +189,12 @@ export class LabelLayer {
 
   /** Mögliche Namen eines Items, bevorzugte zuerst: [{glyphs, em}] */
   _candidates(ctx, f) {
-    const geom = mainParts(f);
-    if (!geom) return [];
+    const parts = mainParts(f);
+    if (!parts) return [];
+    const { geom } = parts;
+    // 0 … 1: wie sehr das Item als Inselstaat gilt
+    const isl = Math.min(1, Math.max(0, (parts.islands - ISLANDS_MIN) / (ISLANDS_FULL - ISLANDS_MIN)));
+    const mix = ([a, b]) => a + (b - a) * isl;
     const lon0 = d3.geoCentroid(geom)[0];
     const proj = makeProjection().rotate([-lon0, 0]).translate([0, 0]).scale(1);
     const [[a0, b0], [a1, b1]] = d3.geoPath(proj).bounds(geom);
@@ -174,24 +202,42 @@ export class LabelLayer {
     if (!(ext > 0)) return [];
     const scale = REF_PX / ext;
     proj.scale(scale);
-    const mask = this._mask(proj, geom);
-    const shape = mask && analyse(mask);
-    if (!shape) return [];
+    const mask = this._mask(proj, geom, mix(CLOSE), this._neighbours(f));
+    const main = mask && analyse(mask);
+    if (!main) return [];
     const text = [...displayName(f)];
     if (text.length < 2) return [];
-    const [minTr, maxTr] = TRACK[f.kind];
     ctx.font = fontFor(f.kind, 100);
     const adv100 = text.map((ch) => ctx.measureText(ch).width);
+    const lim = (MAX_ANGLE * Math.PI) / 180;
+    const shapes = [main];
+    for (const d of isl > 0 ? TURNS : []) {
+      const ang = main.ang + (d * Math.PI) / 180;
+      if (Math.abs(ang) > lim) continue;
+      const sh = analyse(mask, ang);
+      if (sh) shapes.push(sh);
+    }
+    const out = [];
+    const overrun = mix(OVERRUN);
+    for (const shape of shapes) out.push(...this._sized(f, text, adv100, shape, mask, proj, scale, shape === main, overrun));
+    // größte zuerst
+    out.sort((a, b) => b.rank - a.rank);
+    return out.slice(0, MAX_CANDS);
+  }
+
+  /** Kandidaten einer Richtung in abnehmender Größe */
+  _sized(f, text, adv100, shape, mask, proj, scale, isMain, overrun) {
+    const [minTr, maxTr] = TRACK[f.kind];
     const w100 = adv100.reduce((a, b) => a + b, 0);
     const gaps = text.length - 1;
     const target = FILL * shape.length;
-    let px = Math.min(THICK * shape.thick, target / (w100 / 100 + gaps * minTr));
+    let px = Math.min(THICK * shape.thick, Math.max(target, overrun * shape.length) / (w100 / 100 + gaps * minTr));
     const out = [];
     for (let step = 0; step < SHRINK_STEPS; step++, px *= SHRINK) {
       const track = Math.min(maxTr, Math.max(minTr, (target - (w100 * px) / 100) / (gaps * px)));
       const advances = adv100.map((a) => (a * px) / 100);
       for (const shift of SHIFTS) {
-        const glyphs = placeOnCurve(shape.curve(shift), advances, track * px);
+        const glyphs = placeOnCurve(shape.curve(shift, Math.max(1, overrun)), advances, track * px);
         if (!glyphs || !fits(glyphs, text, advances, (CAP * px) / 2, mask)) continue;
         const geo = [];
         for (let i = 0; i < glyphs.length; i++) {
@@ -202,17 +248,33 @@ export class LabelLayer {
           if (!ll || !dir || !Number.isFinite(ll[0]) || !Number.isFinite(dir[0])) { geo.length = 0; break; }
           geo.push({ ch: text[i], ll, dir, hw: advances[i] / 2 / scale });
         }
-        if (geo.length) out.push({ glyphs: geo, em: px / scale });
+        // Rang fürs Sortieren: schräge Richtungen nur, wenn sie spürbar größer sind als die Hauptachse
+        if (geo.length) out.push({ glyphs: geo, em: px / scale, rank: (px / scale) / (isMain ? 1 : TURN_GAIN) });
         break; // je Größe die erste passende Linie
       }
     }
     return out;
   }
 
-  /** Item in der Bezugsansicht als Maske (1 = im Item) samt Abstand zum Item (in Zellen) */
-  _mask(proj, geom) {
+  /** Staaten, deren Land unter einem Namen des Items liegen könnte (nicht der eigene Staat) */
+  _neighbours(f) {
+    if (f.kind === "continent") return [];
+    const b = geoBox(f), mx = (b[2] - b[0]) * 0.6 + 1, my = (b[3] - b[1]) * 0.6 + 1;
+    return this.items().filter((o) => {
+      if (o.kind !== "country" || o === f || o.id === f.properties.country) return false;
+      const c = geoBox(o);
+      return c[0] < b[2] + mx && c[2] > b[0] - mx && c[1] < b[3] + my && c[3] > b[1] - my;
+    });
+  }
+
+  /**
+   * Item in der Bezugsansicht als Maske: Land und Hülle (Land samt Meerengen und Buchten bis zur Breite
+   * close · REF_PX, morphologisch geschlossen, ohne fremdes Land), fremdes Land, Abstand zur Hülle
+   */
+  _mask(proj, geom, close, neighbours) {
     const [[bx0, by0], [bx1, by1]] = d3.geoPath(proj).bounds(geom);
-    const pad = 0.15 * REF_PX;
+    const r = Math.round((close * REF_PX) / 2 / CELL_PX); // Radius in Zellen (schließt Lücken bis 2 r)
+    const pad = 0.15 * REF_PX + (r + 2) * CELL_PX;
     const x0 = bx0 - pad, y0 = by0 - pad;
     const cw = Math.ceil((bx1 - bx0 + 2 * pad) / CELL_PX), ch = Math.ceil((by1 - by0 + 2 * pad) / CELL_PX);
     const canvas = this._canvas ??= document.createElement("canvas");
@@ -229,19 +291,51 @@ export class LabelLayer {
     const data = g.getImageData(0, 0, cw, ch).data;
     const m = new Uint8Array(cw * ch);
     for (let i = 0; i < m.length; i++) m[i] = data[i * 4 + 3] > 127 ? 1 : 0;
-    const dist = distanceField(m, cw, ch);
+    // fremdes Land (Nachbarstaaten)
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, cw, ch);
+    g.setTransform(1 / CELL_PX, 0, 0, 1 / CELL_PX, -x0 / CELL_PX, -y0 / CELL_PX);
+    g.beginPath();
+    const path = d3.geoPath(proj, g);
+    for (const o of neighbours) path(o.geometry);
+    g.fill();
+    const fdata = g.getImageData(0, 0, cw, ch).data;
+    const foreign = new Uint8Array(cw * ch);
+    for (let i = 0; i < m.length; i++) foreign[i] = !m[i] && fdata[i * 4 + 3] > 127 ? 1 : 0;
+    // Hülle = Land, um r ausgedehnt und wieder um r geschrumpft
+    const grown = distanceField(m, cw, ch);
+    const out = new Uint8Array(m.length);
+    for (let i = 0; i < m.length; i++) out[i] = grown[i] <= r ? 0 : 1;
+    const toOut = distanceField(out, cw, ch);
+    const hull = new Uint8Array(m.length);
+    for (let i = 0; i < m.length; i++) hull[i] = m[i] || (grown[i] <= r && toOut[i] > r && !foreign[i]) ? 1 : 0;
+    const dist = distanceField(hull, cw, ch);
     const cell = CELL_PX;
     const idx = (x, y) => {
       const i = Math.floor((x - x0) / cell), j = Math.floor((y - y0) / cell);
       return i >= 0 && j >= 0 && i < cw && j < ch ? j * cw + i : -1;
     };
     return {
-      m, cw, ch, x0, y0, cell,
+      m: hull, cw, ch, x0, y0, cell,
+      /** Punkt auf Land des Items */
       at(x, y) { const i = idx(x, y); return i >= 0 && m[i] === 1; },
-      /** Abstand zum Item in px (außerhalb der Maske: unendlich) */
+      /** Punkt auf Land eines anderen Staates */
+      onForeign(x, y) { const i = idx(x, y); return i >= 0 && foreign[i] === 1; },
+      /** Punkt in der Hülle */
+      inHull(x, y) { const i = idx(x, y); return i >= 0 && hull[i] === 1; },
+      /** Abstand zur Hülle in px (außerhalb der Maske: unendlich) */
       dist(x, y) { const i = idx(x, y); return i < 0 ? Infinity : dist[i] * cell; },
     };
   }
+}
+
+/** Länge/Breite-Rahmen [w, s, e, n] eines Items (zwischengespeichert; über die Datumsgrenze: ganze Breite) */
+function geoBox(f) {
+  if (!f._geoBox) {
+    const [[w, s], [e, n]] = d3.geoBounds(f.geometry);
+    f._geoBox = e >= w ? [w, s, e, n] : [-180, s, 180, n];
+  }
+  return f._geoBox;
 }
 
 function fontFor(kind, px) {
@@ -262,7 +356,7 @@ function visibility(kind, px) {
 
 /**
  * Hauptteil des Items samt naher Inseln (Griechenland mit Kreta und den Kykladen; die USA ohne Alaska und
- * Hawaii) als MultiPolygon
+ * Hawaii) als MultiPolygon, dazu der Inselanteil (Fläche außerhalb des größten Teils, 0 … 1)
  */
 function mainParts(f) {
   const g = f.fitGeometry ?? f.geometry;
@@ -276,7 +370,8 @@ function mainParts(f) {
   const main = parts.reduce((m, p) => (p.a > m.a ? p : m));
   const reach = NEAR * 2 * Math.sqrt(main.a / Math.PI);
   const near = parts.filter((p) => p === main || d3.geoDistance(p.center, main.center) <= reach + 2 * Math.sqrt(p.a / Math.PI));
-  return { type: "MultiPolygon", coordinates: near.map((p) => p.c) };
+  const total = near.reduce((sum, p) => sum + p.a, 0);
+  return { geom: { type: "MultiPolygon", coordinates: near.map((p) => p.c) }, islands: 1 - main.a / total };
 }
 
 /** Abstand jeder Zelle zur nächsten Zelle im Item (Zellen; Chamfer 3-4) */
@@ -295,9 +390,9 @@ function distanceField(m, cw, ch) {
   return d;
 }
 
-/** Toleranztest: genug der Buchstaben im Item, keiner zu weit weg */
+/** Toleranztest: genug der Buchstaben in der Hülle und auf Land, keiner zu weit weg */
 function fits(glyphs, text, advances, hh, mask) {
-  let inside = 0, total = 0;
+  let inside = 0, land = 0, alien = 0, total = 0;
   for (let i = 0; i < glyphs.length; i++) {
     if (text[i] === " ") continue;
     const g = glyphs[i];
@@ -305,10 +400,13 @@ function fits(glyphs, text, advances, hh, mask) {
     if (mask.dist(g.x, g.y) > MAX_OUT * 2 * hh) return false;
     for (const u of [-hw, 0, hw]) for (const v of [-hh, 0, hh]) {
       total++;
-      if (mask.at(g.x + u * c - v * s, g.y + u * s + v * c)) inside++;
+      const x = g.x + u * c - v * s, y = g.y + u * s + v * c;
+      if (mask.inHull(x, y)) inside++;
+      if (mask.at(x, y)) land++;
+      else if (mask.onForeign(x, y)) alien++;
     }
   }
-  return total > 0 && inside / total >= MIN_INSIDE;
+  return total > 0 && inside / total >= MIN_INSIDE && land / total >= MIN_LAND && alien / total <= MAX_FOREIGN;
 }
 
 /** Buchstabenrahmen in der gemeinsamen Weltansicht (für den Überschneidungstest) */
@@ -331,7 +429,7 @@ function worldBoxes(c, world) {
  * Form der Maske: Hauptachse, Länge und Dicke des tragenden Abschnitts und die ausgeglichene Mittellinie
  * als Kurve in Pixeln der Bezugsansicht (65 Punkte, von links nach rechts), quer verschiebbar.
  */
-function analyse({ m, cw, ch, x0, y0, cell }) {
+function analyse({ m, cw, ch, x0, y0, cell }, forced) {
   let n = 0, sx = 0, sy = 0;
   for (let j = 0; j < ch; j++) for (let i = 0; i < cw; i++) if (m[j * cw + i]) { n++; sx += i; sy += j; }
   if (n < 12) return null;
@@ -346,6 +444,7 @@ function analyse({ m, cw, ch, x0, y0, cell }) {
   const l1 = tr / 2 + Math.sqrt(Math.max(0, (tr * tr) / 4 - det)), l2 = tr - l1;
   let ang = 0.5 * Math.atan2(2 * sxy, sxx - syy);
   if (l2 <= 0 || Math.sqrt(l1 / l2) < ELONGATED) ang = 0;
+  if (forced !== undefined) ang = forced;
   if (Math.cos(ang) < 0) ang += Math.PI; // Leserichtung links → rechts
   if (ang > Math.PI) ang -= 2 * Math.PI;
   const lim = (MAX_ANGLE * Math.PI) / 180;
@@ -403,17 +502,17 @@ function analyse({ m, cw, ch, x0, y0, cell }) {
   bl = Math.max(-half * 0.35, Math.min(half * 0.35, bl));
   ts.sort((p, q) => p - q);
   const med = ts[Math.floor(ts.length / 2)];
-  /** Kurve, um `shift` (Anteil der Dicke) quer zur Achse verschoben */
-  const curve = (shift) => {
+  /** Kurve, um `shift` (Anteil der Dicke) quer zur Achse verschoben, auf das `reach`-fache verlängert */
+  const curve = (shift, reach = 1) => {
     const pts = [];
     for (let k = 0; k <= 64; k++) {
-      const t = -1 + (2 * k) / 64, u = uc + t * half, v = a * t * t + bl * t + c + shift * med;
+      const t = reach * (-1 + (2 * k) / 64), u = uc + t * half, v = a * t * t + bl * t + c + shift * med;
       const gx = mx + u * ax + v * nx, gy = my + u * ay + v * ny;
       pts.push([x0 + (gx + 0.5) * cell, y0 + (gy + 0.5) * cell]);
     }
     return pts;
   };
-  return { curve, length: 2 * half * cell, thick: med * cell };
+  return { ang, curve, length: 2 * half * cell, thick: med * cell };
 }
 
 /** Buchstabenmitten und -winkel entlang der Kurve, mittig; null, wenn der Name länger ist als die Kurve */
