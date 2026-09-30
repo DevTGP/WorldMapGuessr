@@ -1,6 +1,7 @@
 // Weltkarte: Daten, Projektion und Ansicht (Drehung um die Längsachse, Zoom, vertikale Verschiebung).
 // Globale Abhängigkeit (CDN): d3. Kartendaten: Kacheln + Items mit Detailstufen (tiles.js, items.js).
 
+import { LABEL_FONT } from "./labels.js";
 import { Renderer } from "./renderer.js";
 import { Gestures } from "./gestures.js";
 import { yielder } from "../ui/loading-screen.js";
@@ -116,6 +117,11 @@ export class WorldMap {
     this.renderer.onColorsChanged = () => this.requestRender();
     tiles.onLoad = () => this.requestRender();
     items.onUpgrade = () => this.requestRender();
+    // Die Schrift der Namen (Google Fonts) kommt evtl. erst nach dem ersten Bild: dann neu auslegen
+    document.fonts?.load(`700 20px ${LABEL_FONT}`).then(() => {
+      this.renderer.labels.invalidate();
+      this.requestRender();
+    }).catch(() => {});
     this._listeners = { view: [], click: [], contextmenu: [], projection: [] };
     this._applyQuality(quality.value);
     quality.onChange((q) => {

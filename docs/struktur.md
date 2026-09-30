@@ -48,7 +48,7 @@ worldmapguessr/
     ui/feed.js                Nachrichtenleiste (Meldungen, Punkte, Chat)
     map/map.js                Startdaten laden, Ansicht (Drehung, Zoom, Verschieben), Projektionswechsel
     map/renderer.js           Canvas-Zeichnung aus Kacheln (Zellfarben, Küsten, Grenzen, Wasser, Kleinststaat-Ringe)
-    map/labels.js             Namen eingesetzter Items (Platzsuche, keine Überschneidungen)
+    map/labels.js             Namen eingesetzter Items (gebogen nach der Form, keine Überschneidungen)
     map/tiles.js              Kacheln: Detailstufe je Zoom, Laden, Ersatz aus gröberer Stufe, Speichergrenze
     map/items.js              Item-Umrisse: Startstufe für alle, feinere Stufe je Item bei Bedarf
     map/project.js            Schnelle Projektion, Sichtbarkeitstest
