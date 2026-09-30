@@ -46,6 +46,7 @@ worldmapguessr/
     i18n/index.js             t(), parts(), Zahlenformat, Server-Fehler übersetzen, Sprache wechseln
     ui/loading-screen.js      Ladebildschirm
     ui/feed.js                Nachrichtenleiste (Meldungen, Punkte, Chat)
+    ui/cosmos.js              Kosmos-Hintergrund (Sterne, Nebel) hinter der Karte
     map/map.js                Startdaten laden, Ansicht (Drehung, Zoom, Verschieben), Projektionswechsel
     map/renderer.js           Canvas-Zeichnung aus Kacheln (Zellfarben, Küsten, Grenzen, Wasser, Kleinststaat-Ringe)
     map/labels.js             Namen eingesetzter Items (gebogen nach der Form, keine Überschneidungen)

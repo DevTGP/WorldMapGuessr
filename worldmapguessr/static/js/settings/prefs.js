@@ -7,6 +7,7 @@
 //   projection            natural (Natural Earth, Kompromiss) · equal (Equal Earth, flächentreu)
 //   relief                Geländeschummerung: off · light · strong
 //   water                 Flüsse und Seen zeichnen
+//   cosmos                Sterne und Nebel außerhalb der Erde (ui/cosmos.js)
 
 const KEY = "wmg.prefs";
 /** Stand der gespeicherten Einstellungen. 2: Standard-Farbschema A statt B – ein gespeichertes „b“ aus
@@ -24,6 +25,7 @@ const DEFS = {
   projection: { def: "natural", options: ["natural", "equal"] },
   relief: { def: "light", options: ["off", "light", "strong"] },
   water: { def: true, bool: true },
+  cosmos: { def: true, bool: true },
 };
 
 const listeners = new Set();

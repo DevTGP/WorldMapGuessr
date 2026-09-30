@@ -37,6 +37,8 @@ const SEAM_PX = 1.2;
  *  Unterteilungen sichtbar bleiben. Küste: COAST_PX in der Küstenfarbe. */
 const BORDER_PX = { continent: 2.2, country: 0.8 };
 const COAST_PX = 0.7;
+/** Kosmos: Schein um die Erde als breite, schwache Striche [Breite px, Deckkraft] */
+const GLOW = [[26, 0.035], [14, 0.06], [6, 0.1], [2, 0.18]];
 
 export class Renderer {
   /**
@@ -64,7 +66,7 @@ export class Renderer {
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => this.readColors());
     new MutationObserver(() => this.readColors())
       .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    prefs.onChange((key) => { if (key === "scheme") this.readColors(); });
+    prefs.onChange((key) => { if (key === "scheme" || key === "cosmos") this.readColors(); });
   }
 
   /** Farben aus dem Farbschema (Hintergrund außerhalb der Erde aus dem Seiten-Thema) */
@@ -131,11 +133,24 @@ export class Renderer {
     const now = performance.now();
     const v = viewOf(projection);
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    ctx.fillStyle = c.outside;
-    ctx.fillRect(0, 0, this.w, this.h);
+    const cosmos = prefs.get("cosmos");
+    const plain = d3.geoPath(projection, ctx);
+    if (cosmos) {
+      // Außen durchsichtig (Sterne dahinter, ui/cosmos.js), um die Erde ein schwacher Schein
+      ctx.clearRect(0, 0, this.w, this.h);
+      ctx.beginPath();
+      plain({ type: "Sphere" });
+      for (const [width, alpha] of GLOW) {
+        ctx.lineWidth = width;
+        ctx.strokeStyle = `rgba(110, 170, 255, ${alpha})`;
+        ctx.stroke();
+      }
+    } else {
+      ctx.fillStyle = c.outside;
+      ctx.fillRect(0, 0, this.w, this.h);
+    }
 
     // Meer (und Gradnetz) über d3 – wenige Punkte
-    const plain = d3.geoPath(projection, ctx);
     ctx.beginPath();
     plain({ type: "Sphere" });
     ctx.fillStyle = c.sea;

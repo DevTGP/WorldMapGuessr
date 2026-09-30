@@ -29,9 +29,11 @@ export class SettingsDialog {
       (id) => { document.getElementById("set-projection-hint").textContent = PROJECTIONS[id].blurb; });
     this._segmented(document.getElementById("set-relief"), "relief", RELIEF);
     this._segmented(document.getElementById("set-lang"), null, LANGS);
-    const water = document.getElementById("set-water");
-    water.addEventListener("change", () => prefs.set("water", water.checked));
-    this.syncs.push(() => { water.checked = prefs.get("water"); });
+    for (const key of ["water", "cosmos"]) {
+      const box = document.getElementById(`set-${key}`);
+      box.addEventListener("change", () => prefs.set(key, box.checked));
+      this.syncs.push(() => { box.checked = prefs.get(key); });
+    }
 
     this.name = document.getElementById("set-name");
     this.name.maxLength = NAME_MAX;

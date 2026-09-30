@@ -76,6 +76,10 @@ export class ReliefLayer {
       }
     }
     ctx.save();
+    // nur auf der Erde überblenden – außerhalb kann die Fläche durchsichtig sein (Kosmos)
+    ctx.beginPath();
+    d3.geoPath(projection, ctx)({ type: "Sphere" });
+    ctx.clip();
     for (const [mode, alpha] of passes) {
       ctx.globalCompositeOperation = mode;
       ctx.globalAlpha = alpha;

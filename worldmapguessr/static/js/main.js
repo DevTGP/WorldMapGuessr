@@ -22,6 +22,7 @@ import { LoadingScreen, yielder } from "./ui/loading-screen.js";
 import { Home } from "./home/home.js";
 import { askLobbyCode } from "./home/code-dialog.js";
 import { SettingsDialog } from "./settings/settings-dialog.js";
+import { Cosmos } from "./ui/cosmos.js";
 import { serverError, t } from "./i18n/index.js";
 
 const WMG = window.WMG ?? {};
@@ -45,6 +46,8 @@ async function prepareIcons(features) {
     if (await tick()) loading.report((i + 1) / features.length, t("loading.itemsOf", { i: i + 1, n: features.length }));
   }
 }
+
+new Cosmos(document.getElementById("stage"));
 
 createMap({
   canvas: document.getElementById("map"),
