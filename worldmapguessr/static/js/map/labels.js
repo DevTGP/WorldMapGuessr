@@ -82,6 +82,7 @@ export class LabelLayer {
     }
     const scale = projection.scale();
     ctx.save();
+    const base = ctx.getTransform();
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.lineJoin = "round";
@@ -96,13 +97,13 @@ export class LabelLayer {
         for (const g of l.glyphs) {
           const p = projection(g.ll);
           if (!p) continue;
-          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.setTransform(base); // Grundtransformation (Pixeldichte) behalten
           ctx.translate(p[0], p[1]);
           ctx.rotate(g.ang);
           ctx.strokeText(g.ch, 0, 0);
           ctx.fillText(g.ch, 0, 0);
         }
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.setTransform(base);
       } else {
         const p = projection(l.item.labelPoint);
         if (!p) continue;
