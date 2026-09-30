@@ -35,7 +35,7 @@ const SHELF_STEP_PX = 2.5;
 const SEAM_PX = 1.2;
 /** Grenzen je Ebene (px): deutlich abgestuft, damit übergeordnete Grenzen zwischen eingesetzten
  *  Unterteilungen sichtbar bleiben. Küste: COAST_PX in der Küstenfarbe. */
-const BORDER_PX = { continent: 2.2, country: 0.8 };
+const BORDER_PX = { continent: 2.2, country: 0.8, state: 0.45 };
 const COAST_PX = 0.7;
 /** Kosmos: Schein um die Erde als breite, schwache Striche [Breite px, Deckkraft] */
 const GLOW = [[26, 0.035], [14, 0.06], [6, 0.1], [2, 0.18]];
@@ -60,7 +60,7 @@ export class Renderer {
     this.labels = new LabelLayer(itemOf);
     this.showLabels = true;
     // Zelle → Keys der Ebenen, die sie enthalten
-    this.cells = index.cells.map(([continent, item]) => ({ continent: `continent:${continent}`, item }));
+    this.cells = index.cells.map(([continent, item, state = null]) => ({ continent: `continent:${continent}`, item, state }));
     this.readColors();
 
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => this.readColors());
@@ -108,17 +108,18 @@ export class Renderer {
     return t0 === undefined ? 0 : Math.min(1, (now - t0) / PLACED_FADE_MS);
   }
 
-  /** Einsetz-Stufe der Landfläche eines eingesetzten Items (ohne Animation): Kontinent + Item */
+  /** Einsetz-Stufe der Landfläche eines eingesetzten Items (ohne Animation): Kontinent + Staat + Bundesland */
   _stage(key) {
     if (key.startsWith("continent:")) return 1;
-    const region = this.itemOf(key)?.properties?.region;
-    return 1 + (this.placed.has(`continent:${region}`) ? 1 : 0);
+    const p = this.itemOf(key)?.properties;
+    return 1 + (this.placed.has(`continent:${p?.region}`) ? 1 : 0) +
+      (key.startsWith("state:") && this.placed.has(`country:${p?.country}`) ? 1 : 0);
   }
 
   /** Farbe je Zelle für diesen Frame: Stufe = Summe der eingesetzten Ebenen (mit Einblend-Anteil) */
   _cellColors(now) {
-    return this.cells.map((c, i) =>
-      stageColor(this.cellStops[i], this._fraction(c.continent, now) + (c.item ? this._fraction(c.item, now) : 0)));
+    return this.cells.map((c, i) => stageColor(this.cellStops[i], this._fraction(c.continent, now) +
+      (c.item ? this._fraction(c.item, now) : 0) + (c.state ? this._fraction(c.state, now) : 0)));
   }
 
   /**
@@ -173,8 +174,10 @@ export class Renderer {
     const shelf = moving ? null : new Path2D();
     const borders = new Path2D();
     const continentBorders = new Path2D();
+    const stateBorders = new Path2D();
     const seams = new Map(); // Farbe → Pfad
     const itemPlaced = (cell) => cell >= 0 && this.cells[cell].item && this.placed.has(this.cells[cell].item);
+    const statePlaced = (cell) => cell >= 0 && this.cells[cell].state && this.placed.has(this.cells[cell].state);
     for (const t of tiles) {
       const off = wrapOffset(t.lon0, v.rot);
       const cut = t.lon1 + v.rot + off > Math.PI + 1e-9; // Kachel liegt über der Schnittlinie
@@ -192,7 +195,9 @@ export class Renderer {
         if (!cb) target = coast;
         // Grenze zwischen Kontinenten (Ural, Sinai, Panama …): erst sichtbar, wenn einer davon eingesetzt ist
         else if (ca.continent !== cb.continent && (this.placed.has(ca.continent) || this.placed.has(cb.continent))) target = continentBorders;
-        else if (ca.item !== cb.item && (itemPlaced(l.a) || itemPlaced(l.b))) target = borders;
+        else if (ca.item !== cb.item && (itemPlaced(l.a) || itemPlaced(l.b) || statePlaced(l.a) || statePlaced(l.b))) target = borders;
+        // Grenze zwischen Bundesländern: eigene, schwächste Stufe
+        else if (ca.state !== cb.state && (statePlaced(l.a) || statePlaced(l.b))) target = stateBorders;
         else if (colors[l.a] === colors[l.b]) {
           target = seams.get(colors[l.a]);
           if (!target) seams.set(colors[l.a], (target = new Path2D()));
@@ -224,6 +229,10 @@ export class Renderer {
     if (extras.relief) extras.relief.layer.draw(ctx, projection, { w: this.w, h: this.h }, extras.relief.passes, moving);
     if (extras.water?.length) this._drawWater(extras.water, v);
     ctx.strokeStyle = c.border;
+    ctx.lineWidth = BORDER_PX.state;
+    ctx.setLineDash([3, 2.5]);
+    ctx.stroke(stateBorders);
+    ctx.setLineDash([]);
     ctx.lineWidth = BORDER_PX.country;
     ctx.stroke(borders);
     ctx.lineCap = "round";
@@ -283,7 +292,9 @@ export class Renderer {
       const p = projection(item.geom.anchor);
       if (!p || p[0] < -10 || p[1] < -10 || p[0] > this.w + 10 || p[1] > this.h + 10) continue;
       const cont = key.startsWith("continent:") ? key : `continent:${item.properties?.region}`;
-      const k = this._fraction(key, now) + (cont === key ? 0 : this._fraction(cont, now));
+      const country = key.startsWith("state:") ? `country:${item.properties.country}` : null;
+      const k = this._fraction(key, now) + (cont === key ? 0 : this._fraction(cont, now)) +
+        (country ? this._fraction(country, now) : 0);
       ctx.beginPath();
       ctx.arc(p[0], p[1], TINY_RING_R, 0, 2 * Math.PI);
       ctx.fillStyle = stageColor(stopsFor(this.scheme, cont), k);

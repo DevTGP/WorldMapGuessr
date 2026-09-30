@@ -593,3 +593,11 @@ def test_api_waited_event_and_duration(client):
     item = client.post(f"/api/items/{uid}/events", json={"event": "waited", "value": 2}).get_json()
     assert (item["waited"], item["waitedCount"], item["duration"]) == (8, 2, 4.0)
     assert client.post(f"/api/items/{uid}/events", json={"event": "waited", "value": -1}).status_code == 400
+
+
+def test_state_groups_are_opt_in(store):
+    lobby, _ = store.create(player_name="Manu", config={})
+    assert "state-de" not in lobby["settings"]["config"]["kinds"]         # Standard: ohne Bundesländer
+    assert "country-eu" in lobby["settings"]["config"]["kinds"]
+    lobby, _ = store.create(player_name="Manu", config={"kinds": ["state-de"]})
+    assert lobby["settings"]["config"]["kinds"] == ["state-de"]

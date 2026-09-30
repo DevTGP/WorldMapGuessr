@@ -1,6 +1,6 @@
 # WorldMapGuessr
 
-Geografie-Spiel: Kontinente und Länder (später Bundesländer und Regionen) auf einer Weltkarte an die richtige
+Geografie-Spiel: Kontinente, Länder und Bundesländer (bisher Deutschland; später weitere Regionen) auf einer Weltkarte an die richtige
 Stelle setzen – allein oder mit anderen in einer Lobby. Oberfläche auf Deutsch und Englisch.
 
 **Stand:** Punkte am Rundenende, Sprache Deutsch/Englisch, inaktive Lobbys, Spieler entfernen, komprimierte Auslieferung.

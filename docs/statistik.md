@@ -5,7 +5,7 @@ Jedes Item ist auf dem Server mit fester UID registriert. Gezählt wird in Mongo
 
 | Methode | Pfad | Zweck |
 |---|---|---|
-| GET | `/api/items?kind=continent` bzw. `?kind=country` | Items mit UID, Zählern, `duration`, `difficulty`, `nameEn` und `region` (Kontinent-Code) |
+| GET | `/api/items?kind=continent`, `?kind=country` bzw. `?kind=state` | Items mit UID, Zählern, `duration`, `difficulty`, `nameEn` und `region` (Kontinent-Code) |
 | GET | `/api/items/<uid>` | ein Item |
 | POST | `/api/items/<uid>/events` | Body `{"event": "spawned" \| "correct" \| "incorrect"}` oder `{"event": "waited", "value": n}` (für Werkzeuge und Tests) |
 
@@ -42,6 +42,6 @@ enthalten (Neuladen, gesendete Items).
 
 <http://127.0.0.1:5000/stats> (im Hauptmenü „Statistik“), in der Sprache der Seite (Namen auf Englisch aus `nameEn`).
 
-- Tabelle aller Items, sortierbar per Klick auf den Spaltenkopf (zweiter Klick kehrt die Richtung um), Filter Art (Kontinente/Staaten) und Kontinent (kombinierbar), Suche nach Name oder Code. Schmale Spalten ohne „Zuletzt“ und UID (beides steht in den Rohdaten).
+- Tabelle aller Items, sortierbar per Klick auf den Spaltenkopf (zweiter Klick kehrt die Richtung um), Filter Art (Kontinente/Staaten/Bundesländer) und Kontinent (Bundesländer zählen zu ihrem Kontinent) (kombinierbar), Suche nach Name oder Code. Schmale Spalten ohne „Zuletzt“ und UID (beides steht in den Rohdaten).
 - Die Seite füllt genau das Fenster: Kopf und Filter oben, darunter scrollt nur die Tabelle; Spaltenköpfe und die Summenzeile (Summen, Quoten, Ø bis platziert, Ø Schwierigkeit für den aktuellen Filter) bleiben stehen. Auf kleinen Bildschirmen scrollt die ganze Seite.
 - Darunter die Rohdaten als JSON (gefiltert und sortiert wie die Tabelle, unverändert wie von der API).

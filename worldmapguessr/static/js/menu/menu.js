@@ -14,7 +14,7 @@ import { createTtlField } from "./ttl-field.js";
 import { ModePicker } from "./mode-picker.js";
 import { DEFAULT_LEVEL, DEFAULT_MODE, LEVELS, MODE, applyPreset, metrics, mmss, perMinute, valuesLine } from "./presets.js";
 import { describeMap } from "./map-presets.js";
-import { GROUPS, LIMITS, cloneConfig, defaultConfig, enforceBalance, poolFor } from "./config.js";
+import { GROUPS, isDefaultGroup, LIMITS, cloneConfig, defaultConfig, enforceBalance, poolFor } from "./config.js";
 import { t } from "../i18n/index.js";
 
 const ADVANCED_KEY = "wmg.menu.advanced";
@@ -68,7 +68,7 @@ export class Menu {
     this.groups = GROUPS
       .map((g) => ({ kind: g.id, title: g.title, preview: g.preview, features: map.features.filter((f) => f.group === g.id) }))
       .filter((g) => g.features.length);
-    this.config = defaultConfig(this.groups.map((g) => g.kind));
+    this.config = defaultConfig(this.groups.map((g) => g.kind).filter(isDefaultGroup));
     this.lastMode = DEFAULT_MODE; // für „Stufe wählen“ bei eigenen Einstellungen
 
     this.modePicker = new ModePicker({

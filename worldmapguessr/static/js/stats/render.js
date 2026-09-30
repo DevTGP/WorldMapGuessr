@@ -3,7 +3,7 @@
 import { hitRate, placeRate } from "./sort.js";
 import { locale, t } from "../i18n/index.js";
 
-const KIND_LABEL = { continent: t("stats.kind.continent"), country: t("stats.kind.country") };
+const KIND_LABEL = { continent: t("stats.kind.continent"), country: t("stats.kind.country"), state: t("stats.kind.state") };
 const pct = new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 });
 const int = new Intl.NumberFormat(locale);
 

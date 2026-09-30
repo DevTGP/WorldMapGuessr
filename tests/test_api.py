@@ -94,3 +94,25 @@ def test_items_carry_region(client):
     items = {i["code"]: i for i in client.get("/api/items").get_json()["items"]}
     assert items["DEU"]["region"] == "EU" and items["BRA"]["region"] == "SA"
     assert items["AN"]["region"] == "AN"                        # Kontinent-Item: eigener Code
+
+
+def test_german_states_are_seeded(client, app):
+    items = client.get("/api/items?kind=state").get_json()["items"]
+    codes = {i["code"] for i in items}
+    assert len(items) == 16 and {"DE-BY", "DE-NW", "DE-BE", "DE-HB", "DE-HH", "DE-SL"} <= codes
+    by = {i["code"]: i for i in items}
+    assert by["DE-BY"]["name"] == "Bayern" and by["DE-BY"]["nameEn"] == "Bavaria"
+    assert all(i["region"] == "EU" for i in items)             # Statistik: Filter „Europa“
+    catalog = app.extensions["lobby_store"].catalog
+    assert sorted(catalog["state-de"]) == sorted(f"state:{c}" for c in codes)
+    assert "state:DE-BY" in app.extensions["lobby_store"].difficulty()
+
+
+def test_state_cells_lie_inside_germany(app):
+    from worldmapguessr.map_data import load_index
+    index = load_index(app.static_folder)
+    states = [c for c in index["cells"] if len(c) == 3]
+    assert {c[2] for c in states} == {f"state:DE-{s}" for s in
+                                      ("BB", "BE", "BW", "BY", "HB", "HE", "HH", "MV", "NI", "NW", "RP", "SH", "SL", "SN", "ST", "TH")}
+    assert all(c[0] == "EU" and c[1] == "country:DEU" for c in states)
+    assert not [c for c in index["cells"] if c[1] == "country:DEU" and len(c) == 2]  # ganz Deutschland aufgeteilt

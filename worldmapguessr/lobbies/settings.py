@@ -15,7 +15,9 @@ TEN_SECOND_STEPS = ("timer", "grace")
 MODES = ("casual", "easyfocus", "focus", "tempo", "hardcore", "custom")
 LEVELS = (0, 4)  # Sehr einfach … Sehr schwer
 # Item-Gruppen (Menü-Karten); Items behalten ihre Art im Key ("country:USA")
-KINDS = ("continent", "country-eu", "country-na", "country-sa", "country-af", "country-as", "country-oc")
+KINDS = ("continent", "country-eu", "country-na", "country-sa", "country-af", "country-as", "country-oc", "state-de")
+# Ohne Angabe gespielt (Standard): Kontinente und Staaten, Bundesländer nur auf Wunsch
+DEFAULT_KINDS = tuple(k for k in KINDS if not k.startswith("state-"))
 # Ältere Lobbys: "country" meinte die Staaten Europas
 LEGACY_KINDS = {"country": ("country-eu",)}
 MAX_PLAYERS = (1, 50)
@@ -41,7 +43,7 @@ DEFAULT_CONFIG = {
     "noReturn": False,       # gehaltenes Item kann nicht zurück ins Inventar – es muss eingesetzt werden
     "missLoses": False,      # Fehlwurf: Item geht zurück in den Vorrat (außer im Endspurt)
     "rotate": False,         # Items liegen gedreht im Inventar (30°-Schritte), nur Erschwernis – eingesetzt wird immer
-    "kinds": list(KINDS),
+    "kinds": list(DEFAULT_KINDS),
     "excluded": [],
 }
 
@@ -69,7 +71,7 @@ def clean_config(raw) -> dict:
     for k in raw.get("kinds") or []:
         wanted.update(LEGACY_KINDS.get(k, (k,)) if isinstance(k, str) else ())
     kinds = [k for k in KINDS if k in wanted]
-    cfg["kinds"] = kinds or list(KINDS)
+    cfg["kinds"] = kinds or list(DEFAULT_KINDS)
     excluded = raw.get("excluded") or []
     cfg["excluded"] = sorted({str(x)[:40] for x in excluded if isinstance(x, str)})[:500]
     return cfg

@@ -23,7 +23,7 @@
 
 | Deutsch | Englisch | Bedeutung |
 |---|---|---|
-| Item | item | Kontinent, Staat (später Bundesland) zum Einsetzen |
+| Item | item | Kontinent, Staat oder Bundesland zum Einsetzen |
 | Inventar | inventory | eigene Items unten |
 | Vorrat | pool | noch nicht ausgeteilte Items der Runde |
 | Einsetzen, Treffer, Fehlwurf | place, hit, miss | |

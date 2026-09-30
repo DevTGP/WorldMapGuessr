@@ -24,7 +24,10 @@ export const GROUPS = [
   { id: "country-af", preview: ["EGY", "ZAF", "MDG"] },
   { id: "country-as", preview: ["CHN", "IND", "JPN"] },
   { id: "country-oc", preview: ["AUS", "NZL", "PNG"] },
+  { id: "state-de", preview: ["DE-BY", "DE-NW", "DE-SN"] },
 ].map((g) => ({ ...g, title: t(`group.${g.id}`), short: g.id === "continent" ? undefined : t(`group.${g.id}.short`) }));
+/** Gruppen, die „Standard“ (neues Menü) und der Server ohne Angabe spielen: Kontinente und Staaten */
+export const isDefaultGroup = (id) => !id.startsWith("state-");
 export const GROUP_LABELS = Object.fromEntries(GROUPS.map((g) => [g.id, g]));
 
 /**

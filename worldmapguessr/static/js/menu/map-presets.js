@@ -2,8 +2,8 @@
 //
 //   Kontinente   die 7 Kontinente
 //   Länder       Staaten ausgewählter Kontinente (Europa, Asien …), wahlweise ohne Kleinstaaten
-//   Alles        Kontinente und alle Staaten (wahlweise ohne Kleinstaaten), später auch Bundesländer
-//   Bundesländer kommt noch
+//   Alles        Kontinente, alle Staaten (wahlweise ohne Kleinstaaten) und alle Bundesländer
+//   Bundesländer Bundesländer/Regionen (bisher: Deutschland)
 // Die Konfiguration speichert weiterhin nur Item-Gruppen (config.kinds) und ausgeschlossene Items
 // (config.excluded); describeMap() erkennt daraus das Preset. Passt keins, ist es eine „Eigene Auswahl“.
 
@@ -15,10 +15,12 @@ export const SMALL_KM2 = 1100;
 const EARTH_R_KM = 6371.0088;
 
 export const MAP_PRESETS = ["continents", "countries", "all", "regions"]
-  .map((id) => ({ id, title: t(`mapPreset.${id}`), blurb: t(`mapPreset.${id}.blurb`), soon: id === "regions" }));
+  .map((id) => ({ id, title: t(`mapPreset.${id}`), blurb: t(`mapPreset.${id}.blurb`), soon: false }));
 
 export const COUNTRY_GROUPS = GROUPS.filter((g) => g.id.startsWith("country-"));
 const COUNTRY_IDS = COUNTRY_GROUPS.map((g) => g.id);
+export const STATE_GROUPS = GROUPS.filter((g) => g.id.startsWith("state-"));
+const STATE_IDS = STATE_GROUPS.map((g) => g.id);
 
 export function isSmall(f) {
   return f.kind === "country" && f.geom.area * EARTH_R_KM * EARTH_R_KM < SMALL_KM2;
@@ -33,9 +35,10 @@ export function applyMap(config, features, { preset, continents, small }) {
   let kinds;
   if (preset === "continents") kinds = ["continent"];
   else if (preset === "countries") kinds = COUNTRY_IDS.filter((g) => continents.has(g));
+  else if (preset === "regions") kinds = STATE_IDS;
   else kinds = [...present];
   config.kinds = new Set(kinds.filter((g) => present.has(g)));
-  config.excluded = new Set(preset === "continents" || small ? []
+  config.excluded = new Set(preset === "continents" || preset === "regions" || small ? []
     : features.filter((f) => config.kinds.has(f.group) && isSmall(f)).map((f) => f.key));
   return config;
 }
@@ -43,7 +46,7 @@ export function applyMap(config, features, { preset, continents, small }) {
 /**
  * Preset einer Konfiguration erkennen.
  * @returns {{preset: string, continents: string[], small: boolean, label: string}}
- *   preset: continents | countries | all | custom
+ *   preset: continents | countries | regions | all | custom
  */
 export function describeMap(config, features) {
   const played = features.filter((f) => config.kinds.has(f.group));
@@ -65,6 +68,9 @@ export function describeMap(config, features) {
     const names = continents.length === COUNTRY_IDS.length ? ""
       : ` · ${COUNTRY_GROUPS.filter((g) => config.kinds.has(g.id)).map((g) => g.short).join(", ")}`;
     return { preset: "countries", continents, small, label: `${t("mapPreset.countries")}${names}${without}` };
+  }
+  if (kinds.every((g) => STATE_IDS.includes(g))) {
+    return small ? { preset: "regions", continents, small: true, label: t("mapPreset.regions") } : custom;
   }
   if (allGroups.every((g) => config.kinds.has(g))) return { preset: "all", continents, small, label: `${t("mapPreset.all")}${without}` };
   return custom;

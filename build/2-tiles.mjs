@@ -6,7 +6,8 @@
 //             Kacheln des sichtbaren Ausschnitts in der Stufe, die zum Zoom passt.
 //   Items     static/data/map/items/i0.json – alle Items grob (Menü-Icons, Start);
 //             static/data/map/items/i{1..4}/{kind}-{id}.json – feinere Stufen, bei Bedarf geladen.
-//   Index     static/data/map/index.json – Stufen, Zellen, Items (Name, Gruppe, Anker, Fläche), Kachelliste.
+//   Index     static/data/map/index.json – Stufen, Zellen ([Kontinent, Staat, Bundesland?]), Items (Name,
+//             Gruppe, Anker, Fläche), Kachelliste.
 //
 // Vereinfachung: Visvalingam mit sphärischer Dreiecksfläche (topojson presimplify). Gemeinsame Grenzen
 // werden in allen Zellen gleich vereinfacht (Topologie), es entstehen keine Lücken. Stufe z wird bis zur
@@ -57,7 +58,7 @@ const CONTINENTS_EN = { AF: "Africa", AN: "Antarctica", AS: "Asia", EU: "Europe"
 const COUNTRIES_EN = Object.fromEntries(JSON.parse(fs.readFileSync("node_modules/world-countries/countries.json"))
   .map((c) => [c.cca3, c.name.common]));
 COUNTRIES_EN.XKX ??= "Kosovo";
-const nameEn = (it) => (it.kind === "continent" ? CONTINENTS_EN[it.id] : COUNTRIES_EN[it.id]) ?? it.name;
+const nameEn = (it) => it.nameEn ?? (it.kind === "continent" ? CONTINENTS_EN[it.id] : COUNTRIES_EN[it.id]) ?? it.name;
 const itemKeys = Object.keys(items);
 
 // ---------- Topologie + Gewichte ----------
@@ -230,7 +231,7 @@ const piecesOf = (key) => {
   const [kind, id] = key.split(":");
   return land.filter((g) => {
     const c = cells[g.properties.cell];
-    return kind === "continent" ? c.continent === id : c.item === key;
+    return kind === "continent" ? c.continent === id : kind === "state" ? c.state === key : c.item === key;
   });
 };
 const itemPieces = Object.fromEntries(itemKeys.map((k) => [k, piecesOf(k)]));
@@ -412,7 +413,7 @@ const z0Bytes = Object.keys(tileIndex[0]).reduce((n, k) => n + fs.statSync(`${OU
 const index = {
   levels: LEVELS.map(({ z, tile, sMax, q, itemQ }) => ({ z, tile, overlap: tile * OVERLAP, sMax: Number.isFinite(sMax) ? sMax : null, q, itemQ })),
   itemStart: { sMax: ITEM_START_SMAX, itemQ: ITEM_START_Q },
-  cells: cells.map((c) => [c.continent, c.item]),
+  cells: cells.map((c) => (c.state ? [c.continent, c.item, c.state] : [c.continent, c.item])),
   items: itemList,
   tiles: Object.fromEntries(Object.entries(tileIndex).map(([z, t]) => [z, Object.keys(t)])),
   startBytes: { i0: i0Bytes, z0: z0Bytes },

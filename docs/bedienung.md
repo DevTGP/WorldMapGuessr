@@ -27,7 +27,7 @@ Popup im Hauptmenü und im Spiel über ⚙; gilt sofort und nur auf diesem Gerä
 | Allgemein | Spielername | für neue Spiele; in einer laufenden Lobby wird man sofort umbenannt |
 | | Sprache | Automatisch (Browsersprache) / Deutsch / English – siehe [sprache.md](sprache.md) |
 
-- Jede Einsetz-Stufe (nichts, Kontinent, Staat, später Bundesland) unterscheidet sich in der Helligkeit; das Item in der Hand und im Inventar hat eine Farbe, die in keiner Stufe vorkommt, mit Rand.
+- Jede Einsetz-Stufe (nichts, Kontinent, Staat, Bundesland) unterscheidet sich in der Helligkeit; das Item in der Hand und im Inventar hat eine Farbe, die in keiner Stufe vorkommt, mit Rand.
 - Projektionswechsel: Die geladenen Kacheln werden neu gerechnet (jeder Punkt behält seine Breite), Drehung und Zoom bleiben; Icons und gehaltenes Item folgen. Der Treffertest rechnet geografisch – in einer Lobby darf jeder seine eigene Projektion haben.
 - „Standard wiederherstellen“ setzt Darstellung und Steuerung zurück (nicht Name und Sprache). Der größte Zoom ist bei jeder Qualität 16000 %.
 
