@@ -19,6 +19,12 @@ const MIN_TOLERANCE_PX = 6;
 const TINY_PX = 14;
 const TINY_RING_R = 11;
 const TOLERANCE_FACTOR = 0.05;
+/** Kleinststaaten (Vatikanstadt, Monaco, San Marino …; kleiner als TINY_KM im Quadrat): Ein Klick bis
+ *  TINY_RADIUS_KM um den Anker zählt – ein fester Radius auf der Erde, der beim Hineinzoomen mitwächst.
+ *  Sonst wären sie beim Hineinzoomen kaum zu treffen (die Vatikanstadt ist selbst bei größtem Zoom unter 1 px). */
+const TINY_KM = 20;
+const TINY_RADIUS_KM = 10;
+const EARTH_R_KM = 6371.0088;
 
 export class HeldPiece {
   constructor(map, layerEl) {
@@ -98,8 +104,14 @@ export class HeldPiece {
       }
     }
     const [tx, ty] = this.map.toScreen(this.piece.geom.anchor);
-    const tolerance = Math.max(MIN_TOLERANCE_PX, TOLERANCE_FACTOR * this._sizePx());
-    return Math.hypot(tx - px, ty - py) <= tolerance;
+    return Math.hypot(tx - px, ty - py) <= this._tolerancePx();
+  }
+
+  /** Radius um den Anker (px), in dem ein Klick immer zählt */
+  _tolerancePx() {
+    const km = Math.sqrt(this.piece.geom.area) * EARTH_R_KM;
+    const geo = km < TINY_KM ? (TINY_RADIUS_KM / EARTH_R_KM) * this.map.projection.scale() : 0;
+    return Math.max(MIN_TOLERANCE_PX, TOLERANCE_FACTOR * this._sizePx(), geo);
   }
 
   /** Einzelteile des Items, die überhaupt in Reichweite des Klicks liegen (spart Rechenzeit bei Russland & Co.) */
@@ -183,9 +195,11 @@ export class HeldPiece {
     const px = ax - r.left, py = ay - r.top, m = 20; // Anker in Kartenkoordinaten
     this.pathEl.attr("d", this.map.svgPath(this.piece.feature,
       [[px - r.width - m, py - r.height - m], [px + r.width + m, py + r.height + m]]));
+    // Ring um winzige Items: zeigt, wo das Item liegt, und bei Kleinststaaten den Trefferbereich
     this.ringEl
       .attr("cx", ax - r.left)
       .attr("cy", ay - r.top)
+      .attr("r", Math.max(TINY_RING_R, this._tolerancePx()))
       .attr("hidden", this._sizePx() < TINY_PX ? null : true);
     this._applyRotation(); // Anker verschiebt sich mit der Ansicht
     this._follow();

@@ -44,7 +44,7 @@ Phasen: Kartendaten herunterladen (in MB, der Server gibt die Größe des Startp
 ## Einsetzen
 
 - Klick auf ein Item im Inventar nimmt es auf; es folgt dem Mauszeiger in der aktuellen Ansicht (gleiche Drehung, gleicher Zoom).
-- Klick auf die Karte setzt es ein. Richtig ist jeder Klick in die Fläche des Items oder höchstens 6 Bildschirmpixel neben ihrem Rand (Touch: 12 px). Winzige Items (Vatikan, Monaco …) zählen zusätzlich, wenn der Klick nahe an ihrem Mittelpunkt liegt; gehalten bekommen sie einen gestrichelten Ring.
+- Klick auf die Karte setzt es ein. Richtig ist jeder Klick in die Fläche des Items oder höchstens 6 Bildschirmpixel neben ihrem Rand (Touch: 12 px). Winzige Items zählen zusätzlich, wenn der Klick nahe an ihrem Mittelpunkt liegt (mindestens 6 px). Kleinststaaten unter 20 km × 20 km (Vatikanstadt, Monaco, San Marino, Liechtenstein, Inselstaaten …) zählen im Umkreis von 10 km um ihren Mittelpunkt – ein fester Radius auf der Erde, der beim Hineinzoomen mitwächst (die Vatikanstadt ist in Natural Earth nur ~100 m groß und selbst bei größtem Zoom unter 1 px). Gehalten bekommen winzige Items einen gestrichelten Ring in der Größe dieses Trefferbereichs.
 - Richtig: Das Item rastet ein, die Fläche wird eine Stufe heller, es gibt Punkte (siehe [punkte.md](punkte.md)).
 - Daneben: ein Leben weniger; das Item fliegt zurück ins Inventar (bzw. geht zurück in den Vorrat, wenn der Modus das vorsieht).
 - Zurücklegen ohne Strafe: Klick auf den Slot, `Esc` oder Rechtsklick (außer bei „Kein Zurücklegen“).
