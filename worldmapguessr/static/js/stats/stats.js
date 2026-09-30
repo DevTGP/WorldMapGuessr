@@ -4,6 +4,7 @@ import { fetchItems } from "../api/items-api.js";
 import { sortItems, NUMERIC_KEYS } from "./sort.js";
 import { renderRows, renderSummary, renderFoot, renderJson } from "./render.js";
 import { LANG, t } from "../i18n/index.js";
+import { Cosmos } from "../ui/cosmos.js";
 
 const $ = (id) => document.getElementById(id);
 const state = { items: [], raw: new Map(), kind: "", region: "", query: "", key: "name", dir: 1 };
@@ -90,4 +91,6 @@ function regionButtons() {
 $("search").addEventListener("input", (e) => { state.query = e.target.value; render(); });
 $("refresh").addEventListener("click", load);
 
+// Kosmos-Hintergrund wie auf der Karte (Einstellung „Kosmos“)
+new Cosmos(document.body);
 load();

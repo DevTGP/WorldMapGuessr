@@ -1,4 +1,4 @@
-// Kosmos-Hintergrund hinter der Karte (und durch Hauptmenü und Spielmenü sichtbar): dunkler Raum,
+// Kosmos-Hintergrund hinter der Karte (und durch Hauptmenü und Spielmenü sichtbar) sowie auf der Statistikseite: dunkler Raum,
 // einige weiche Nebel und Sterne, von denen ein Teil ganz leicht funkelt. Einstellung „Kosmos“ (prefs.cosmos);
 // aus: die Seite sieht aus wie ohne (Hintergrund --outside, der Renderer füllt das Außen wieder selbst).
 //
@@ -24,7 +24,7 @@ const NEBULAE = [
 const TINTS = [[200, 215, 255], [255, 255, 255], [255, 236, 210], [220, 230, 255]];
 
 export class Cosmos {
-  /** @param {HTMLElement} stage  #stage – die Fläche kommt hinter die Karte */
+  /** @param {HTMLElement} stage  #stage (die Fläche kommt hinter die Karte) oder body der Statistikseite */
   constructor(stage) {
     this.canvas = document.createElement("canvas");
     this.canvas.id = "cosmos";

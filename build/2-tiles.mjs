@@ -83,7 +83,16 @@ const artificial = (p, q) =>
 const degPerRad = 180 / Math.PI;
 function levelArcs(level) {
   const minW = Number.isFinite(level.sMax) ? PX2 / (level.sMax * level.sMax) : -1;
-  return topo.arcs.map((arc) => arc.filter((p, i) => i === 0 || i === arc.length - 1 || p[2] >= minW).map((p) => [p[0], p[1]]));
+  // Künstliche Kanten (Südpol-Rand der Antarktis, Schnitt an ±180°): Auf der Kugel liegen sie am Pol bzw.
+  // gerade, ihre Punkte wiegen dort fast nichts – in der Karte sind sie aber die Ränder. Ohne ihre Endpunkte
+  // endete die Antarktis bei ≈ 84° S und liefe an der Datumsgrenze schräg aus. Innere Punkte einer solchen
+  // Kante braucht es nicht (in der Karte gerade; Kachelschnitte setzen weitere).
+  const edge = (p) => (!p ? null : p[1] < -89.9999 ? "pole" : Math.abs(p[0]) > 179.99999 ? "cut" : null);
+  return topo.arcs.map((arc) => arc.filter((p, i) => {
+    if (i === 0 || i === arc.length - 1 || p[2] >= minW) return true;
+    const k = edge(p);
+    return k !== null && !(edge(arc[i - 1]) === k && edge(arc[i + 1]) === k);
+  }).map((p) => [p[0], p[1]]));
 }
 function ringFromArcs(arcs, ring) {
   const out = [];

@@ -21,7 +21,7 @@ Popup im Hauptmenü und im Spiel über ⚙; gilt sofort und nur auf diesem Gerä
 | | Projektion (`map/projections.js`) | Natural Earth (Standard) oder Flächentreu (Equal Earth: Afrika : Europa 3,07 statt 2,27) |
 | | Relief | Aus / Leicht (Standard) / Stark (`map/relief.js`) |
 | | Flüsse und Seen | an (Standard) / aus (`map/water.js`) |
-| | Kosmos | an (Standard): Sterne (ein Teil funkelt leicht) und Nebel außerhalb der Erde, auch hinter Haupt- und Spielmenü, dazu ein schwacher Schein um die Erde (`ui/cosmos.js`); aus: einfarbiger Hintergrund wie bisher. Pausiert im verborgenen Tab, steht bei „weniger Bewegung“ still |
+| | Kosmos | an (Standard): Sterne (ein Teil funkelt leicht) und Nebel außerhalb der Erde, auch hinter Haupt- und Spielmenü und auf der Statistikseite, dazu ein schwacher Schein um die Erde (`ui/cosmos.js`); aus: einfarbiger Hintergrund wie bisher. Pausiert im verborgenen Tab, steht bei „weniger Bewegung“ still |
 | Steuerung | Zoom- und Bewegungsempfindlichkeit | je 25–200 % |
 | | Tastenbelegung | aufklappbare Übersicht |
 | Allgemein | Spielername | für neue Spiele; in einer laufenden Lobby wird man sofort umbenannt |
