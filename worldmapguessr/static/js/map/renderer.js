@@ -5,8 +5,12 @@
 // Stufe weiter; die Farben je Stufe kommen aus dem Farbschema (map/schemes.js). Zellen gleicher Farbe
 // werden in einem Pfad gefüllt – so gibt es an Kachelrändern keine Haarlinien.
 //
-// Linien: Küsten und Kontinentgrenzen immer; Staatsgrenzen erst, wenn einer der beiden Staaten
-// eingesetzt ist (Grenzen sind bis dahin unsichtbar – das macht es schwerer).
+// Linien: Küsten immer; Kontinentgrenzen, sobald einer der beiden Kontinente eingesetzt ist; Staatsgrenzen
+// erst, wenn einer der beiden Staaten eingesetzt ist (Grenzen sind bis dahin unsichtbar – das macht es
+// schwerer). Die Ebenen unterscheiden sich in der Strichstärke (BORDER_PX): Auch wenn alle Staaten eines
+// Kontinents eingesetzt sind, bleibt die Kontinentgrenze erkennbar.
+//
+// Namen eingesetzter Items zeichnet map/labels.js obenauf.
 //
 // Pro Punkt wird nur noch gedreht und skaliert (vorberechnete Faktoren, siehe project.js). Kacheln an der
 // Schnittlinie der Karte (Längengrad gegenüber der Mitte) werden dort aufgetrennt.
@@ -14,6 +18,7 @@
 import { TAU, viewOf, wrapOffset } from "./project.js";
 import { scheme, stageColor, stopsFor } from "./schemes.js";
 import { riverWidth } from "./water.js";
+import { LabelLayer } from "./labels.js";
 import { prefs } from "../settings/prefs.js";
 
 const PLACED_FADE_MS = 500;
@@ -28,6 +33,10 @@ const MIN_STEP_PX = 0.75; // Standard (Qualität „Niedrig“); setQuality änd
 const SHELF_STEP_PX = 2.5;
 /** Strichbreite gegen Haarlinien zwischen Zellen */
 const SEAM_PX = 1.2;
+/** Grenzen je Ebene (px): deutlich abgestuft, damit übergeordnete Grenzen zwischen eingesetzten
+ *  Unterteilungen sichtbar bleiben. Küste: COAST_PX in der Küstenfarbe. */
+const BORDER_PX = { continent: 2.2, country: 0.8 };
+const COAST_PX = 0.7;
 
 export class Renderer {
   /**
@@ -46,6 +55,8 @@ export class Renderer {
     this.shelfStep = SHELF_STEP_PX;
     this.graticule = d3.geoGraticule10();
     this.itemOf = itemOf;
+    this.labels = new LabelLayer(itemOf);
+    this.showLabels = true;
     // Zelle → Keys der Ebenen, die sie enthalten
     this.cells = index.cells.map(([continent, item]) => ({ continent: `continent:${continent}`, item }));
     this.readColors();
@@ -95,6 +106,13 @@ export class Renderer {
     return t0 === undefined ? 0 : Math.min(1, (now - t0) / PLACED_FADE_MS);
   }
 
+  /** Einsetz-Stufe der Landfläche eines eingesetzten Items (ohne Animation): Kontinent + Item */
+  _stage(key) {
+    if (key.startsWith("continent:")) return 1;
+    const region = this.itemOf(key)?.properties?.region;
+    return 1 + (this.placed.has(`continent:${region}`) ? 1 : 0);
+  }
+
   /** Farbe je Zelle für diesen Frame: Stufe = Summe der eingesetzten Ebenen (mit Einblend-Anteil) */
   _cellColors(now) {
     return this.cells.map((c, i) =>
@@ -139,6 +157,7 @@ export class Renderer {
     const coast = new Path2D();
     const shelf = moving ? null : new Path2D();
     const borders = new Path2D();
+    const continentBorders = new Path2D();
     const seams = new Map(); // Farbe → Pfad
     const itemPlaced = (cell) => cell >= 0 && this.cells[cell].item && this.placed.has(this.cells[cell].item);
     for (const t of tiles) {
@@ -157,7 +176,7 @@ export class Renderer {
         const ca = this.cells[l.a], cb = l.b < 0 ? null : this.cells[l.b];
         if (!cb) target = coast;
         // Grenze zwischen Kontinenten (Ural, Sinai, Panama …): erst sichtbar, wenn einer davon eingesetzt ist
-        else if (ca.continent !== cb.continent && (this.placed.has(ca.continent) || this.placed.has(cb.continent))) target = coast;
+        else if (ca.continent !== cb.continent && (this.placed.has(ca.continent) || this.placed.has(cb.continent))) target = continentBorders;
         else if (ca.item !== cb.item && (itemPlaced(l.a) || itemPlaced(l.b))) target = borders;
         else if (colors[l.a] === colors[l.b]) {
           target = seams.get(colors[l.a]);
@@ -190,13 +209,21 @@ export class Renderer {
     if (extras.relief) extras.relief.layer.draw(ctx, projection, { w: this.w, h: this.h }, extras.relief.passes, moving);
     if (extras.water?.length) this._drawWater(extras.water, v);
     ctx.strokeStyle = c.border;
-    ctx.lineWidth = 0.6;
+    ctx.lineWidth = BORDER_PX.country;
     ctx.stroke(borders);
+    ctx.lineCap = "round";
+    ctx.lineWidth = BORDER_PX.continent;
+    ctx.stroke(continentBorders);
+    ctx.lineCap = "butt";
     ctx.strokeStyle = c.coast;
-    ctx.lineWidth = 0.7;
+    ctx.lineWidth = COAST_PX;
     ctx.stroke(coast);
 
     this._drawTinyMarkers(projection, now);
+    if (this.showLabels) {
+      this.labels.draw(ctx, projection, { w: this.w, h: this.h }, this.placed.keys(),
+        (key) => this._stage(key), this.scheme, moving);
+    }
   }
 
   /** Seen füllen, Flüsse als Linien (Breite nach Bedeutung und Zoom) – in der Wasserfarbe des Schemas */

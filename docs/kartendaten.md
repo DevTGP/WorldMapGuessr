@@ -24,7 +24,12 @@ Schritte 3 und 4 ergänzen `index.json` (`water`, `relief`) und setzen die Versi
 
 ## Relief zeichnen
 
-Die Karte ist pseudozylindrisch (x = λ · fx(φ)), auf jeder Breite ist x also linear in der Länge. Jede Rasterkachel wird in waagerechten Streifen (3 px, beim Bewegen 8 px) auf eine graue Zwischenfläche gezeichnet, die dann einmal über die Landfarben geblendet wird – „hard-light“ auf hellem Land (B), „soft-light“ auf dunklem (A, C; ruhiger, kein Grieseln). Reihenfolge: Landflächen → Relief → Seen und Flüsse → Grenzen → Küsten.
+Die Karte ist pseudozylindrisch (x = λ · fx(φ)), auf jeder Breite ist x also linear in der Länge. Jede Rasterkachel wird in waagerechten Streifen (3 px, beim Bewegen 8 px) auf eine graue Zwischenfläche gezeichnet, die dann einmal über die Landfarben geblendet wird – „hard-light“ auf hellem Land (B), „soft-light“ auf dunklem (A, C; ruhiger, kein Grieseln). Reihenfolge: Landflächen → Relief → Seen und Flüsse → Grenzen → Küsten → Namen.
+
+## Grenzen und Namen
+
+- Grenzen sind je Ebene abgestuft (`BORDER_PX` in `map/renderer.js`): Kontinentgrenzen 2,2 px, Staatsgrenzen 0,8 px, Küsten 0,7 px in der Küstenfarbe. So bleibt die übergeordnete Grenze sichtbar, auch wenn alle Unterteilungen eingesetzt sind. Bundesländer sollen, wenn sie kommen, eine eigene, noch schwächere Stufe bekommen.
+- Namen eingesetzter Items (`map/labels.js`): Platz am Pol der Unerreichbarkeit des größten Teils (polylabel, einmal je Item aus der Startstufe). Ein Name steht nur, wenn sein Rahmen ganz im Item liegt und keinen anderen Namen berührt; sonst kleinere Schrift oder zweizeilig, notfalls kein Name. Vergabe: Kontinente vor Staaten (vor Bundesländern), innerhalb einer Ebene größere zuerst. Kontinentnamen entfallen, wenn der Kontinent mehr als 1,6 Bildschirmgrößen überspannt. Schriftfarbe hell oder dunkel nach der Landfarbe darunter. Berechnet wird nur im Stillstand (≈ 2–8 ms); beim Bewegen wandern die zuletzt gewählten Namen mit.
 
 Der Server liefert die Dateien unter `/data/<version>/…` mit einem Jahr Cache und gzip-komprimiert aus ([server.md](server.md#komprimierung)); nach einem neuen Build ändert sich die Version und der Browser lädt neu.
 

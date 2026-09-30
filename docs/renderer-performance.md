@@ -10,7 +10,7 @@ Einsetzen (500 ms) zeichnet die ganze Karte neu, höchstens einmal je Frame:
 
 1. Meer und Gradnetz über d3 (wenige Punkte).
 2. Für jede sichtbare Kachel: Punkte projizieren (x = tx + s·(λ + rot)·fx(φ), y = ty − s·Y(φ)) und in `Path2D` je Farbe schreiben; Linien je Art (Küste, Grenze, Naht).
-3. Flächen füllen, Nähte, **Relief** (Rasterkacheln in 3-px-Streifen auf eine Zwischenfläche, dann überblenden), Seen/Flüsse, Grenzen, Küsten, Ringe um Kleinststaaten.
+3. Flächen füllen, Nähte, **Relief** (Rasterkacheln in 3-px-Streifen auf eine Zwischenfläche, dann überblenden), Seen/Flüsse, Grenzen, Küsten, Ringe um Kleinststaaten, Namen (`labels.js`).
 
 Die Projektion ist pseudozylindrisch: Eine Drehung verschiebt jede Zeile um s·rot·fx(φ) – je Breite anders. Ein
 einmal projizierter Pfad lässt sich deshalb weder bei Drehung noch bei Zoom per Canvas-Transformation

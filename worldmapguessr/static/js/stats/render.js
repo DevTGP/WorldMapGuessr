@@ -6,7 +6,6 @@ import { locale, t } from "../i18n/index.js";
 const KIND_LABEL = { continent: t("stats.kind.continent"), country: t("stats.kind.country") };
 const pct = new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 });
 const int = new Intl.NumberFormat(locale);
-const dateFmt = new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" });
 
 function cell(text, className) {
   const td = document.createElement("td");
@@ -56,10 +55,6 @@ export function renderRows(tbody, items) {
     const kind = document.createElement("span");
     kind.className = `kind ${it.kind}`;
     kind.textContent = KIND_LABEL[it.kind] ?? it.kind;
-    const updated = it.spawned || it.correct || it.incorrect ? dateFmt.format(new Date(it.updated)) : "—";
-    const uid = cell(it.uid.slice(0, 8) + "…", "mono muted uid");
-    uid.title = t("stats.copyUid", { uid: it.uid });
-    uid.dataset.uid = it.uid;
     tr.append(
       cell(it.name),
       cell(kind),
@@ -71,8 +66,6 @@ export function renderRows(tbody, items) {
       rateCell(placeRate(it)),
       rateCell(hitRate(it)),
       durationCell(it.duration, it.waitedCount),
-      cell(updated, updated === "—" ? "muted" : ""),
-      uid,
     );
     return tr;
   }));
@@ -127,8 +120,6 @@ export function renderFoot(tfoot, items) {
     rateCell(placeRate(sum)),
     rateCell(hitRate(sum)),
     durationCell(sum.duration, sum.waitedCount),
-    cell(""),
-    cell(""),
   );
   tfoot.replaceChildren(tr);
 }

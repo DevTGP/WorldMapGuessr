@@ -6,13 +6,14 @@ import { renderRows, renderSummary, renderTotals, renderFoot, renderJson } from 
 import { LANG, t } from "../i18n/index.js";
 
 const $ = (id) => document.getElementById(id);
-const state = { items: [], raw: new Map(), kind: "", query: "", key: "name", dir: 1 };
+const state = { items: [], raw: new Map(), kind: "", region: "", query: "", key: "name", dir: 1 };
 
 function visibleItems() {
   const q = state.query.trim().toLowerCase();
   const filtered = state.items.filter((i) =>
     (!state.kind || i.kind === state.kind) &&
-    (!q || i.name.toLowerCase().includes(q) || i.code.toLowerCase().includes(q) || i.uid.includes(q)));
+    (!state.region || i.region === state.region) &&
+    (!q || i.name.toLowerCase().includes(q) || i.code.toLowerCase().includes(q)));
   return sortItems(filtered, state.key, state.dir);
 }
 
@@ -37,6 +38,7 @@ async function load() {
     state.raw = new Map(items.map((i) => [i.uid, i]));
     // Anzeige (Tabelle, Suche, Sortierung) in der Sprache der Seite; Rohdaten bleiben unverändert
     state.items = LANG === "en" ? items.map((i) => ({ ...i, name: i.nameEn ?? i.name })) : items;
+    regionButtons();
     render();
   } catch (err) {
     $("summary").textContent = t("stats.failed", { error: err.message });
@@ -56,25 +58,37 @@ document.querySelectorAll("th[data-key]").forEach((th) => {
   th.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); sortBy(); } });
 });
 
-document.querySelectorAll(".segmented button").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".segmented button").forEach((b) => b.setAttribute("aria-checked", String(b === btn)));
-    state.kind = btn.dataset.kind;
+/** Auswahlgruppe: Klick auf einen Knopf setzt state[field] auf dessen data-Wert */
+function segmented(group, field) {
+  group.addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    group.querySelectorAll("button").forEach((b) => b.setAttribute("aria-checked", String(b === btn)));
+    state[field] = btn.dataset[field];
     render();
   });
-});
+}
+segmented($("kind"), "kind");
+segmented($("region"), "region");
+
+/** Kontinent-Filter: ein Knopf je Kontinent-Item (Name in der Sprache der Seite), alphabetisch */
+function regionButtons() {
+  const group = $("region");
+  const conts = state.items.filter((i) => i.kind === "continent")
+    .sort((a, b) => a.name.localeCompare(b.name, LANG));
+  if (!conts.some((c) => c.code === state.region)) state.region = "";
+  group.replaceChildren(group.querySelector('[data-region=""]'), ...conts.map((c) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.setAttribute("role", "radio");
+    btn.dataset.region = c.code;
+    btn.textContent = c.name;
+    return btn;
+  }));
+  group.querySelectorAll("button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.region === state.region)));
+}
 
 $("search").addEventListener("input", (e) => { state.query = e.target.value; render(); });
 $("refresh").addEventListener("click", load);
-
-// UID kopieren
-$("rows").addEventListener("click", (e) => {
-  const td = e.target.closest("td.uid");
-  if (!td) return;
-  navigator.clipboard?.writeText(td.dataset.uid).then(
-    () => { td.textContent = t("stats.copied"); setTimeout(() => { td.textContent = td.dataset.uid.slice(0, 8) + "…"; }, 900); },
-    () => {},
-  );
-});
 
 load();

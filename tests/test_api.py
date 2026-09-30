@@ -88,3 +88,9 @@ def test_map_data_is_served_with_long_cache(app, client):
     assert client.get(f"/data/{index['version']}/tiles/z4/{key}.json").status_code == 200
     assert client.get(f"/data/{index['version']}/items/i2/country-DEU.json").status_code == 200
     assert client.get(f"/data/{index['version']}/../../app.py").status_code == 404
+
+
+def test_items_carry_region(client):
+    items = {i["code"]: i for i in client.get("/api/items").get_json()["items"]}
+    assert items["DEU"]["region"] == "EU" and items["BRA"]["region"] == "SA"
+    assert items["AN"]["region"] == "AN"                        # Kontinent-Item: eigener Code

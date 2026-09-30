@@ -29,13 +29,15 @@
     <div class="total"><span>{{ t('stats.duration') }}</span><b id="t-duration">–</b><small>{{ t('stats.durationHint') }}</small></div>
     <div class="total"><span>{{ t('stats.avgDifficulty') }}</span><b id="t-difficulty">–</b><small>{{ t('stats.difficultyScale') }}</small></div>
   </section>
-  <p class="how">{{ t('stats.how') | safe }}</p>
 
   <div class="toolbar">
-    <div class="segmented" role="radiogroup" aria-label="{{ t('stats.kind') }}">
+    <div class="segmented" id="kind" role="radiogroup" aria-label="{{ t('stats.kind') }}">
       <button type="button" role="radio" data-kind="" aria-checked="true">{{ t('common.all') }}</button>
       <button type="button" role="radio" data-kind="continent" aria-checked="false">{{ t('group.continent') }}</button>
       <button type="button" role="radio" data-kind="country" aria-checked="false">{{ t('stats.countries') }}</button>
+    </div>
+    <div class="segmented" id="region" role="radiogroup" aria-label="{{ t('stats.region') }}">
+      <button type="button" role="radio" data-region="" aria-checked="true">{{ t('common.all') }}</button>
     </div>
     <label class="search">
       <span class="visually-hidden">{{ t('stats.search') }}</span>
@@ -57,8 +59,6 @@
           <th data-key="placeRate" scope="col" class="num" title="{{ t('stats.placeRate') }}">{{ t('stats.placeRate') }}</th>
           <th data-key="rate" scope="col" class="num" title="{{ t('stats.hitRateTitle') }}">{{ t('stats.hitRate') }}</th>
           <th data-key="duration" scope="col" class="num" title="{{ t('stats.durationHint') }}">{{ t('stats.duration') }}</th>
-          <th data-key="updated" scope="col">{{ t('stats.col.updated') }}</th>
-          <th data-key="uid" scope="col">UID</th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>

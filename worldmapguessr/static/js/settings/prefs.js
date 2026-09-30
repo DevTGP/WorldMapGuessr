@@ -10,8 +10,9 @@
 
 const KEY = "wmg.prefs";
 /** Stand der gespeicherten Einstellungen. 2: Standard-Farbschema A statt B – ein gespeichertes „b“ aus
- *  älteren Ständen war meist nur der damalige Standard und wird deshalb einmal auf A gesetzt. */
-const VERSION = 2;
+ *  älteren Ständen war meist nur der damalige Standard und wird deshalb einmal auf A gesetzt.
+ *  3: Nachtatlas (A) für alle – jedes vorher gespeicherte Farbschema wird einmal auf A zurückgesetzt. */
+const VERSION = 3;
 
 /** Grenzen der Regler (Faktor, 1 = Standard) */
 export const PREF_LIMITS = { min: 0.25, max: 2, step: 0.05 };
@@ -31,7 +32,7 @@ let current = read();
 function read() {
   let raw = {};
   try { raw = JSON.parse(localStorage.getItem(KEY)) ?? {}; } catch { /* ohne Speicher */ }
-  if ((raw.v ?? 1) < 2 && raw.scheme === "b") delete raw.scheme;
+  if ((raw.v ?? 1) < 3) delete raw.scheme;
   return Object.fromEntries(Object.keys(DEFS).map((k) => [k, clean(k, raw[k])]));
 }
 

@@ -24,20 +24,23 @@ def health():
 
 @bp.get("/items")
 def list_items():
-    """Alle Items mit Zählern und Schwierigkeit (0–10), optional gefiltert: /api/items?kind=continent"""
-    names = _names_en()
+    """Alle Items mit Zählern, Schwierigkeit (0–10) und Kontinent (region), optional gefiltert: /api/items?kind=continent"""
+    meta = _item_meta()
     items = [with_difficulty(i) for i in _store().list(request.args.get("kind"))]
     for it in items:
-        it["nameEn"] = names.get((it["kind"], it["code"]), it["name"])
+        name_en, region = meta.get((it["kind"], it["code"]), (it["name"], None))
+        it["nameEn"] = name_en
+        it["region"] = region
     return jsonify(items=items)
 
 
-def _names_en() -> dict:
-    """Englische Namen (Kartendaten index.json) je (kind, code) – für die Statistikseite auf Englisch"""
+def _item_meta() -> dict:
+    """Englischer Name und Kontinent (Kartendaten index.json) je (kind, code) – für die Statistikseite"""
     ext = current_app.extensions
-    if "names_en" not in ext:
-        ext["names_en"] = {(it["kind"], it["id"]): it.get("nameEn") or it["name"] for it in ext["map_index"]["items"]}
-    return ext["names_en"]
+    if "item_meta" not in ext:
+        ext["item_meta"] = {(it["kind"], it["id"]): (it.get("nameEn") or it["name"], it.get("region"))
+                            for it in ext["map_index"]["items"]}
+    return ext["item_meta"]
 
 
 @bp.get("/items/<uid>")

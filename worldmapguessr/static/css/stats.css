@@ -39,6 +39,7 @@ body {
 .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 .segmented {
   display: inline-flex;
+  flex-wrap: wrap;
   padding: 3px;
   gap: 2px;
   background: var(--panel);
@@ -51,7 +52,7 @@ body {
   background: transparent;
   color: var(--ink-soft);
   font: 600 13px/1 "Instrument Sans", system-ui, sans-serif;
-  padding: 7px 12px;
+  padding: 7px 10px;
   cursor: pointer;
 }
 .segmented button[aria-checked="true"] { background: var(--ink); color: var(--outside); }
@@ -75,22 +76,31 @@ body {
   border-radius: 8px;
 }
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-th, td { padding: 9px 12px; text-align: left; white-space: nowrap; }
+/* schmale Spalten: wenig Innenabstand, Spaltenköpfe dürfen umbrechen (z. B. „Eingesetzt / Spawns“) */
+th, td { padding: 7px 8px; text-align: left; white-space: nowrap; }
+th:first-child, td:first-child { padding-left: 12px; }
+th:last-child, td:last-child { padding-right: 12px; }
 th {
   position: sticky;
   top: 0;
   background: var(--panel);
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  line-height: 1.25;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--ink-soft);
   border-bottom: 1px solid var(--panel-line);
+  white-space: normal;
+  vertical-align: bottom;
   cursor: pointer;
   user-select: none;
 }
 th:hover { color: var(--ink); }
 th[aria-sort] { color: var(--ink); }
+/* alle Spalten außer dem Namen so schmal wie ihr Inhalt; den übrigen Platz bekommt der Name */
+th:not(:first-child), td:not(:first-child) { width: 1%; }
+th.num { min-width: 8ch; }
 th[aria-sort="ascending"]::after { content: " ▲"; font-size: 9px; }
 th[aria-sort="descending"]::after { content: " ▼"; font-size: 9px; }
 td { border-bottom: 1px solid var(--panel-line); }
@@ -110,12 +120,11 @@ td.muted { color: var(--ink-soft); }
 .kind.continent { border-color: var(--piece); color: var(--piece); }
 
 /* Trefferquote: Zahl + Balken */
-.rate { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; }
-.bar { width: 64px; height: 6px; border-radius: 3px; background: var(--panel-line); overflow: hidden; }
+.rate { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.bar { width: 36px; height: 6px; border-radius: 3px; background: var(--panel-line); overflow: hidden; }
 .bar i { display: block; height: 100%; background: var(--good); }
 .bar.low i { background: var(--bad); }
 
-.uid { cursor: copy; }
 .empty { margin: 0; padding: 24px; text-align: center; color: var(--ink-soft); }
 
 .raw summary { cursor: pointer; color: var(--ink-soft); font-weight: 600; }
@@ -153,8 +162,6 @@ td.muted { color: var(--ink-soft); }
 .total small { font-size: 12px; color: var(--ink-soft); }
 .total.accent { border-color: var(--good); }
 .total .bar { display: block; width: 100%; }
-.how { margin: -4px 0 0; font-size: 12.5px; color: var(--ink-soft); }
-.how b { color: var(--ink); }
 tfoot td { border-top: 2px solid var(--panel-line); border-bottom: 0; font-weight: 600; }
 @media (max-width: 1100px) {
   .totals { grid-template-columns: repeat(4, minmax(0, 1fr)); }
