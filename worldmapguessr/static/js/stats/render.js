@@ -86,24 +86,6 @@ export function renderSummary(el, items) {
   el.innerHTML = t("stats.summary", { n: `<b>${int.format(items.length)}</b>`, seen: `<b>${int.format(seen)}</b>` });
 }
 
-/** Kacheln oben: Summen und Quoten */
-export function renderTotals(items) {
-  const sum = totals(items);
-  const $ = (id) => document.getElementById(id);
-  const place = placeRate(sum);
-  const hit = hitRate(sum);
-  $("t-spawned").textContent = int.format(sum.spawned);
-  $("t-correct").textContent = int.format(sum.correct);
-  $("t-incorrect").textContent = int.format(sum.incorrect);
-  $("t-place-rate").textContent = place === null ? "—" : pct.format(place);
-  $("t-place-bar").style.width = `${place === null ? 0 : Math.min(100, Math.round(place * 100))}%`;
-  $("t-hit-rate").textContent = hit === null ? "—" : pct.format(hit);
-  $("t-duration").textContent = sum.duration === null ? "—" : dec.format(sum.duration);
-  const withD = items.filter((i) => typeof i.difficulty === "number");
-  $("t-difficulty").textContent = withD.length
-    ? dec.format(withD.reduce((s, i) => s + i.difficulty, 0) / withD.length) : "—";
-}
-
 /** Summenzeile unter der Tabelle */
 export function renderFoot(tfoot, items) {
   const sum = totals(items);
