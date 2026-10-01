@@ -1,9 +1,9 @@
 // Kartenauswahl im Spielmenü (rechte Spalte): Preset-Kacheln mit Mini-Weltkarte, bei Länder/Alles die
-// Kontinente als Chips und der Schalter „mit Kleinstaaten“, darunter „Einzelne Items anpassen“ (ItemPicker).
+// Kontinente als Chips und der Schalter „mit Kleinstaaten“, bei Bundesländer die Staaten als Chips, darunter „Einzelne Items anpassen“ (ItemPicker).
 // Regeln und Erkennung der Presets: menu/map-presets.js.
 
 import { ItemPicker } from "./item-picker.js";
-import { COUNTRY_GROUPS, MAP_PRESETS, SMALL_KM2, applyMap, describeMap, isSmall } from "./map-presets.js";
+import { COUNTRY_GROUPS, MAP_PRESETS, SMALL_KM2, STATE_GROUPS, applyMap, describeMap, isSmall } from "./map-presets.js";
 import { fmt, locale, t } from "../i18n/index.js";
 
 const PREVIEW_W = 148;
@@ -22,7 +22,9 @@ export class MapPicker {
     this.features = features;
     this.onChange = onChange;
     this.config = null;
-    this.sel = { continents: new Set(COUNTRY_GROUPS.map((g) => g.id)), small: true };
+    this.stateGroups = STATE_GROUPS.filter((g) => features.some((f) => f.group === g.id))
+      .sort((a, b) => a.short.localeCompare(b.short, locale));
+    this.sel = { continents: new Set(COUNTRY_GROUPS.map((g) => g.id)), states: new Set(this.stateGroups.map((g) => g.id)), small: true };
     this.small = features.filter(isSmall);
 
     this.tiles = new Map();
@@ -71,6 +73,25 @@ export class MapPicker {
       this.chips.set(g.id, chip);
     }
 
+    // Staaten der Bundesländer-Auswahl (wie die Kontinente)
+    this.stateChips = new Map();
+    const stateChips = root.querySelector(".state-chips");
+    this.stateChipAll = this._chip(t("common.all"), features.filter((f) => f.kind === "state").length, () => {
+      this.sel.states = new Set(this.stateGroups.map((g) => g.id));
+      this._pick("regions");
+    });
+    stateChips.append(this.stateChipAll);
+    for (const g of this.stateGroups) {
+      const chip = this._chip(g.short, features.filter((f) => f.group === g.id).length, () => {
+        const set = this.sel.states;
+        if (set.size === this.stateGroups.length) set.clear();
+        if (set.has(g.id) && set.size > 1) set.delete(g.id); else set.add(g.id);
+        this._pick("regions");
+      });
+      stateChips.append(chip);
+      this.stateChips.set(g.id, chip);
+    }
+
     this.smallToggle = root.querySelector("#map-small");
     this.smallToggle.addEventListener("change", () => {
       this.sel.small = this.smallToggle.checked;
@@ -111,6 +132,7 @@ export class MapPicker {
       if (d.preset === "countries" && d.continents.length) this.sel.continents = new Set(d.continents);
       this.sel.small = d.small;
     }
+    if (d.preset === "regions" && d.states.length) this.sel.states = new Set(d.states);
     for (const [id, btn] of this.tiles) btn.setAttribute("aria-checked", String(id === d.preset));
     const countries = d.preset === "countries";
     const allCont = this.sel.continents.size === COUNTRY_GROUPS.length;
@@ -118,6 +140,11 @@ export class MapPicker {
     for (const [id, chip] of this.chips) chip.setAttribute("aria-checked", String(countries && !allCont && this.sel.continents.has(id)));
     this.root.querySelector("#map-sub").classList.toggle("muted", !(countries || d.preset === "all"));
     this.root.querySelector(".continent-chips").classList.toggle("muted", !countries);
+    const regions = d.preset === "regions";
+    const allStates = this.sel.states.size === this.stateGroups.length;
+    this.root.querySelector("#state-sub").hidden = !regions;
+    this.stateChipAll.setAttribute("aria-checked", String(regions && allStates));
+    for (const [id, chip] of this.stateChips) chip.setAttribute("aria-checked", String(regions && !allStates && this.sel.states.has(id)));
     this.smallToggle.checked = d.preset === "custom" ? this.sel.small : d.small;
     this.smallToggle.disabled = this.readOnly || !(countries || d.preset === "all");
     this.customBadge.hidden = d.preset !== "custom";

@@ -90,6 +90,10 @@
             <input id="map-small" type="checkbox" role="switch" checked>
           </label>
         </div>
+        <div class="map-sub" id="state-sub" hidden>
+          <p class="map-sub-title">{{ t('map.statesFrom') }}</p>
+          <div class="continent-chips state-chips" role="group" aria-label="{{ t('map.statesLabel') }}"></div>
+        </div>
         <p class="map-summary" id="map-summary" aria-live="polite"></p>
         <button type="button" class="adv-toggle" id="picker-toggle" aria-expanded="false" aria-controls="picker-panel" data-always="1">
           <span>{{ t('picker.toggle') }}</span>

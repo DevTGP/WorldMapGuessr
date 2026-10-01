@@ -40,6 +40,7 @@
 .map-sub-title { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); }
 .continent-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .continent-chips.muted { opacity: 0.6; }
+.map-sub[hidden] { display: none; }
 .chip {
   display: inline-flex;
   align-items: baseline;

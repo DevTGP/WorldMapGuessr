@@ -5,7 +5,7 @@
 
 ## Kartenauswahl (rechts)
 
-- Presets mit Mini-Weltkarte: **Kontinente** (7), **Länder** (197; darunter die Kontinente als Chips – „Alle“ oder einzelne, mehrere möglich), **Alles** (Kontinente, Länder und Bundesländer, 220) und **Bundesländer** (die 16 Länder Deutschlands; Gruppe `state-de`). Ein neues Spiel und eine Lobby ohne Angabe spielen Kontinente und Länder – Bundesländer nur, wenn sie gewählt sind („Bundesländer“ oder „Alles“).
+- Presets mit Mini-Weltkarte: **Kontinente** (7), **Länder** (197; darunter die Kontinente als Chips – „Alle“ oder einzelne, mehrere möglich), **Alles** (Kontinente, Länder und Bundesländer, 877) und **Bundesländer** (673 Regionen und Provinzen aus 39 Staaten Europas; darunter je Staat ein Chip – „Alle“ oder einzelne, mehrere möglich; Gruppen `state-xx`). Bei bis zu 3 gewählten Staaten nennt die Zusammenfassung sie, sonst „n Staaten“. Ein neues Spiel und eine Lobby ohne Angabe spielen Kontinente und Länder – Bundesländer nur, wenn sie gewählt sind („Bundesländer“ oder „Alles“).
 - **Mit Kleinstaaten** gilt für Länder und Alles: aus = ohne die 25 Staaten unter 1.100 km² (Vatikanstadt, Monaco, Tuvalu, Nauru, San Marino, Malediven, Liechtenstein, Marshallinseln, St. Kitts und Nevis, Malta, Grenada, St. Vincent, Seychellen, Barbados, Andorra, Antigua und Barbuda, Palau, Singapur, Tonga, St. Lucia, Mikronesien, Bahrain, Dominica, Kiribati, São Tomé und Príncipe).
 - **Einzelne Items anpassen** klappt die Einzelauswahl auf (Suche, „Alle“/„Keine“ je Gruppe); passt das Ergebnis zu keinem Preset, heißt es „Eigene Auswahl“.
 - Gespeichert werden Gruppen und ausgeschlossene Items (`config.kinds`, `config.excluded`); das Preset erkennt `menu/map-presets.js`.

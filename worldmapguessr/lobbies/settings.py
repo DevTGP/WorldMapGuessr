@@ -14,8 +14,13 @@ TEN_SECOND_STEPS = ("timer", "grace")
 # Spielmodi (Voreinstellungen im Browser: static/js/menu/presets.js); "custom" = unter „Erweitert“ geändert
 MODES = ("casual", "easyfocus", "focus", "tempo", "hardcore", "custom")
 LEVELS = (0, 4)  # Sehr einfach … Sehr schwer
+# Staaten mit Bundesländern/Regionen (ISO-3166-1-Alpha-2, wie build/regions.py)
+STATE_COUNTRIES = ("al", "at", "ba", "be", "bg", "by", "ch", "cz", "de", "dk", "ee", "es", "fi",
+                   "fr", "gb", "gr", "hr", "hu", "ie", "is", "it", "lt", "lu", "lv", "md", "me",
+                   "mk", "nl", "no", "pl", "pt", "ro", "rs", "ru", "se", "si", "sk", "ua", "xk")
 # Item-Gruppen (Menü-Karten); Items behalten ihre Art im Key ("country:USA")
-KINDS = ("continent", "country-eu", "country-na", "country-sa", "country-af", "country-as", "country-oc", "state-de")
+KINDS = ("continent", "country-eu", "country-na", "country-sa", "country-af", "country-as", "country-oc",
+         *(f"state-{c}" for c in STATE_COUNTRIES))
 # Ohne Angabe gespielt (Standard): Kontinente und Staaten, Bundesländer nur auf Wunsch
 DEFAULT_KINDS = tuple(k for k in KINDS if not k.startswith("state-"))
 # Ältere Lobbys: "country" meinte die Staaten Europas

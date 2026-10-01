@@ -96,23 +96,29 @@ def test_items_carry_region(client):
     assert items["AN"]["region"] == "AN"                        # Kontinent-Item: eigener Code
 
 
-def test_german_states_are_seeded(client, app):
+def test_european_states_are_seeded(client, app):
     items = client.get("/api/items?kind=state").get_json()["items"]
-    codes = {i["code"] for i in items}
-    assert len(items) == 16 and {"DE-BY", "DE-NW", "DE-BE", "DE-HB", "DE-HH", "DE-SL"} <= codes
     by = {i["code"]: i for i in items}
+    de = {c for c in by if c.startswith("DE-")}
+    assert len(de) == 16 and {"DE-BY", "DE-NW", "DE-BE", "DE-HB", "DE-HH", "DE-SL"} <= de
     assert by["DE-BY"]["name"] == "Bayern" and by["DE-BY"]["nameEn"] == "Bavaria"
-    assert all(i["region"] == "EU" for i in items)             # Statistik: Filter „Europa“
+    assert by["FR-BRE"]["name"] == "Bretagne" and by["FR-BRE"]["nameEn"] == "Brittany"
+    assert len([c for c in by if c.startswith("FR-")]) == 13 and len([c for c in by if c.startswith("IT-")]) == 20
+    assert {"GB-ENG", "GB-SCT", "GB-WLS", "GB-NIR"} <= set(by) and "BE-VLG" in by and "CH-ZH" in by
+    assert by["RU-MOW"]["region"] == "EU" and by["RU-SA"]["region"] == "AS"   # Statistik: Filter nach Kontinent
     catalog = app.extensions["lobby_store"].catalog
-    assert sorted(catalog["state-de"]) == sorted(f"state:{c}" for c in codes)
+    assert sorted(catalog["state-de"]) == sorted(f"state:{c}" for c in de)
+    assert sum(len(v) for k, v in catalog.items() if k.startswith("state-")) == len(items)
     assert "state:DE-BY" in app.extensions["lobby_store"].difficulty()
 
 
-def test_state_cells_lie_inside_germany(app):
+def test_state_cells_lie_inside_their_country(app):
     from worldmapguessr.map_data import load_index
     index = load_index(app.static_folder)
     states = [c for c in index["cells"] if len(c) == 3]
-    assert {c[2] for c in states} == {f"state:DE-{s}" for s in
+    assert {c[2] for c in states if c[1] == "country:DEU"} == {f"state:DE-{s}" for s in
                                       ("BB", "BE", "BW", "BY", "HB", "HE", "HH", "MV", "NI", "NW", "RP", "SH", "SL", "SN", "ST", "TH")}
-    assert all(c[0] == "EU" and c[1] == "country:DEU" for c in states)
-    assert not [c for c in index["cells"] if c[1] == "country:DEU" and len(c) == 2]  # ganz Deutschland aufgeteilt
+    assert all(c[2].startswith("state:DE-") for c in states if c[1] == "country:DEU")
+    assert all(c[0] == "EU" for c in states if c[1] != "country:RUS")
+    for code in ("DEU", "FRA", "ITA", "POL", "NOR"):                 # Landesteile in Europa ganz aufgeteilt
+        assert not [c for c in index["cells"] if c[1] == f"country:{code}" and len(c) == 2 and c[0] == "EU"]

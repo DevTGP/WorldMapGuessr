@@ -599,5 +599,6 @@ def test_state_groups_are_opt_in(store):
     lobby, _ = store.create(player_name="Manu", config={})
     assert "state-de" not in lobby["settings"]["config"]["kinds"]         # Standard: ohne Bundesländer
     assert "country-eu" in lobby["settings"]["config"]["kinds"]
-    lobby, _ = store.create(player_name="Manu", config={"kinds": ["state-de"]})
-    assert lobby["settings"]["config"]["kinds"] == ["state-de"]
+    assert not [k for k in lobby["settings"]["config"]["kinds"] if k.startswith("state-")]
+    lobby, _ = store.create(player_name="Manu", config={"kinds": ["state-de", "state-fr"]})
+    assert lobby["settings"]["config"]["kinds"] == ["state-de", "state-fr"]

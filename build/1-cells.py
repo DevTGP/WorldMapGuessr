@@ -8,7 +8,7 @@ Bundesland-Item, z. B. (EU, country:RUS) und (AS, country:RUS) für die beiden T
 (SA, –) für Französisch-Guayana, (EU, country:DEU, state:DE-BY) für Bayern. Kontinent-Items bestehen aus
 allen Zellen ihres Kontinents, Staat- und Bundesland-Items aus ihren Zellen.
 
-Bundesländer (STATES): Natural Earth 1:10m Admin-1, zugeschnitten auf den Umriss des Staates aus Admin-0
+Bundesländer (regions.py, Staaten Europas ohne Mikrostaaten): Natural Earth 1:10m Admin-1, zugeschnitten auf den Umriss des Staates aus Admin-0
 (die Außengrenzen stimmen dort fast genau überein; übrig bleibende Splitter bekommt das angrenzende Land).
 
 Ausgabe:
@@ -23,6 +23,9 @@ import urllib.request
 from shapely.geometry import MultiPolygon, Polygon, box, mapping, shape
 from shapely.geometry.polygon import orient
 from shapely.ops import unary_union
+from shapely.strtree import STRtree
+
+from regions import ADMIN1_CODE, STATE_COUNTRIES, names, state_id
 
 SRC_URL = ("https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/"
            "ne_10m_admin_0_countries.geojson")
@@ -31,11 +34,6 @@ WORLD_COUNTRIES = "node_modules/world-countries/countries.json"
 ADMIN1_URL = ("https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/"
               "ne_10m_admin_1_states_provinces.geojson")
 ADMIN1 = "tmp/src/ne_10m_admin_1_states_provinces.geojson"
-# Staaten mit Bundesländern: ISO-Code → (Menü-Gruppe, Kontinent); Items "state:DE-BY", Name deutsch, nameEn englisch
-STATES = {"DEU": ("state-de", "EU")}
-# Englische Namen, die in Natural Earth amtlich lang sind
-STATE_NAME_EN = {"DE-HB": "Bremen"}
-
 CONTINENT_NAMES = {"AF": "Afrika", "AN": "Antarktika", "AS": "Asien", "EU": "Europa",
                    "NA": "Nordamerika", "SA": "Südamerika", "OC": "Ozeanien"}
 
@@ -99,31 +97,63 @@ def load_source():
 
 
 def load_states():
-    """{Staat: [(Key, Item, Geometrie)]} aus Admin-1 für die Staaten in STATES"""
-    out = {}
+    """{Staat: (Keys, Items, Geometrien, STRtree)} aus Admin-1 für die Staaten in STATE_COUNTRIES"""
+    by_code = {ADMIN1_CODE.get(c, c): c for c in STATE_COUNTRIES}
+    geoms, info = {}, {}
     for f in download(ADMIN1_URL, ADMIN1):
         p = f["properties"]
-        code = p.get("adm0_a3")
-        if code not in STATES or not p.get("iso_3166_2"):
+        code = by_code.get(p.get("adm0_a3"))
+        if not code:
             continue
-        sid = p["iso_3166_2"]
-        item = {"kind": "state", "id": sid, "name": p["name"], "nameEn": STATE_NAME_EN.get(sid) or p.get("name_en") or p["name"],
-                "group": STATES[code][0], "region": STATES[code][1], "country": code}
-        out.setdefault(code, []).append((f"state:{sid}", item, shape(f["geometry"]).buffer(0)))
-    for lst in out.values():
-        lst.sort(key=lambda t: t[0])
+        sid = state_id(code, p)
+        if sid is None:
+            continue
+        geoms.setdefault(code, {}).setdefault(sid, []).append(shape(f["geometry"]).buffer(0))
+        info.setdefault(sid, (code, p))
+    out = {}
+    for code, by_sid in geoms.items():
+        keys, its, gs = [], [], []
+        for sid in sorted(by_sid):
+            g = unary_union(by_sid[sid]).buffer(0)
+            de, en = names(code, sid, info[sid][1])
+            region = "EU"
+            if code == "RUS":
+                region = "EU" if g.intersection(EURO_RUSSIA).area * 2 > g.area else "AS"
+            keys.append(f"state:{sid}")
+            its.append({"kind": "state", "id": sid, "name": de, "nameEn": en,
+                        "group": f"state-{STATE_COUNTRIES[code].lower()}", "region": region, "country": code})
+            gs.append(g)
+        for field in ("name", "nameEn"):
+            seen = [it[field] for it in its]
+            dup = {n for n in seen if seen.count(n) > 1}
+            assert not dup, (code, field, dup)
+        out[code] = (keys, its, gs, STRtree(gs))
     return out
 
 
 def split_states(geom, states):
-    """Staatsfläche in Bundesländer zerlegen → [(Geometrie, Key)]; Splitter an das Land mit der
-    längsten gemeinsamen Grenze"""
-    parts = [(geom.intersection(g), key) for key, _, g in states]
-    rest = geom.difference(unary_union([g for _, _, g in states]))
+    """Staatsfläche in Bundesländer zerlegen → [(Geometrie, Index)]; Splitter an das Land mit der
+    längsten gemeinsamen Grenze (ohne gemeinsame Grenze: das nächste)"""
+    _, _, gs, tree = states
+    parts = {}
+    for i in tree.query(geom):
+        part = geom.intersection(gs[i])
+        if not part.is_empty and part.area > 0:
+            parts[int(i)] = part
+    rest = geom.difference(unary_union([gs[i] for i in parts])) if parts else geom
     for sliver in polys(rest):
-        near = max(range(len(parts)), key=lambda i: parts[i][0].boundary.intersection(sliver.buffer(1e-7)).length)
-        parts[near] = (parts[near][0].union(sliver), parts[near][1])
-    return parts
+        if sliver.area <= 0:
+            continue
+        near, best = None, 0
+        probe = sliver.buffer(1e-7)
+        for i, part in parts.items():
+            length = part.boundary.intersection(probe).length
+            if length > best:
+                near, best = i, length
+        if near is None:
+            near = int(tree.nearest(sliver))
+        parts[near] = parts[near].union(sliver) if near in parts else sliver
+    return sorted(parts.items())
 
 
 wc = json.load(open(WORLD_COUNTRIES, encoding="utf-8"))
@@ -201,9 +231,11 @@ items = {f"continent:{k}": {"kind": "continent", "id": k, "name": v, "group": "c
 def add(poly, continent, item_key, state_key=None):
     """Fläche einer Zelle hinzufügen; bei Staaten mit Bundesländern je Bundesland eine eigene Zelle"""
     code = item_key.split(":")[1] if item_key else None
-    if state_key is None and code in STATE_PARTS:
-        for part, key in split_states(poly, STATE_PARTS[code]):
-            add(part, continent, item_key, key)
+    if state_key is None and code in STATE_PARTS and (continent == "EU" or code == "RUS"):  # ohne Clipperton
+        keys, its = STATE_PARTS[code][:2]
+        for i, part in split_states(poly, STATE_PARTS[code]):
+            items.setdefault(keys[i], its[i])
+            add(part, continent, item_key, keys[i])
         return
     cell = cell_index.setdefault((continent, item_key, state_key), len(cells))
     if cell == len(cells):
@@ -215,9 +247,6 @@ def add(poly, continent, item_key, state_key=None):
 
 
 STATE_PARTS = load_states()
-for code, lst in STATE_PARTS.items():
-    for key, item, _ in lst:
-        items[key] = item
 
 for f in load_source():
     props = f["properties"]
