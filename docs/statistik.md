@@ -44,4 +44,5 @@ enthalten (Neuladen, gesendete Items).
 
 - Tabelle aller Items, sortierbar per Klick auf den Spaltenkopf (zweiter Klick kehrt die Richtung um), Filter Art (Kontinente/Staaten/Bundesländer) und Kontinent (Bundesländer zählen zu ihrem Kontinent) (kombinierbar), Suche nach Name oder Code. Schmale Spalten ohne „Zuletzt“ und UID (beides steht in den Rohdaten).
 - Die Seite füllt genau das Fenster: Kopf und Filter oben, darunter scrollt nur die Tabelle; Spaltenköpfe und die Summenzeile (Summen, Quoten, Ø bis platziert, Ø Schwierigkeit für den aktuellen Filter) bleiben stehen. Auf kleinen Bildschirmen scrollt die ganze Seite.
+- Nie quer scrollen: Die Seite ist bis 1440 px breit, lange Namen brechen um. In schmaleren Fenstern brechen die Spaltenköpfe um, dann werden Spalten ausgeblendet: ≤ 1000 px Code, ≤ 900 px Art, ≤ 760 px die Balken, ≤ 480 px Fehlplatziert, Eingesetzt / Spawns und Ø bis platziert (alles bleibt in den Rohdaten).
 - Darunter die Rohdaten als JSON (gefiltert und sortiert wie die Tabelle, unverändert wie von der API).

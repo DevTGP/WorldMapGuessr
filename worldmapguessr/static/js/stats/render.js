@@ -15,23 +15,23 @@ function cell(text, className) {
   return td;
 }
 
-function rateCell(r) {
-  if (r === null) return cell("—", "num muted");
+function rateCell(r, extra = "") {
+  if (r === null) return cell("—", `num muted ${extra}`.trim());
   const wrap = document.createElement("span");
   wrap.className = "rate";
   const bar = document.createElement("span");
   bar.className = r < 0.5 ? "bar low" : "bar";
   bar.innerHTML = `<i style="width:${Math.min(100, Math.round(r * 100))}%"></i>`;
   wrap.append(pct.format(r), bar);
-  return cell(wrap, "num");
+  return cell(wrap, `num ${extra}`.trim());
 }
 
 const dec = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 /** Ø eingesetzte Items der Lobby, bis das Item sitzt bzw. verloren geht (Anzahl gemessener Spawns im Titel) */
-function durationCell(d, n) {
-  if (d == null) return cell("—", "num muted");
-  const td = cell(dec.format(d), "num");
+function durationCell(d, n, extra = "") {
+  if (d == null) return cell("—", `num muted ${extra}`.trim());
+  const td = cell(dec.format(d), `num ${extra}`.trim());
   td.title = t("stats.durationTitle", { n });
   return td;
 }
@@ -57,15 +57,15 @@ export function renderRows(tbody, items) {
     kind.textContent = KIND_LABEL[it.kind] ?? it.kind;
     tr.append(
       cell(it.name),
-      cell(kind),
-      cell(it.code, "mono"),
+      cell(kind, "col-kind"),
+      cell(it.code, "mono col-code"),
       difficultyCell(it.difficulty),
       cell(int.format(it.spawned), "num"),
       cell(int.format(it.correct), "num"),
-      cell(int.format(it.incorrect), "num"),
-      rateCell(placeRate(it)),
+      cell(int.format(it.incorrect), "num col-incorrect"),
+      rateCell(placeRate(it), "col-place"),
       rateCell(hitRate(it)),
-      durationCell(it.duration, it.waitedCount),
+      durationCell(it.duration, it.waitedCount, "col-duration"),
     );
     return tr;
   }));
@@ -90,18 +90,20 @@ export function renderSummary(el, items) {
 export function renderFoot(tfoot, items) {
   const sum = totals(items);
   const tr = document.createElement("tr");
+  // Name, Art, Code als eigene Zellen statt colSpan, damit ausgeblendete Spalten (schmale Fenster) nichts verschieben
   const label = cell(t("stats.sum", { n: int.format(items.length) }));
-  label.colSpan = 3;
   const withD = items.filter((i) => typeof i.difficulty === "number");
   tr.append(
     label,
+    cell("", "col-kind"),
+    cell("", "col-code"),
     difficultyCell(withD.length ? Math.round(10 * withD.reduce((s, i) => s + i.difficulty, 0) / withD.length) / 10 : null),
     cell(int.format(sum.spawned), "num"),
     cell(int.format(sum.correct), "num"),
-    cell(int.format(sum.incorrect), "num"),
-    rateCell(placeRate(sum)),
+    cell(int.format(sum.incorrect), "num col-incorrect"),
+    rateCell(placeRate(sum), "col-place"),
     rateCell(hitRate(sum)),
-    durationCell(sum.duration, sum.waitedCount),
+    durationCell(sum.duration, sum.waitedCount, "col-duration"),
   );
   tfoot.replaceChildren(tr);
 }

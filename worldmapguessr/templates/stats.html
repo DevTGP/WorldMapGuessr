@@ -42,15 +42,15 @@
       <thead>
         <tr>
           <th data-key="name" scope="col">{{ t('stats.col.name') }}</th>
-          <th data-key="kind" scope="col">{{ t('stats.kind') }}</th>
-          <th data-key="code" scope="col">{{ t('stats.col.code') }}</th>
+          <th data-key="kind" scope="col" class="col-kind">{{ t('stats.kind') }}</th>
+          <th data-key="code" scope="col" class="col-code">{{ t('stats.col.code') }}</th>
           <th data-key="difficulty" scope="col" class="num" title="{{ t('stats.difficultyScale') }}">{{ t('stats.col.difficulty') }}</th>
           <th data-key="spawned" scope="col" class="num">{{ t('stats.spawned') }}</th>
           <th data-key="correct" scope="col" class="num">{{ t('stats.correct') }}</th>
-          <th data-key="incorrect" scope="col" class="num">{{ t('stats.incorrect') }}</th>
-          <th data-key="placeRate" scope="col" class="num" title="{{ t('stats.placeRate') }}">{{ t('stats.placeRate') }}</th>
+          <th data-key="incorrect" scope="col" class="num col-incorrect">{{ t('stats.incorrect') }}</th>
+          <th data-key="placeRate" scope="col" class="num col-place" title="{{ t('stats.placeRate') }}">{{ t('stats.placeRate') }}</th>
           <th data-key="rate" scope="col" class="num" title="{{ t('stats.hitRateTitle') }}">{{ t('stats.hitRate') }}</th>
-          <th data-key="duration" scope="col" class="num" title="{{ t('stats.durationHint') }}">{{ t('stats.duration') }}</th>
+          <th data-key="duration" scope="col" class="num col-duration" title="{{ t('stats.durationHint') }}">{{ t('stats.duration') }}</th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>

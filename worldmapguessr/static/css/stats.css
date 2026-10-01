@@ -9,7 +9,7 @@ body {
 /* Seite füllt genau das Fenster: Kopf und Filter oben, dazwischen scrollt nur die Tabelle (samt Rohdaten);
    Spaltenköpfe und Summenzeile bleiben stehen. Auf kleinen Bildschirmen scrollt die ganze Seite (siehe unten). */
 .page {
-  max-width: 1100px;
+  max-width: 1440px;
   height: 100dvh;
   box-sizing: border-box;
   margin: 0 auto;
@@ -28,7 +28,8 @@ html.cosmos body { background: #03050b; }
 /* Kopf liegt direkt auf dem Weltraum: helle Schrift, auch im hellen Farbschema */
 html.cosmos .head h1, html.cosmos .summary b, html.cosmos .back:hover { color: #e6ecf1; }
 html.cosmos .summary, html.cosmos .back { color: #9aa7b2; }
-.scroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+/* nur senkrecht scrollen: die Tabelle passt sich der Breite an (schmale Fenster blenden Spalten aus, siehe unten) */
+.scroll { flex: 1; min-height: 0; overflow: hidden auto; scrollbar-gutter: stable; display: flex; flex-direction: column; gap: 12px; }
 .head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
 .head h1 { margin: 4px 0 2px; font-size: 24px; letter-spacing: 0.01em; }
 .back { color: var(--ink-soft); text-decoration: none; font-size: 13px; }
@@ -91,9 +92,11 @@ html.cosmos .summary, html.cosmos .back { color: #9aa7b2; }
   border-radius: 8px;
 }
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-/* schmale Spalten: wenig Innenabstand, Spaltenköpfe dürfen umbrechen (z. B. „Eingesetzt / Spawns“) */
+/* schmale Spalten: wenig Innenabstand; Spaltenköpfe einzeilig, erst in schmaleren Fenstern dürfen sie umbrechen (siehe unten) */
 th, td { padding: 7px 8px; text-align: left; white-space: nowrap; }
 th:first-child, td:first-child { padding-left: 12px; }
+/* lange Namen brechen um statt die Tabelle zu verbreitern */
+td:first-child { white-space: normal; min-width: 12ch; overflow-wrap: anywhere; }
 th:last-child, td:last-child { padding-right: 12px; }
 th {
   position: sticky;
@@ -107,7 +110,6 @@ th {
   text-transform: uppercase;
   color: var(--ink-soft);
   border-bottom: 1px solid var(--panel-line);
-  white-space: normal;
   vertical-align: bottom;
   cursor: pointer;
   user-select: none;
@@ -116,7 +118,7 @@ th:hover { color: var(--ink); }
 th[aria-sort] { color: var(--ink); }
 /* alle Spalten außer dem Namen so schmal wie ihr Inhalt; den übrigen Platz bekommt der Name */
 th:not(:first-child), td:not(:first-child) { width: 1%; }
-th.num { min-width: 8ch; }
+th.num { min-width: 9ch; }
 th[aria-sort="ascending"]::after { content: " ▲"; font-size: 9px; }
 th[aria-sort="descending"]::after { content: " ▼"; font-size: 9px; }
 td { border-bottom: 1px solid var(--panel-line); }
@@ -167,4 +169,29 @@ tfoot td {
 @media (max-width: 760px), (max-height: 560px) {
   .page { height: auto; }
   .scroll { overflow: visible; }
+}
+/* schmale Fenster: weniger wichtige Spalten ausblenden, damit nie quer gescrollt werden muss */
+@media (max-width: 1240px) {
+  th { white-space: normal; }
+}
+@media (max-width: 1000px) {
+  .col-code { display: none; }
+}
+@media (max-width: 900px) {
+  .col-kind { display: none; }
+  .bar { width: 24px; }
+  th.num { min-width: 0; }
+}
+@media (max-width: 760px) {
+  .bar { display: none; }
+  th, td { padding: 6px 5px; }
+  td:first-child { min-width: 9ch; }
+}
+@media (max-width: 480px) {
+  .col-duration, .col-incorrect, .col-place { display: none; }
+  table { font-size: 13px; }
+  th { letter-spacing: 0; font-size: 10px; hyphens: auto; }
+  td:first-child { min-width: 7ch; }
+  .page { padding-left: 8px; padding-right: 8px; }
+  th, td { padding: 6px 4px; }
 }
