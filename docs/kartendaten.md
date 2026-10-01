@@ -9,18 +9,27 @@ pip install -r requirements.txt
 npm run build
 ```
 
-`npm run build` führt vier Schritte aus (Dauer: unter einer Minute plus einmalig die Downloads, ~55 MB):
+`npm run build` führt fünf Schritte aus (Dauer: unter einer Minute plus einmalig die Downloads, ~55 MB):
 
 1. `python 1-cells.py` – lädt Natural Earth 1:10m Admin-0 und Admin-1 (nach `build/tmp/src`), ordnet jedes Landstück einem Kontinent, höchstens einem Staat-Item und höchstens einem Bundesland zu („Zelle“, z. B. Europa × Russland, Europa × Deutschland × Bayern) und wendet die Sonderfälle unten an. Ausgabe in `build/tmp/`.
 2. `node 2-tiles.mjs` – baut daraus `worldmapguessr/static/data/map/`:
-   - `tiles/z0…z4/{x}_{y}.json` – Karte in 5 Detailstufen, je Stufe ein Längen-/Breitengrad-Raster (90°, 45°, 22,5°, 11,25°, 5,625°). Inhalt je Kachel: Landflächen je Zelle und Linien (Küsten, Kontinent- und Staatsgrenzen), ganzzahlig und als Differenzen kodiert.
+   - `tiles/z0…z4/{x}_{y}.json` (nach Schritt 5 `.bin`) – Karte in 5 Detailstufen, je Stufe ein Längen-/Breitengrad-Raster (90°, 45°, 22,5°, 11,25°, 5,625°). Inhalt je Kachel: Landflächen je Zelle und Linien (Küsten, Kontinent- und Staatsgrenzen), ganzzahlig und als Differenzen kodiert.
    - `items/i0.json` – alle Items in der Startstufe; `items/i1…i4/{kind}-{id}.json` – feinere Umrisse je Item.
    - `index.json` – Stufen, Zellen, Items (Name, englischer Name `nameEn` aus `world-countries`, Gruppe, Anker, Fläche), Kachelliste, Version (Hash über die Daten).
 
 3. `python 3-water.py` – Flüsse und Seen (Natural Earth 1:10m `rivers_lake_centerlines`, `lakes`, von GitHub) als Kacheln `water/z0…z4/{x}_{y}.json` im selben Raster: je Objekt die Kartenskala `sMin = 256 · 2^min_zoom / 2π` (aus Natural Earths `min_zoom`), ab der der Browser es zeichnet; je Stufe nur Objekte bis zu ihrem `sMax`, vereinfacht auf 0,6 px. ~5 MB, nur bei Bedarf geladen.
 4. `python 4-relief.py` – Geländeschummerung als Graustufen-JPEGs `relief/r0…r3/{x}_{y}.jpg` (512 px; Welt 1024 … 8192 px breit, reine Meereskacheln fehlen; ~2,9 MB). Quelle: Natural Earth „Shaded Relief, High Res“ (`SR_HR.tif`, 21600 × 10800, gemeinfrei, reine Graustufen-Schummerung) vom S3-Spiegel `naturalearth.s3.amazonaws.com` (naturalearthdata.com ist aus der Build-Umgebung nicht erreichbar). Ebenes Gelände hat dort den Grauwert 206; Abweichungen werden mit `GAIN` = 1,5 um 128 (neutral) gelegt. Meer und ein 1-px-Küstensaum sind neutral (Landmaske aus Schritt 1). Braucht `numpy`, `scipy`, `pillow`.
 
-Schritte 3 und 4 ergänzen `index.json` (`water`, `relief`) und setzen die Version neu (`versions`: Hash je Teil). Nach Schritt 2 müssen sie erneut laufen.
+5. `node 5-binary.mjs` – wandelt die Land- und Wasserkacheln (Schritte 2 und 3) in ein Binärformat (`.bin`) und zerlegt die Flächen dabei in Dreiecke (earcut); die JSON-Kacheln werden gelöscht. Der Browser muss so weder JSON parsen noch triangulieren, der WebGL-Renderer lädt die Dreiecke direkt hoch. Format: Kopf und Gliederung (Gruppen = Zelle bzw. sMin, Ringe, Linien mit Zellen a/b bzw. sMin) als 4-Byte-Felder, Koordinaten (Differenzen wie im JSON) und Dreiecksindizes (Differenz zum vorigen) als Zickzack-Varints; Beschreibung im Kopf von `build/5-binary.mjs`, Leser `static/js/map/tile-format.js`.
+
+   | Stufe | JSON (roh / Brotli) | binär mit Dreiecken (roh / Brotli) |
+   |---|---|---|
+   | Land z0 | 142 / 37 kB | 92 / 40 kB |
+   | Land z4 | 9,0 / 2,1 MB | 5,8 / 2,5 MB |
+
+   Außenringe und Löcher haben entgegengesetzten Umlaufsinn (der Canvas-Renderer füllt „nonzero“); je Zelle gilt der Umlaufsinn des größten Rings als außen, jedes Loch gehört zum kleinsten Außenring, der es enthält.
+
+Schritte 3 bis 5 ergänzen `index.json` (`water`, `relief`, `tileFormat`) und setzen die Version neu (`versions`: Hash je Teil). Nach Schritt 2 müssen sie erneut laufen.
 
 ## Relief zeichnen
 

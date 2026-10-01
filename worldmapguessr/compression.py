@@ -27,7 +27,7 @@ from flask import request, send_file, send_from_directory
 from werkzeug.exceptions import NotFound
 from werkzeug.security import safe_join
 
-COMPRESSIBLE = {".json", ".js", ".css", ".html", ".svg", ".txt"}
+COMPRESSIBLE = {".json", ".js", ".css", ".html", ".svg", ".txt", ".bin", ".map"}
 MIN_SIZE = 512       # kleinere Dateien lohnen den Umweg nicht
 LEVEL = 9
 DYNAMIC_LEVEL = 6   # für Antworten, die bei jeder Anfrage neu entstehen

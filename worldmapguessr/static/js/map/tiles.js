@@ -5,7 +5,8 @@
 // gezeichnet wird, hängt von der Kartenskala ab (index.levels[].sMax). Fehlt eine Kachel noch, wird bis
 // zum Eintreffen die nächstgröbere vorhandene gezeichnet – die Karte bleibt immer bedienbar.
 
-import { RAD, boxTest, prepare, reproject } from "./project.js";
+import { RAD, boxTest, reproject } from "./project.js";
+import { canvasParts, readTile } from "./tile-format.js";
 
 const MAX_PARALLEL = 6;
 
@@ -44,7 +45,7 @@ export class TileStore {
     return i < 0 ? this.levels.length - 1 : i;
   }
 
-  /** Kachel aus Rohdaten (JSON) übernehmen – auch für die Startkacheln */
+  /** Kachel aus Rohdaten (binär, tile-format.js) übernehmen – auch für die Startkacheln */
   add(z, key, raw) {
     const id = `${z}/${key}`;
     if (this.tiles.has(id)) return;
@@ -60,13 +61,13 @@ export class TileStore {
     await Promise.all([...this.exists[z]].map(async (key) => {
       const res = await fetch(this.url(z, key));
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const text = await res.text();
-      onBytes?.(text.length);
-      this.add(z, key, JSON.parse(text));
+      const buf = await res.arrayBuffer();
+      onBytes?.(buf.byteLength);
+      this.add(z, key, buf);
     }));
   }
 
-  url(z, key) { return `${this.base}/${this.dir}/z${z}/${key}.json`; }
+  url(z, key) { return `${this.base}/${this.dir}/z${z}/${key}.bin`; }
 
   /** Nach einem Wechsel der Projektion: alle geladenen Kacheln neu rechnen (project.js useProjection) */
   reproject() {
@@ -134,7 +135,7 @@ export class TileStore {
       const [z, key] = this.queue.pop();
       this.active++;
       fetch(this.url(z, key))
-        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+        .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`HTTP ${r.status}`))))
         .then((raw) => { this.add(z, key, raw); this.onLoad(); })
         .catch((err) => console.warn(`Kachel ${z}/${key} nicht geladen:`, err.message))
         .finally(() => {
@@ -157,46 +158,43 @@ export class TileStore {
 }
 
 /** Landkachel entpacken: Flächen je Zelle und Linien (Küsten, Grenzen) */
-function decode(level, key, raw) {
-  const { tile, pts, count } = tileDecoder(level, key);
-  return {
-    ...tile,
-    fills: raw.f.map(([cell, ...rings]) => ({ cell, rings: rings.map(pts) })),
-    lines: raw.l.map(([a, b, ints]) => ({ a, b, pts: pts(ints) })),
-    get points() { return count(); },
-    /** alle Punktfolgen (für reproject) */
-    *all() {
-      for (const f of this.fills) yield* f.rings;
-      for (const l of this.lines) yield l.pts;
-    },
-  };
+function decode(level, key, buf) {
+  return tileObject(level, key, buf, (parts) => ({
+    fills: parts.groups.map((g) => ({ cell: g.attr, rings: g.rings })),
+    lines: parts.lines,
+  }));
 }
 
 /**
- * Punktfolge einer Kachel entpacken: Differenzen in 1/q der Kachelseite → vorbereitete Projektionswerte
- * @returns {{tile: object, pts: (ints: number[]) => Float64Array, count: () => number}}
+ * Kachel aus Binärdaten: Kopfdaten, Rohdaten für WebGL (data) und – erst bei Bedarf – vorbereitete Ringe
+ * und Linien für den Canvas-Renderer (shape(canvasParts) liefert die Felder, z. B. fills/lines).
  */
-export function tileDecoder(level, key) {
+export function tileObject(level, key, buf, shape) {
   const [x, y] = key.split("_").map(Number);
-  const size = level.tile, q = level.q, e = level.overlap ?? 0;
-  const lon0 = -180 + x * size, lat0 = -90 + y * size;
-  let points = 0;
-  const pts = (ints) => {
-    const out = new Float64Array(ints.length);
-    let qx = 0, qy = 0;
-    for (let i = 0; i < ints.length; i += 2) {
-      qx += ints[i]; qy += ints[i + 1];
-      out[i] = lon0 + (qx / q) * size;
-      out[i + 1] = lat0 + (qy / q) * size;
-    }
-    points += ints.length / 2;
-    return prepare(out);
+  const size = level.tile, e = level.overlap ?? 0;
+  const lon0 = -180 + x * size;
+  const data = readTile(buf, level, x, y);
+  let parts = null;
+  const canvas = () => (parts ??= shape(canvasParts(data)));
+  const tile = {
+    z: level.z, x, y, key, lon0: (lon0 - e) * RAD, lon1: (lon0 + size + e) * RAD,
+    data,
+    points: (data.poly.length + data.line.length) / 2,
+    /** vorbereitete Punktfolgen, soweit schon erzeugt (für reproject) */
+    *all() {
+      if (!parts) return;
+      for (const list of Object.values(parts)) {
+        for (const item of list) {
+          if (item.rings) yield* item.rings;
+          if (item.pts) yield item.pts;
+        }
+      }
+    },
   };
-  return {
-    tile: { z: level.z, x, y, key, lon0: (lon0 - e) * RAD, lon1: (lon0 + size + e) * RAD },
-    pts,
-    count: () => points,
-  };
+  for (const name of Object.keys(shape({ groups: [], lines: [] }))) {
+    Object.defineProperty(tile, name, { get: () => canvas()[name], enumerable: true });
+  }
+  return tile;
 }
 
 /** Grenzen einer Kachel in Bogenmaß */

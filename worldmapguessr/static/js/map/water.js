@@ -3,7 +3,7 @@
 // min_zoom) – beim Hineinzoomen kommen kleinere Flüsse und Seen dazu. Gezeichnet in der Wasserfarbe des
 // Farbschemas über Land und Relief (map/renderer.js).
 
-import { TileStore, tileDecoder } from "./tiles.js";
+import { TileStore, tileObject } from "./tiles.js";
 
 /** Kachel-Speicher für Flüsse und Seen oder null (Daten fehlen) */
 export function createWaterStore(base, index, onLoad) {
@@ -11,18 +11,11 @@ export function createWaterStore(base, index, onLoad) {
   return new TileStore(base, index, onLoad, { dir: "water", tiles: index.water.tiles, decode: decodeWater });
 }
 
-function decodeWater(level, key, raw) {
-  const { tile, pts, count } = tileDecoder(level, key);
-  return {
-    ...tile,
-    rivers: raw.r.map(([sMin, ints]) => ({ sMin, pts: pts(ints) })),
-    lakes: raw.k.map(([sMin, ...rings]) => ({ sMin, rings: rings.map(pts) })),
-    get points() { return count(); },
-    *all() {
-      for (const r of this.rivers) yield r.pts;
-      for (const l of this.lakes) yield* l.rings;
-    },
-  };
+function decodeWater(level, key, buf) {
+  return tileObject(level, key, buf, (parts) => ({
+    lakes: parts.groups.map((g) => ({ sMin: g.attr, rings: g.rings })),
+    rivers: parts.lines.map((l) => ({ sMin: l.a, pts: l.pts })),
+  }));
 }
 
 /** Strichbreite eines Flusses (px): dünn beim Erscheinen, breiter, je weiter man hineinzoomt */

@@ -57,6 +57,7 @@ worldmapguessr/
     map/renderer.js           Canvas-Zeichnung aus Kacheln (Zellfarben, Küsten, Grenzen, Wasser, Kleinststaat-Ringe)
     map/labels.js             Namen eingesetzter Items (gebogen nach der Form, keine Überschneidungen)
     map/tiles.js              Kacheln: Detailstufe je Zoom, Laden, Ersatz aus gröberer Stufe, Speichergrenze
+    map/tile-format.js        Binäre Kacheln lesen (Punkte, Dreiecke, Linien; build/5-binary.mjs)
     map/items.js              Item-Umrisse: Startstufe für alle, feinere Stufe je Item bei Bedarf
     map/project.js            Schnelle Projektion, Sichtbarkeitstest
     map/projections.js        Natural Earth / Equal Earth

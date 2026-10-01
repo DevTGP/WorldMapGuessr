@@ -24,7 +24,8 @@ def load_index(static_folder: str) -> dict:
 def start_files(index: dict) -> list[str]:
     """Dateien, die der Browser beim Start lädt (relativ zu /data/<version>/): Index, grobe Items, Kacheln der
     Stufe 0. Die Seite lädt sie per <link rel="preload"> gleich mit, statt erst nach dem JavaScript."""
-    return ["index.json", "items/i0.json"] + [f"tiles/z0/{key}.json" for key in index["tiles"]["0"]]
+    ext = index.get("tileFormat", "json")
+    return ["index.json", "items/i0.json"] + [f"tiles/z0/{key}.{ext}" for key in index["tiles"]["0"]]
 
 
 def start_bytes(static_folder: str, index: dict) -> int:

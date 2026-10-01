@@ -85,7 +85,7 @@ def test_map_data_is_served_with_long_cache(app, client):
     assert r.status_code == 200 and r.get_json()["version"] == index["version"]
     assert "max-age=31536000" in r.headers["Cache-Control"]
     key = index["tiles"]["4"][0]
-    assert client.get(f"/data/{index['version']}/tiles/z4/{key}.json").status_code == 200
+    assert client.get(f"/data/{index['version']}/tiles/z4/{key}.bin").status_code == 200
     assert client.get(f"/data/{index['version']}/items/i2/country-DEU.json").status_code == 200
     assert client.get(f"/data/{index['version']}/../../app.py").status_code == 404
 

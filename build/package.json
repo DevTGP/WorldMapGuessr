@@ -1,12 +1,13 @@
 {
   "name": "worldmapguessr-build",
   "private": true,
-  "description": "Erzeugt die Kartendaten für WorldMapGuessr (Kacheln mit Detailstufen, Item-Umrisse, Flüsse/Seen, Relief)",
+  "description": "Erzeugt die Kartendaten für WorldMapGuessr (Kacheln mit Detailstufen, Item-Umrisse, Flüsse/Seen, Relief; Kacheln binär)",
   "scripts": {
-    "build": "python 1-cells.py && node 2-tiles.mjs && python 3-water.py && python 4-relief.py"
+    "build": "python 1-cells.py && node 2-tiles.mjs && python 3-water.py && python 4-relief.py && node 5-binary.mjs"
   },
   "dependencies": {
     "d3-geo": "^3.1.1",
+    "earcut": "^3.2.4",
     "topojson-client": "^3.1.0",
     "topojson-server": "^3.0.1",
     "topojson-simplify": "^3.0.3",
