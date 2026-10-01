@@ -21,13 +21,16 @@ def load_index(static_folder: str) -> dict:
         return json.load(fh)
 
 
+def start_files(index: dict) -> list[str]:
+    """Dateien, die der Browser beim Start lädt (relativ zu /data/<version>/): Index, grobe Items, Kacheln der
+    Stufe 0. Die Seite lädt sie per <link rel="preload"> gleich mit, statt erst nach dem JavaScript."""
+    return ["index.json", "items/i0.json"] + [f"tiles/z0/{key}.json" for key in index["tiles"]["0"]]
+
+
 def start_bytes(static_folder: str, index: dict) -> int:
-    """Bytes, die der Browser beim Start lädt: Index, grobe Items, Kacheln der Stufe 0."""
+    """Bytes, die der Browser beim Start lädt"""
     base = map_dir(static_folder)
-    size = os.path.getsize(os.path.join(base, "index.json")) + os.path.getsize(os.path.join(base, "items", "i0.json"))
-    for key in index["tiles"]["0"]:
-        size += os.path.getsize(os.path.join(base, "tiles", "z0", f"{key}.json"))
-    return size
+    return sum(os.path.getsize(os.path.join(base, *f.split("/"))) for f in start_files(index))
 
 
 def catalog(index: dict) -> dict[str, list[str]]:

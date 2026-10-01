@@ -5,12 +5,13 @@ import os
 from flask import Flask
 from flask_sock import Sock
 
+from .assets import DIST, Assets, page_assets
 from .compression import gzip_response, precompress_in_background, send_compressed
 from .i18n import template_context
 from .difficulty import difficulty_map
 from .item_events import ItemEventRecorder
 from .item_store import seed_items
-from .map_data import catalog, load_index, start_bytes
+from .map_data import CACHE_SECONDS, catalog, load_index, start_bytes
 from .lobbies import LobbyHub, LobbyStore
 from .storage import create_stores
 from .lobbies.codes import LobbyCodeConverter
@@ -67,9 +68,17 @@ def create_app(test_config: dict | None = None) -> Flask:
     lobby_ws.register(Sock(app))
     # Sprache (de/en): t() und Wörterbuch in allen Vorlagen
     app.context_processor(template_context)
+    # JS/CSS je Seite: gebündelt (static/dist) oder einzeln (assets.py)
+    app.extensions["assets"] = Assets(app.static_folder, app.config.get("ASSET_BUNDLE"))
+    app.context_processor(lambda: {"page_assets": page_assets})
 
-    # Statische Dateien (JS, CSS …) komprimiert ausliefern
+    # Statische Dateien (JS, CSS …) komprimiert ausliefern. Gebündelte Dateien (dist/) tragen einen Hash im
+    # Namen und ändern sich nie: ein Jahr zwischenspeichern, ohne Rückfrage beim Server (immutable).
     def static(filename):
+        if filename.startswith(DIST + "/"):
+            response = send_compressed(app.static_folder, filename, max_age=CACHE_SECONDS)
+            response.cache_control.immutable = True
+            return response
         return send_compressed(app.static_folder, filename, max_age=app.get_send_file_max_age(filename))
     app.view_functions["static"] = static
     if app.config["PRECOMPRESS"]:

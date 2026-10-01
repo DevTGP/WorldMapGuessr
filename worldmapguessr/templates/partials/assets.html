@@ -1,0 +1,14 @@
+{# JS/CSS/Schriften einer Seite – gebündelt oder einzeln (assets.py) #}
+{% macro head(a) -%}
+{% for f in a.fonts %}<link rel="preload" href="{{ f }}" as="font" type="font/woff2" crossorigin>
+{% endfor -%}
+{% for c in a.css %}<link rel="stylesheet" href="{{ c }}">
+{% endfor -%}
+<link rel="modulepreload" href="{{ a.js }}">
+{% for p in a.modulepreload %}<link rel="modulepreload" href="{{ p }}">
+{% endfor -%}
+{%- endmacro %}
+{% macro scripts(a) -%}
+{% if a.d3 %}<script src="{{ a.d3 }}"></script>
+{% endif %}<script type="module" src="{{ a.js }}"></script>
+{%- endmacro %}

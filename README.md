@@ -44,6 +44,9 @@ python run.py
 
 Tests: `pip install -r requirements-dev.txt` und `python -m pytest`.
 
+Optional: JS/CSS wie auf dem Server gebündelt ausliefern (Node.js nötig): `cd web && npm ci && npm run build`.
+Ohne diesen Schritt lädt die Seite die Quelldateien einzeln ([docs/server.md](docs/server.md#js-und-css-bündel)).
+
 Umgebungsvariablen: `WMG_HOST` (Standard `127.0.0.1`), `WMG_PORT` (Standard `5000`), `FLASK_DEBUG` (`1`/`0`).
 
 Debug: In der Browser-Konsole sind Spiel, Karte und Menüs unter `WMG.game`, `WMG.map`, `WMG.menu` erreichbar.

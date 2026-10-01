@@ -17,6 +17,7 @@ def app(request, tmp_path):
         "PRECOMPRESS": False,
         "ITEM_IMPORT_PATH": "",
         "MONGODB_URI": "",
+        "ASSET_BUNDLE": "0",  # Quelldateien, unabhängig von einem lokal gebauten static/dist
     }
     if request.param == "mongodb":
         config.update(

@@ -8,15 +8,10 @@
 import { createMap } from "./map/map.js";
 import { bindMapControls } from "./map/controls.js";
 import { Game } from "./game/game.js";
-import { RemoteRound } from "./game/remote.js";
 import { Menu } from "./menu/menu.js";
 import { toWire } from "./menu/config.js";
 import { MODE } from "./menu/presets.js";
-import { LobbyClient } from "./lobby/client.js";
-import { LobbyMenu } from "./lobby/lobby-menu.js";
-import { PlayersRail } from "./lobby/players-rail.js";
 import { identity } from "./lobby/identity.js";
-import { askPlayer, showLobbyGone } from "./lobby/join-dialog.js";
 import { prepareRowIcon } from "./menu/item-picker.js";
 import { LoadingScreen, yielder } from "./ui/loading-screen.js";
 import { Home } from "./home/home.js";
@@ -26,6 +21,10 @@ import { Cosmos } from "./ui/cosmos.js";
 import { serverError, t } from "./i18n/index.js";
 
 const WMG = window.WMG ?? {};
+
+/** Lobby-Teile (Verbindung, Runde, Lobby-Menü, Dialoge) erst bei Bedarf laden: Das Hauptmenü braucht sie
+ *  nicht. Nach dem Start werden sie im Leerlauf vorgeladen, damit „Spielen“ nicht auf den Download wartet. */
+const lobbyModules = () => import("./lobby/index.js");
 const NEW_GAME_URL = "/?neu"; // Startseite direkt mit dem Spielmenü öffnen (nach einem Wechsel mit Neuladen)
 
 // Ladephasen mit Gewicht ≈ typischem Zeitanteil (Download hängt von der Leitung ab). Geladen wird nur
@@ -48,6 +47,11 @@ async function prepareIcons(features) {
 }
 
 const cosmos = new Cosmos(document.getElementById("stage"));
+
+// Kartendaten und Bündel im Service Worker zwischenspeichern (static/sw.js); ohne Bündel (Entwicklung) nicht
+if (WMG.serviceWorker && "serviceWorker" in navigator) {
+  navigator.serviceWorker.register(WMG.serviceWorker).catch((err) => console.warn("Service Worker:", err));
+}
 
 createMap({
   canvas: document.getElementById("map"),
@@ -116,6 +120,7 @@ createMap({
     });
 
     if (WMG.lobbyCode) return startLobby(WMG.lobbyCode, ctx);
+    (window.requestIdleCallback ?? setTimeout)(() => lobbyModules());
     const newGame = new URLSearchParams(location.search).has("neu");
     showHome(ctx); // setzt die Adresse auf /
     if (newGame) openNewGame(ctx);
@@ -208,6 +213,7 @@ async function startSolo(config, ctx) {
 
 /** Neue Mehrspieler-Lobby mit der aktuellen Menü-Konfiguration */
 async function createLobby(config, ttl, ctx) {
+  const { askPlayer } = await lobbyModules();
   const who = await askPlayer({
     title: t("menu.createLobby"),
     text: t("create.text"),
@@ -236,7 +242,8 @@ async function createLobby(config, ttl, ctx) {
 async function startLobby(code, ctx, { autoStart = false } = {}) {
   const { game, menu, home } = ctx;
   ctx.used = true;
-  const info = await lobbyInfo(code);
+  const [{ LobbyClient, RemoteRound, LobbyMenu, PlayersRail, askPlayer, showLobbyGone }, info] =
+    await Promise.all([lobbyModules(), lobbyInfo(code)]);
   if (!info) {
     identity.clear(code);
     return showLobbyGone(t("gone.notFound"));

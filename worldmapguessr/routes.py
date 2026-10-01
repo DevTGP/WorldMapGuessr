@@ -5,7 +5,7 @@ from flask import Blueprint, abort, current_app, redirect, render_template, requ
 
 from .lobbies.codes import PATTERN, normalize
 from .compression import send_compressed
-from .map_data import CACHE_SECONDS, map_dir
+from .map_data import CACHE_SECONDS, map_dir, start_files
 
 bp = Blueprint("main", __name__)
 
@@ -13,8 +13,11 @@ bp = Blueprint("main", __name__)
 def _game_page(**kwargs):
     """Spielseite mit Kartendaten-URL (inkl. Version) und Startgröße für den Ladebalken."""
     version = current_app.extensions["map_index"]["version"]
-    return render_template("index.html", map_base=f"{request.script_root}/data/{version}",
-                           data_size=current_app.extensions["map_start_bytes"], **kwargs)
+    build = current_app.extensions["assets"].build
+    service_worker = f"{request.script_root}/sw.js?b={build}&m={version}" if build else None
+    return render_template("index.html", map_base=f"{request.script_root}/data/{version}", service_worker=service_worker,
+                           data_size=current_app.extensions["map_start_bytes"],
+                           map_start=start_files(current_app.extensions["map_index"]), **kwargs)
 
 
 @bp.get("/")
@@ -25,8 +28,18 @@ def index():
 @bp.get("/data/<version>/<path:filename>")
 def map_data(version, filename):
     """Kartendaten (Kacheln, Items, Index). Die Version im Pfad ändert sich mit jedem Build, daher darf
-    der Browser alles ein Jahr lang zwischenspeichern."""
-    return send_compressed(map_dir(current_app.static_folder), filename, max_age=CACHE_SECONDS)
+    der Browser alles ein Jahr lang zwischenspeichern, ohne nachzufragen (immutable)."""
+    response = send_compressed(map_dir(current_app.static_folder), filename, max_age=CACHE_SECONDS)
+    response.cache_control.immutable = True
+    return response
+
+
+@bp.get("/sw.js")
+def service_worker():
+    """Service Worker (static/sw.js) – vom Wurzelpfad, damit er für die ganze Seite gilt; immer frisch prüfen."""
+    response = send_compressed(current_app.static_folder, "sw.js", max_age=0)
+    response.cache_control.no_cache = True
+    return response
 
 
 @bp.get("/stats")

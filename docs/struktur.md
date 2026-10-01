@@ -11,13 +11,16 @@ Dockerfile, docker-compose.yml  Container (Netzwerk local-web, Port 5002); der B
 instance/                     Laufzeitdaten ohne MongoDB (items.json, lobbies.json; nicht versioniert)
 docs/                         Dokumentation je Thema (Übersicht: README.md)
 build/                        Erzeugung der Kartendaten (docs/kartendaten.md)
+web/                          Bündel für JS/CSS (esbuild): build.mjs, d3.js (genutzte d3-Funktionen) – docs/server.md
 tests/                        pytest – Item-Store, API, Lobbys, Runde, Punkte, Sprache, Komprimierung; JSON und MongoDB (mongomock)
 
 worldmapguessr/
   __init__.py                 App-Factory create_app(): Speicher, Kartendaten, Lobbys, Routen, Sprache, Komprimierung
   routes.py                   Seiten (/ , /CODE, /stats) und Kartendaten /data/<version>/…
   api.py                      JSON-API /api/items (mit englischen Namen), /api/health
-  compression.py              gzip: vorkomprimierte statische Dateien, HTML/JSON-Antworten
+  compression.py              Brotli/gzip: vorkomprimierte statische Dateien, HTML/JSON-Antworten
+  assets.py                   JS/CSS je Seite: Bündel (static/dist) oder Quelldateien
+  pages.json                  Einstiegspunkte je Seite (JS, CSS, vorzuladende Schriften)
   precompress.py              Kommandozeile: alle .gz-Fassungen erzeugen (Docker-Build)
   i18n/__init__.py            Sprache wählen (Cookie, Browser), t() für Vorlagen, Wörterbuch für den Browser
   i18n/de.json, en.json       Texte je Sprache
@@ -39,7 +42,10 @@ worldmapguessr/
   templates/partials/         hud (Karte, Statusleiste, Inventar, Nachrichten, Steuerung), menu, home, dialogs, settings
   templates/stats.html        Statistik-Seite
   static/data/map/            Kartendaten mit Detailstufen (generiert)
-  static/css/                 tokens (Farben hell/dunkel), style (Karte, HUD), game, menu, lobby, feed,
+  static/sw.js                Service Worker: Bündel und Kartendaten im Cache (nur mit Bündel)
+  static/fonts/               Schriften (Cinzel, Instrument Sans, IBM Plex Mono; OFL)
+  static/dist/                Bündel (generiert, nicht versioniert)
+  static/css/                 fonts (Schriften), tokens (Farben hell/dunkel), style (Karte, HUD), game, menu, lobby, feed,
                               map-picker, home, settings, stats
   static/js/
     main.js                   Einstiegspunkt: Karte laden, Navigation (Hauptmenü, Spiel), Lobby verbinden
@@ -70,6 +76,7 @@ worldmapguessr/
     menu/stepper.js, toggle.js, ttl-field.js, difficulty-slider.js
     home/home.js, code-dialog.js   Hauptmenü, Lobby-Code eingeben
     settings/settings-dialog.js, prefs.js, quality-field.js   Einstellungen
+    lobby/index.js            Lobby-Teile, die main.js erst bei Bedarf lädt
     lobby/client.js           WebSocket-Client mit Wiederverbinden
     lobby/lobby-menu.js       Lobby-Bereich im Menü (Link, Spieler, Entfernen, Einstellungen)
     lobby/identity.js, join-dialog.js, confirm.js, rules-text.js, players-rail.js

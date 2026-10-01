@@ -13,3 +13,6 @@ instance/
 # vorkomprimierte Dateien (worldmapguessr/compression.py, beim Start bzw. Docker-Build erzeugt)
 *.gz
 *.gz.*.tmp
+# gebündelte Seiten (web/build.mjs, im Docker-Build erzeugt)
+worldmapguessr/static/dist/
+*.br

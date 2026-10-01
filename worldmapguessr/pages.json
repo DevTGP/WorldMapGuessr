@@ -1,0 +1,13 @@
+{
+  "_": "Einstiegspunkte je Seite (Pfade unter static/). Ohne Build (static/dist fehlt) bindet die Seite diese Dateien einzeln ein, mit Build (web/build.mjs) je Seite ein Bündel.",
+  "game": {
+    "js": "js/main.js",
+    "css": ["css/fonts.css", "css/tokens.css", "css/style.css", "css/game.css", "css/menu.css", "css/lobby.css", "css/feed.css", "css/map-picker.css", "css/home.css", "css/settings.css"],
+    "preloadFonts": ["fonts/instrument-sans-latin.woff2", "fonts/cinzel-latin.woff2"]
+  },
+  "stats": {
+    "js": "js/stats/stats.js",
+    "css": ["css/fonts.css", "css/tokens.css", "css/stats.css"],
+    "preloadFonts": ["fonts/instrument-sans-latin.woff2"]
+  }
+}

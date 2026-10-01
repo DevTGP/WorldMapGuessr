@@ -18,3 +18,8 @@ docker-compose.yml
 .dockerignore
 README.md
 docs/
+**/*.br
+**/*.br.*.tmp
+web/node_modules/
+web/tmp/
+worldmapguessr/static/dist/

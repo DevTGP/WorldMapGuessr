@@ -2,19 +2,26 @@ import gzip
 import os
 import time
 
+import brotli
+
 from worldmapguessr.compression import ensure_gz, send_compressed
 
 BIG = ('{"a": ' + "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10], " * 200 + '"b": 1}').encode()
 
 
-def test_gzip_when_accepted_plain_otherwise(app, tmp_path):
+def test_brotli_or_gzip_when_accepted_plain_otherwise(app, tmp_path):
     (tmp_path / "d.json").write_bytes(BIG)
     (tmp_path / "small.json").write_bytes(b"{}")
     (tmp_path / "img.jpg").write_bytes(b"\xff\xd8" + b"x" * 2000)
-    with app.test_request_context(headers={"Accept-Encoding": "gzip, br"}):
+    with app.test_request_context(headers={"Accept-Encoding": "gzip, deflate, br"}):
         r = send_compressed(str(tmp_path), "d.json")
         r.direct_passthrough = False
-        assert r.headers["Content-Encoding"] == "gzip" and r.mimetype == "application/json"
+        assert r.headers["Content-Encoding"] == "br" and r.mimetype == "application/json"
+        assert brotli.decompress(r.get_data()) == BIG and len(r.get_data()) < len(BIG) / 3
+    with app.test_request_context(headers={"Accept-Encoding": "gzip, br;q=0"}):
+        r = send_compressed(str(tmp_path), "d.json")
+        r.direct_passthrough = False
+        assert r.headers["Content-Encoding"] == "gzip"
         assert gzip.decompress(r.get_data()) == BIG and len(r.get_data()) < len(BIG) / 3
         assert "Content-Encoding" not in send_compressed(str(tmp_path), "small.json").headers  # lohnt nicht
         assert "Content-Encoding" not in send_compressed(str(tmp_path), "img.jpg").headers     # schon komprimiert
@@ -53,3 +60,17 @@ def test_precompress_removes_stale_temp_files(tmp_path):
     os.utime(stale, (old, old))
     assert precompress(str(tmp_path)) == 1
     assert not stale.exists() and (tmp_path / "d.json.gz").exists()
+
+
+def test_dynamic_responses_use_brotli(client):
+    r = client.get("/", headers={"Accept-Encoding": "gzip, br"})
+    assert r.headers["Content-Encoding"] == "br" and b"<html" in brotli.decompress(r.data)
+    r = client.get("/", headers={"Accept-Encoding": "gzip"})
+    assert r.headers["Content-Encoding"] == "gzip" and b"<html" in gzip.decompress(r.data)
+
+
+def test_versioned_map_data_and_bundle_are_immutable(client, tmp_path):
+    version = client.application.extensions["map_index"]["version"]
+    r = client.get(f"/data/{version}/index.json")
+    assert r.cache_control.immutable and r.cache_control.max_age == 365 * 24 * 3600
+    assert "immutable" not in client.get("/static/css/tokens.css").headers.get("Cache-Control", "")

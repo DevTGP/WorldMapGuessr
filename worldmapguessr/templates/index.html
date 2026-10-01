@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>WorldMapGuessr</title>
 <meta name="description" content="{{ t('app.tagline') }}">
-<link rel="preload" href="{{ url_for('static', filename='fonts/instrument-sans-latin.woff2') }}" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="{{ url_for('static', filename='fonts/cinzel-latin.woff2') }}" as="font" type="font/woff2" crossorigin>
-{% for css in ["fonts", "tokens", "style", "game", "menu", "lobby", "feed", "map-picker", "home", "settings"] %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/' ~ css ~ '.css') }}">
+{% import "partials/assets.html" as assets %}
+{% set page = page_assets("game") %}
+{{ assets.head(page) }}
+{# Startdaten der Karte gleich mitladen, nicht erst nach dem JavaScript (map/map.js holt sie per fetch) #}
+{% for f in map_start %}<link rel="preload" href="{{ map_base }}/{{ f }}" as="fetch" crossorigin>
 {% endfor %}
 </head>
 <body>
@@ -18,16 +19,16 @@
 {% include "partials/dialogs.html" %}
 {% include "partials/settings.html" %}
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script>
   window.WMG = {
     mapBase: "{{ map_base }}",            // Kartendaten (Kacheln, Items) mit Versionsstand im Pfad
     dataSize: {{ data_size | tojson }},   // Startdateien in Bytes (für den Download-Fortschritt)
     apiBase: "{{ request.script_root }}/api",
     lobbyCode: {{ (lobby_code or none) | tojson }},
+    serviceWorker: {{ service_worker | tojson }},  // nur mit Bündel (static/sw.js)
     i18n: {{ i18n_client | tojson }},     // Sprache und Wörterbuch (static/js/i18n/index.js)
   };
 </script>
-<script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
+{{ assets.scripts(page) }}
 </body>
 </html>
