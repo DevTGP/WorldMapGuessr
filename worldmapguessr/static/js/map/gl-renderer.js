@@ -245,7 +245,14 @@ export function createGLRenderer(canvas, index, itemOf) {
       failIfMajorPerformanceCaveat: !params.has("webgl"),
     });
     if (!gl) return null;
-    return new GLRenderer(canvas, gl, index, itemOf);
+    try {
+      return new GLRenderer(canvas, gl, index, itemOf);
+    } catch (err) {
+      // Der Canvas gehört jetzt WebGL – für den Rückfall braucht es einen neuen (map.js nimmt ihn)
+      canvas.parentElement?.querySelector(".map-overlay")?.remove();
+      canvas.dataset.glFailed = "1";
+      throw err;
+    }
   } catch (err) {
     console.warn("WebGL nicht verfügbar:", err);
     return null;
@@ -277,7 +284,10 @@ export class GLRenderer extends RendererBase {
       this.tileGL.clear();
       this.reliefTex = new WeakMap();
       this._init();
-      this.onColorsChanged?.(); // neu zeichnen
+      // neu zeichnen – und kurz danach noch einmal: Das erste Bild nach dem Wiederherstellen war im Test
+      // (SwiftShader) unvollständig, solange Texturen neu hochgeladen wurden
+      this.onColorsChanged?.();
+      setTimeout(() => this.onColorsChanged?.(), 250);
     });
   }
 
@@ -299,9 +309,12 @@ export class GLRenderer extends RendererBase {
     };
     this.cellColorTex = texture(gl, gl.RGBA8, this.cells.length, 1, gl.RGBA, gl.UNSIGNED_BYTE, gl.NEAREST);
     this.cellInfoTex = texture(gl, gl.RGBA16UI, this.cells.length, 1, gl.RGBA_INTEGER, gl.UNSIGNED_SHORT, gl.NEAREST);
+    // Texturen in Fenstergröße entstehen beim ersten Zeichnen (auch nach einem verlorenen Kontext neu)
     this.baseTex = null;
+    this.baseSize = null;
     this.baseFbo = gl.createFramebuffer();
     this.coverTex = null;
+    this.coverSize = null;
     this.coverFbo = gl.createFramebuffer();
     this._buildStatic();
   }
@@ -580,7 +593,7 @@ export class GLRenderer extends RendererBase {
     const { gl } = this;
     const W = this.canvas.width, H = this.canvas.height;
     if (!this.baseSize || this.baseSize[0] !== W || this.baseSize[1] !== H) {
-      if (this.baseTex) gl.deleteTexture(this.baseTex);
+      if (this.baseTex && !this.lost) gl.deleteTexture(this.baseTex);
       this.baseTex = texture(gl, gl.RGBA8, W, H, gl.RGBA, gl.UNSIGNED_BYTE, gl.NEAREST);
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.baseFbo);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.baseTex, 0);

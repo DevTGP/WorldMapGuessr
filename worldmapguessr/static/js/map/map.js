@@ -116,7 +116,17 @@ export class WorldMap {
     this.size = { w: 0, h: 0 };
     // WebGL 2, sonst Canvas 2D (gl-renderer.js / renderer.js)
     const itemOf = (key) => this.byKey.get(key);
-    this.renderer = createGLRenderer(canvas, index, itemOf) ?? new Renderer(canvas, index, itemOf);
+    this.renderer = createGLRenderer(canvas, index, itemOf);
+    if (!this.renderer) {
+      if (canvas.dataset.glFailed) {
+        // WebGL-Kontext bestand schon: frischer Canvas für Canvas 2D
+        const fresh = canvas.cloneNode(false);
+        delete fresh.dataset.glFailed;
+        canvas.replaceWith(fresh);
+        this.canvas = canvas = fresh;
+      }
+      this.renderer = new Renderer(canvas, index, itemOf);
+    }
     this.renderer.onColorsChanged = () => this.requestRender();
     this.renderer.labels.items = () => this.features;
     this.renderer.labels.onChange = () => this.requestRender(); // Namen aus dem Worker angekommen
