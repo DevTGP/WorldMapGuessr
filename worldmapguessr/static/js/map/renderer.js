@@ -58,7 +58,7 @@ export class RendererBase {
     this.dpr = 1;
     this.colors = {};
     this.placed = new Map(); // Item-Key → Startzeit der Aufhell-Animation
-    this.showGraticule = false;
+    this.showGraticule = true;
     this.step = MIN_STEP_PX;
     this.shelfStep = SHELF_STEP_PX;
     this.graticule = d3.geoGraticule10();

@@ -2,10 +2,10 @@
 // einige weiche Nebel und Sterne, von denen ein Teil ganz leicht funkelt. Einstellung „Kosmos“ (prefs.cosmos);
 // aus: die Seite sieht aus wie ohne (Hintergrund --outside, der Renderer füllt das Außen wieder selbst).
 //
-// Zwei Flächen übereinander:
-// - Raum und Nebel: weiche Verläufe, daher in ¼ Auflösung (1/16 der Pixel) und per CSS hochskaliert
-//   (Compositor, ohne Rasterkosten) – sichtbar gleich, je Fenstergröße einmal gezeichnet.
-// - Sterne in voller Auflösung. Die ruhigen werden einmal gezeichnet; je Bild (≈ 20/s) werden nur die kleinen
+// Zwei Ebenen übereinander:
+// - Raum und Farbschleier: CSS-Verläufe als Hintergrund von #cosmos (volle Auflösung, ohne Canvas),
+//   je Fenstergröße einmal gesetzt.
+// - Sterne auf einer Canvas in voller Auflösung. Die ruhigen werden einmal gezeichnet; je Bild (≈ 20/s) werden nur die kleinen
 //   Rechtecke der funkelnden gelöscht und neu gezeichnet (samt der ruhigen Sterne, die hineinragen).
 // Zusammen ≈ 300 ms weniger beim Start als eine Fläche, die je Bild ganz neu gezeichnet wird (DPR 2, 1600 × 900,
 // Software-Raster).
@@ -18,9 +18,7 @@ import { prefs } from "../settings/prefs.js";
 const STARS_PER_MPX = 520;
 const TWINKLE_SHARE = 0.22;
 const FRAME_MS = 50;
-/** Nebel in dieser Verkleinerung zeichnen (weiche Verläufe – beim Hochskalieren kein sichtbarer Unterschied) */
-const NEBULA_SCALE = 4;
-/** Nebel: [x, y (Anteil des Bildes), Radius (Anteil der Diagonale), Farbe r,g,b, Deckkraft] */
+/** Farbschleier: [x, y (Anteil des Bildes), Radius (Anteil der Diagonale), Farbe r,g,b, Deckkraft] */
 const NEBULAE = [
   [0.12, 0.22, 0.38, [96, 70, 170], 0.20],
   [0.86, 0.78, 0.42, [40, 110, 160], 0.18],
@@ -37,9 +35,8 @@ export class Cosmos {
     this.el = document.createElement("div");
     this.el.id = "cosmos";
     this.el.setAttribute("aria-hidden", "true");
-    this.nebula = document.createElement("canvas");
     this.canvas = document.createElement("canvas");
-    this.el.append(this.nebula, this.canvas);
+    this.el.append(this.canvas);
     stage.prepend(this.el);
     this.ctx = this.canvas.getContext("2d");
     this.stars = [];
@@ -102,34 +99,16 @@ export class Cosmos {
     this._run();
   }
 
-  /** Raum, Nebel und ruhige Sterne */
+  /** Raum und Farbschleier (CSS-Verläufe) und ruhige Sterne */
   _paintBase() {
     const { w, h, dpr } = this, g = this.ctx;
-    const small = this.nebula;
-    small.width = Math.max(1, Math.ceil((w * dpr) / NEBULA_SCALE));
-    small.height = Math.max(1, Math.ceil((h * dpr) / NEBULA_SCALE));
-    const n = small.getContext("2d");
-    n.scale(small.width / w, small.height / h);
-    const bg = n.createRadialGradient(w * 0.5, h * 0.45, 0, w * 0.5, h * 0.5, Math.hypot(w, h) * 0.6);
-    bg.addColorStop(0, "#0b1224");
-    bg.addColorStop(1, "#03050b");
-    n.fillStyle = bg;
-    n.fillRect(0, 0, w, h);
-    const diag = Math.hypot(w, h);
-    n.globalCompositeOperation = "lighter";
-    for (const [x, y, r, [cr, cg, cb], a] of NEBULAE) {
-      // jeder Nebel aus einigen versetzten Wolken – wirkt weniger wie ein Kreis
-      for (let k = 0; k < 4; k++) {
-        const ox = Math.sin(k * 2.1 + x * 9) * r * diag * 0.25, oy = Math.cos(k * 1.7 + y * 7) * r * diag * 0.18;
-        const rr = r * diag * (0.55 + 0.15 * k);
-        const grad = n.createRadialGradient(x * w + ox, y * h + oy, 0, x * w + ox, y * h + oy, rr);
-        grad.addColorStop(0, `rgba(${cr},${cg},${cb},${a / 1.5})`);
-        grad.addColorStop(0.5, `rgba(${cr},${cg},${cb},${a / 4})`);
-        grad.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
-        n.fillStyle = grad;
-        n.fillRect(0, 0, w, h);
-      }
-    }
+    const diag = Math.hypot(w, h), px = (v) => `${v.toFixed(1)}px`;
+    const veils = NEBULAE.map(([x, y, r, [cr, cg, cb], a]) => {
+      const c = (k) => `rgba(${cr},${cg},${cb},${(a * k).toFixed(3)})`;
+      return `radial-gradient(circle ${px(r * diag * 0.8)} at ${px(x * w)} ${px(y * h)}, ${c(1.3)}, ${c(0.55)} 40%, ${c(0.15)} 72%, ${c(0)})`;
+    });
+    veils.push(`radial-gradient(circle ${px(diag * 0.6)} at ${px(w * 0.5)} ${px(h * 0.47)}, #0b1224, #03050b)`);
+    this.el.style.background = veils.join(", ");
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, w, h);
     for (const s of this.stars) if (!s.twinkle) star(g, s, s.a);
