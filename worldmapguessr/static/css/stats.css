@@ -22,6 +22,8 @@ body {
 }
 /* Kosmos (ui/cosmos.js): Sterne und Nebel hinter der Seite, wie auf der Karte */
 #cosmos { position: fixed; inset: 0; z-index: 0; display: block; width: 100%; height: 100%; pointer-events: none; }
+#cosmos[hidden] { display: none; }
+#cosmos canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 html.cosmos body { background: #03050b; }
 /* Kopf liegt direkt auf dem Weltraum: helle Schrift, auch im hellen Farbschema */
 html.cosmos .head h1, html.cosmos .summary b, html.cosmos .back:hover { color: #e6ecf1; }

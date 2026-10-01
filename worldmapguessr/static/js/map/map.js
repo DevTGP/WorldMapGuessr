@@ -293,6 +293,9 @@ export class WorldMap {
   }
 
   // ---------- Zeichnen ----------
+  /** Wird die Ansicht gerade bewegt (Ziehen, Zoomen, Animation)? */
+  get moving() { return this._moving; }
+
   markMoving() {
     this._moving = true;
     clearTimeout(this._idleTimer);

@@ -12,6 +12,8 @@ body {
 #map { position: relative; display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
 /* Kosmos (ui/cosmos.js): Sterne und Nebel hinter der Karte, das Außen der Karte bleibt durchsichtig */
 #cosmos { position: absolute; inset: 0; display: block; width: 100%; height: 100%; pointer-events: none; }
+#cosmos[hidden] { display: none; }
+#cosmos canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 html.cosmos body, html.cosmos .loading { background: #03050b; }
 #map.dragging { cursor: grabbing; }
 /* Kartenfarben werden per getComputedStyle in den Canvas-Renderer gelesen. */

@@ -47,7 +47,7 @@ async function prepareIcons(features) {
   }
 }
 
-new Cosmos(document.getElementById("stage"));
+const cosmos = new Cosmos(document.getElementById("stage"));
 
 createMap({
   canvas: document.getElementById("map"),
@@ -60,6 +60,7 @@ createMap({
     loading.enter("start");
     await yielder()(true);
     bindMapControls(map);
+    cosmos.busy = () => map.moving; // Funkeln pausiert, solange die Karte bewegt wird
     const game = new Game(map);
     /** used: auf dieser Seite wurde schon ein Spiel verbunden · code: das gerade verbundene (oder null) */
     const ctx = { map, game, menu: null, home: null, client: null, used: false, code: null };
