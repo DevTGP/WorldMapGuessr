@@ -19,6 +19,7 @@ from .lobbies.codes import LobbyCodeConverter
 # was ES-Module im Browser blockiert.
 mimetypes.add_type("text/javascript", ".js")
 mimetypes.add_type("text/css", ".css")
+mimetypes.add_type("font/woff2", ".woff2")
 
 
 def create_app(test_config: dict | None = None) -> Flask:
