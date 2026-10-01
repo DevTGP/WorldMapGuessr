@@ -54,10 +54,11 @@ export class LabelLayer {
       if (!this.source.busy) { this.layoutKey = ""; this.onChange(); }
     });
     this.gen = 0;
+    this.sprites = new GlyphSprites();
   }
 
   /** Neu auslegen (z. B. wenn die Schrift nachgeladen wurde) */
-  invalidate() { this.layoutKey = ""; this.cands.clear(); this.gen++; }
+  invalidate() { this.layoutKey = ""; this.cands.clear(); this.gen++; this.sprites.clear(); }
 
   /**
    * Namen zeichnen
@@ -93,30 +94,28 @@ export class LabelLayer {
     }
     ctx.save();
     const base = ctx.getTransform();
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.lineJoin = "round";
+    const dpr = Math.hypot(base.a, base.b) || 1;
     for (const l of this.layout) {
       const px = l.em * scale;
       let alpha = visibility(l.item.kind, px);
       if (alpha <= 0.02) continue;
       if (l.item.kind === "country" && statesShown.has(l.item.id)) alpha *= 0.3;
-      ctx.font = fontFor(l.item.kind, px);
-      ctx.lineWidth = Math.min(4, Math.max(2, px / 5));
-      ctx.strokeStyle = l.halo;
-      ctx.fillStyle = l.color;
       // große Namen liegen wie gedruckt auf der Karte, kleine bleiben kräftig
       ctx.globalAlpha = alpha * (px > 22 ? 0.72 : px > 14 ? 0.84 : 0.95);
+      const step = sizeStep(px * dpr), k = px / step.dev;
       for (const g of l.glyphs) {
         const p = projection(g.ll), q = projection(g.dir);
         if (!p || !q || p[0] < -px * 2 || p[1] < -px * 2 || p[0] > size.w + px * 2 || p[1] > size.h + px * 2) continue;
-        ctx.setTransform(base); // Grundtransformation (Pixeldichte) behalten
-        ctx.translate(p[0], p[1]);
-        ctx.rotate(Math.atan2(q[1] - p[1], q[0] - p[0]));
-        ctx.strokeText(g.ch, 0, 0);
-        ctx.fillText(g.ch, 0, 0);
+        const sp = this.sprites.get(l.item.kind, g.ch, l.color, l.halo, step, dpr);
+        const a = Math.atan2(q[1] - p[1], q[0] - p[0]);
+        const cos = Math.cos(a) * k, sin = Math.sin(a) * k;
+        // Grundtransformation (Pixeldichte) · Verschiebung · Drehung · Skalierung auf die Stufe
+        ctx.setTransform(
+          base.a * cos + base.c * sin, base.b * cos + base.d * sin,
+          -base.a * sin + base.c * cos, -base.b * sin + base.d * cos,
+          base.a * p[0] + base.c * p[1] + base.e, base.b * p[0] + base.d * p[1] + base.f);
+        ctx.drawImage(sp.canvas, -sp.ox, -sp.oy, sp.w, sp.h);
       }
-      ctx.setTransform(base);
     }
     ctx.restore();
   }
@@ -178,6 +177,63 @@ export class LabelLayer {
       const c = geoBox(o);
       return c[0] < b[2] + mx && c[2] > b[0] - mx && c[1] < b[3] + my && c[3] > b[1] - my;
     });
+  }
+}
+
+/**
+ * Größenstufe einer Schrift (Gerätepixel): Stufen im Abstand 2^(1/4) ≈ 19 %, nach oben gerundet –
+ * ein Buchstabe wird nur verkleinert gezeichnet
+ */
+function sizeStep(devPx) {
+  const i = Math.ceil(Math.log2(Math.max(devPx, 1)) * SPRITE_STEPS);
+  return STEP_CACHE[i] ??= { i, dev: 2 ** (i / SPRITE_STEPS) };
+}
+const SPRITE_STEPS = 4, STEP_CACHE = [];
+/** Höchstens so viele Pixel in allen Buchstabenbildern; darüber werden die ältesten verworfen */
+const SPRITE_PIXELS_MAX = 8e6;
+
+/**
+ * Buchstaben als Bilder (Rand und Füllung) je Art, Zeichen, Farbe und Größenstufe. strokeText/fillText je
+ * Buchstabe und Bild war beim Zoomen der teuerste Teil (jede Größe neu gerastert: ≈ 12 ms bei 700 Buchstaben);
+ * ein skaliertes drawImage kostet nur einen Bruchteil.
+ */
+class GlyphSprites {
+  constructor() { this.clear(); }
+
+  clear() { this.map = new Map(); this.pixels = 0; }
+
+  get(kind, ch, color, halo, step, dpr) {
+    const key = `${kind}|${ch}|${color}|${halo}|${step.i}|${dpr}`;
+    let sp = this.map.get(key);
+    if (sp) return sp;
+    // in Gerätepixeln gezeichnet (Schrift dev px); der Aufrufer skaliert mit px / dev auf die Bildschirmgröße.
+    // Randbreite wie zuvor: px / 5, 2 … 4 CSS-Pixel
+    const dev = step.dev, line = Math.min(4, Math.max(2, dev / dpr / 5)) * dpr;
+    const canvas = document.createElement("canvas");
+    const g = canvas.getContext("2d");
+    g.font = fontFor(kind, dev);
+    const pad = Math.ceil(line + 2);
+    const width = Math.ceil(g.measureText(ch).width) + 2 * pad;
+    const height = Math.ceil(dev * 1.25) + 2 * pad;
+    canvas.width = width; canvas.height = height;
+    g.font = fontFor(kind, dev);
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.lineJoin = "round";
+    g.lineWidth = line;
+    g.strokeStyle = halo;
+    g.fillStyle = color;
+    g.strokeText(ch, width / 2, height / 2);
+    g.fillText(ch, width / 2, height / 2);
+    sp = { canvas, w: width, h: height, ox: width / 2, oy: height / 2 };
+    this.pixels += width * height;
+    for (const [k, old] of this.map) {
+      if (this.pixels <= SPRITE_PIXELS_MAX) break;
+      this.pixels -= old.w * old.h;
+      this.map.delete(k);
+    }
+    this.map.set(key, sp);
+    return sp;
   }
 }
 
