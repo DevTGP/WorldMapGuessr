@@ -568,6 +568,8 @@
  "settings.controls": "Controls",
  "settings.cosmos": "Cosmos",
  "settings.cosmosHint": "stars and nebulae around the globe",
+ "settings.labels": "Names",
+ "settings.labelsHint": "names of placed areas on the map",
  "settings.display": "Display",
  "settings.eyebrow": "This device only",
  "settings.general": "General",

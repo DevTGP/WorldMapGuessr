@@ -10,6 +10,9 @@
 // schwerer). Die Ebenen unterscheiden sich in der Strichstärke (BORDER_PX): Auch wenn alle Staaten eines
 // Kontinents eingesetzt sind, bleibt die Kontinentgrenze erkennbar.
 //
+// Zellen, in die in der laufenden Runde nichts kommt (kein Item des Pools enthält sie), werden schraffiert
+// (setPool, Farbe map.hatch des Schemas).
+//
 // Namen eingesetzter Items zeichnet map/labels.js obenauf.
 //
 // Pro Punkt wird nur noch gedreht und skaliert (vorberechnete Faktoren, siehe project.js). Kacheln an der
@@ -25,7 +28,8 @@ const PLACED_FADE_MS = 500;
 /** Eingesetzte Items, die kleiner als so viele Pixel erscheinen, bekommen einen Ring */
 const TINY_PX = 5;
 const TINY_RING_R = 3.5;
-/** Mindestabstand zweier gezeichneter Punkte (Pixel) */
+/** Schraffur außerhalb des Pools: Abstand und Strichbreite (CSS-Pixel, 45°) */
+export const HATCH = { period: 7, width: 1.4 };
 /** Kleinere Ringe (Inseln) und Linienstücke werden nicht gezeichnet */
 const MIN_SIZE_PX = 0.5;
 const MIN_STEP_PX = 0.75; // Standard (Qualität „Niedrig“); setQuality ändert step/shelfStep
@@ -67,6 +71,8 @@ export class RendererBase {
     this.showLabels = true;
     // Zelle → Keys der Ebenen, die sie enthalten
     this.cells = index.cells.map(([continent, item, state = null]) => ({ continent: `continent:${continent}`, item, state }));
+    /** Je Zelle: außerhalb des Pools (schraffiert); null = kein Pool (alles normal) */
+    this.cellOut = null;
     this.readColors();
 
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => this.readColors());
@@ -82,7 +88,9 @@ export class RendererBase {
     this.colors = {
       outside: s.map.outside ?? cs.getPropertyValue("--outside").trim(),
       sea: s.map.sea, "sea-shelf": s.map.shelf, coast: s.map.coast, border: s.map.border, water: s.map.water,
+      hatch: s.map.hatch,
     };
+    this._hatchPattern = null;
     this.scheme = s;
     this.cellStops = this.cells.map((c) => stopsFor(s, c.continent));
     this.onColorsChanged?.();
@@ -91,6 +99,19 @@ export class RendererBase {
   setPlaced(key, placed, animate = true) {
     if (placed) this.placed.set(key, animate ? performance.now() : -Infinity);
     else this.placed.delete(key);
+  }
+
+  /**
+   * Item-Keys der laufenden Runde; Zellen, die keines davon enthält (weder als Kontinent, Staat noch
+   * Bundesland), werden schraffiert. null: keine Schraffur.
+   * @param {Iterable<string>|null} keys
+   */
+  setPool(keys) {
+    if (!keys) { this.cellOut = null; return; }
+    const pool = new Set(keys);
+    this.cellOut = this.cells.map((c) => !(pool.has(c.continent) || (c.item && pool.has(c.item)) ||
+      (c.state && pool.has(c.state))));
+    if (!this.cellOut.some(Boolean)) this.cellOut = null;
   }
 
   /** true, solange noch eine Aufhell-Animation läuft */
@@ -134,7 +155,8 @@ export class RendererBase {
         const j = Math.min(stops.length - 2, Math.floor(k)), f = Math.min(1, k - j), a = stops[j], z = stops[j + 1];
         r = a.r + (z.r - a.r) * f; g = a.g + (z.g - a.g) * f; b = a.b + (z.b - a.b) * f;
       }
-      out[4 * i] = Math.round(r); out[4 * i + 1] = Math.round(g); out[4 * i + 2] = Math.round(b); out[4 * i + 3] = 255;
+      out[4 * i] = Math.round(r); out[4 * i + 1] = Math.round(g); out[4 * i + 2] = Math.round(b);
+      out[4 * i + 3] = this.cellOut?.[i] ? 0 : 255; // 0: schraffieren (gl-renderer.js FILL_VS)
     });
     return out;
   }
@@ -241,6 +263,8 @@ export class Renderer extends RendererBase {
     // Teilpfaden ist beim Rastern deutlich teurer als viele kleine (jeder nur so groß wie seine Kachel).
     // Kacheln überlappen leicht (build/2-tiles.mjs), daher keine Nahtlinien.
     const fills = []; // [Farbe, Pfad]
+    const out = this.cellOut;
+    const hatch = out ? new Path2D() : null;
     const coast = new Path2D();
     const shelf = moving ? null : new Path2D();
     const borders = new Path2D();
@@ -258,6 +282,7 @@ export class Renderer extends RendererBase {
         let p = byColor.get(color);
         if (!p) byColor.set(color, (p = new Path2D()));
         for (const ring of f.rings) addRing(p, ring, v, off, cut, true, this.step);
+        if (out?.[f.cell]) for (const ring of f.rings) addRing(hatch, ring, v, off, cut, true, this.step);
       }
       for (const entry of byColor) fills.push(entry);
       for (const l of t.lines) {
@@ -296,6 +321,10 @@ export class Renderer extends RendererBase {
       ctx.strokeStyle = color;
       ctx.stroke(p);
     }
+    if (hatch) {
+      ctx.fillStyle = this._hatch();
+      ctx.fill(hatch);
+    }
     // Relief über die Landfarben, darüber Seen und Flüsse; Grenzen und Küsten bleiben obenauf
     if (extras.relief) extras.relief.layer.draw(ctx, projection, { w: this.w, h: this.h }, extras.relief.passes, moving);
     if (extras.water?.length) this._drawWater(extras.water, v);
@@ -315,6 +344,33 @@ export class Renderer extends RendererBase {
     ctx.stroke(coast);
 
     this._drawOverlay(ctx, projection, now, moving);
+  }
+
+  /** Muster der Schraffur in Gerätepixeln (am Bildschirm ausgerichtet, nahtlos wiederholbar) */
+  _hatch() {
+    if (this._hatchPattern?.dpr === this.dpr) return this._hatchPattern.pattern;
+    const n = Math.max(4, Math.round(HATCH.period * this.dpr));
+    const half = HATCH.width * this.dpr / 2;
+    const c = document.createElement("canvas");
+    c.width = c.height = n;
+    const g = c.getContext("2d");
+    const img = g.createImageData(n, n);
+    const col = d3.rgb(this.colors.hatch);
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        // Abstand zur nächsten Diagonale (x + y ≡ 0 mod n), in Pixeln senkrecht zum Strich
+        const u = (x + y + 1) % n, d = Math.min(u, n - u) * Math.SQRT1_2;
+        const a = Math.max(0, Math.min(1, half + 0.5 - d));
+        const o = 4 * (y * n + x);
+        img.data[o] = col.r; img.data[o + 1] = col.g; img.data[o + 2] = col.b;
+        img.data[o + 3] = Math.round(255 * col.opacity * a);
+      }
+    }
+    g.putImageData(img, 0, 0);
+    const pattern = this.ctx.createPattern(c, "repeat");
+    pattern.setTransform(new DOMMatrix().scale(1 / this.dpr));
+    this._hatchPattern = { dpr: this.dpr, pattern };
+    return pattern;
   }
 
   /** Seen füllen, Flüsse als Linien (Breite nach Bedeutung und Zoom) – in der Wasserfarbe des Schemas */

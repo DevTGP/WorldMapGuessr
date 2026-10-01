@@ -8,6 +8,7 @@
 //   relief                Geländeschummerung: off · light · strong
 //   water                 Flüsse und Seen zeichnen
 //   cosmos                Sterne und Nebel außerhalb der Erde (ui/cosmos.js)
+//   labels                Namen eingesetzter Gebiete auf der Karte (map/labels.js)
 
 const KEY = "wmg.prefs";
 /** Stand der gespeicherten Einstellungen. 2: Standard-Farbschema A statt B – ein gespeichertes „b“ aus
@@ -26,6 +27,7 @@ const DEFS = {
   relief: { def: "light", options: ["off", "light", "strong"] },
   water: { def: true, bool: true },
   cosmos: { def: true, bool: true },
+  labels: { def: true, bool: true },
 };
 
 const listeners = new Set();

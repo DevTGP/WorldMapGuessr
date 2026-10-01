@@ -128,6 +128,7 @@ export class WorldMap {
       this.renderer = new Renderer(canvas, index, itemOf);
     }
     this.renderer.onColorsChanged = () => this.requestRender();
+    this.renderer.showLabels = prefs.get("labels");
     this.renderer.labels.items = () => this.features;
     this.renderer.labels.onChange = () => this.requestRender(); // Namen aus dem Worker angekommen
     tiles.onLoad = () => this.requestRender();
@@ -148,6 +149,7 @@ export class WorldMap {
     prefs.onChange((key) => {
       if (key === "projection") this._switchProjection();
       else if (key === "relief" || key === "water") this.requestRender();
+      else if (key === "labels") { this.renderer.showLabels = prefs.get("labels"); this.requestRender(); }
     });
 
     this.gestures = new Gestures(this);
@@ -405,6 +407,12 @@ export class WorldMap {
 
   resetPlaced() {
     this.renderer.placed.clear();
+    this.requestRender();
+  }
+
+  /** Item-Keys der Runde: Gebiete außerhalb davon werden schraffiert (null: keine Schraffur) */
+  setPool(keys) {
+    this.renderer.setPool(keys);
     this.requestRender();
   }
 

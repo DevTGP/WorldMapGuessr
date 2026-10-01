@@ -13,6 +13,7 @@ import { TimerMeter } from "./timer-meter.js";
 import { Feed } from "../ui/feed.js";
 import { renderScore } from "./score-view.js";
 import { KeyboardControl } from "../map/keyboard.js";
+import { poolFor } from "../menu/config.js";
 import { t } from "../i18n/index.js";
 
 const DBLCLICK_REARM_MS = 400;
@@ -122,6 +123,7 @@ export class Game {
     this.over = false;
     this.dialog.close();
     this.map.resetPlaced();
+    this.map.setPool(poolFor(config, this.map.features).map((f) => f.key));
     this.inventory.clear();
     this.lives.reset(lives);
     this.pieces = new Map();

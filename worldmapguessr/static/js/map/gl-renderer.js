@@ -23,7 +23,7 @@
 // Grenze zu welcher Art gehört (sichtbar erst, wenn eine Seite eingesetzt ist), entscheidet der Shader aus
 // einer Textur mit Kontinent, Staat, Bundesland und Einsetz-Stand je Zelle.
 
-import { RendererBase, BORDER_PX, COAST_PX, GLOW, GLOW_RGB, SHELF_PX, STATE_DASH } from "./renderer.js";
+import { RendererBase, BORDER_PX, COAST_PX, GLOW, GLOW_RGB, HATCH, SHELF_PX, STATE_DASH } from "./renderer.js";
 import { TAU, viewOf, wrapOffset } from "./project.js";
 import { projectionId } from "./projections.js";
 import { PROJECTION_DEFS } from "./projection-defs.js";
@@ -74,17 +74,33 @@ uniform int u_mode;            // 0 Land (Farbe je Zelle), 1 einfarbig, 2 einfar
 uniform sampler2D u_cellColors;
 uniform vec4 u_color;
 flat out vec4 v_color;
+flat out float v_hatch;
 void main() {
   if (u_mode == 2 && a_attr > u_view.x) { gl_Position = NOWHERE; return; }
   v_color = u_mode == 0 ? texelFetch(u_cellColors, ivec2(int(a_attr + 0.5), 0), 0) : u_color;
+  // Land: Alpha 0 markiert Zellen außerhalb des Pools (renderer.js _cellRgba) → schraffieren
+  v_hatch = u_mode == 0 && v_color.a < 0.5 ? 1.0 : 0.0;
+  if (u_mode == 0) v_color.a = 1.0;
   gl_Position = toClip(project(a_pos));
 }`;
 
 const FILL_FS = `#version 300 es
 precision highp float;
 flat in vec4 v_color;
+flat in float v_hatch;
+uniform vec4 u_hatch;    // Farbe (nicht vormultipliziert), Alpha = Deckkraft
+uniform vec2 u_hatchPx;  // Abstand, halbe Strichbreite (Gerätepixel)
 out vec4 o;
-void main() { o = v_color; }`;
+void main() {
+  o = v_color;
+  if (v_hatch > 0.5) {
+    // 45°-Striche am Bildschirm: Abstand zur nächsten Diagonale senkrecht zum Strich
+    float u = mod(gl_FragCoord.x - gl_FragCoord.y, u_hatchPx.x);
+    float d = min(u, u_hatchPx.x - u) * 0.70710678;
+    float a = clamp(u_hatchPx.y + 0.5 - d, 0.0, 1.0) * u_hatch.a;
+    o.rgb = mix(o.rgb, u_hatch.rgb, a);
+  }
+}`;
 
 const LINE_VS = `#version 300 es
 ${PROJECT_GLSL}
@@ -456,6 +472,11 @@ export class GLRenderer extends RendererBase {
     this._uniforms(p, shift);
     gl.uniform1i(p.u.u_mode, mode);
     if (color) gl.uniform4f(p.u.u_color, ...color);
+    if (mode === 0) {
+      const h = d3.rgb(this.colors.hatch);
+      gl.uniform4f(p.u.u_hatch, h.r / 255, h.g / 255, h.b / 255, h.opacity);
+      gl.uniform2f(p.u.u_hatchPx, Math.max(4, Math.round(HATCH.period * this.dpr)), HATCH.width * this.dpr / 2);
+    }
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.cellColorTex);
     gl.uniform1i(p.u.u_cellColors, 0);

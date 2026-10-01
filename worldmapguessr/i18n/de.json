@@ -568,6 +568,8 @@
  "settings.controls": "Steuerung",
  "settings.cosmos": "Kosmos",
  "settings.cosmosHint": "Sterne und Nebel rund um die Erde",
+ "settings.labels": "Namen",
+ "settings.labelsHint": "Namen eingesetzter Gebiete auf der Karte",
  "settings.display": "Darstellung",
  "settings.eyebrow": "Nur auf diesem Gerät",
  "settings.general": "Allgemein",

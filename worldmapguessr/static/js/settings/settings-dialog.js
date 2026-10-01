@@ -1,5 +1,5 @@
 // Einstellungs-Popup (Hauptmenü und im Spiel über ⚙). Alles gilt sofort und nur auf diesem Gerät.
-//   Darstellung: Farbschema, Kartenqualität, Projektion, Relief, Flüsse und Seen
+//   Darstellung: Farbschema, Kartenqualität, Projektion, Relief, Namen, Flüsse und Seen, Kosmos
 //   Steuerung:   Zoom- und Bewegungsempfindlichkeit, Tastenübersicht
 //   Allgemein:   Name, Sprache (Cookie, Wechsel lädt die Seite neu)
 
@@ -29,7 +29,7 @@ export class SettingsDialog {
       (id) => { document.getElementById("set-projection-hint").textContent = PROJECTIONS[id].blurb; });
     this._segmented(document.getElementById("set-relief"), "relief", RELIEF);
     this._segmented(document.getElementById("set-lang"), null, LANGS);
-    for (const key of ["water", "cosmos"]) {
+    for (const key of ["labels", "water", "cosmos"]) {
       const box = document.getElementById(`set-${key}`);
       box.addEventListener("change", () => prefs.set(key, box.checked));
       this.syncs.push(() => { box.checked = prefs.get(key); });
