@@ -54,7 +54,8 @@ worldmapguessr/
     ui/feed.js                Nachrichtenleiste (Meldungen, Punkte, Chat)
     ui/cosmos.js              Kosmos-Hintergrund (Sterne, Nebel) hinter der Karte und der Statistik
     map/map.js                Startdaten laden, Ansicht (Drehung, Zoom, Verschieben), Projektionswechsel
-    map/renderer.js           Canvas-Zeichnung aus Kacheln (Zellfarben, Küsten, Grenzen, Wasser, Kleinststaat-Ringe)
+    map/gl-renderer.js        WebGL-2-Renderer (Projektion im Shader, Linien als Kapseln, Relief im Shader)
+    map/renderer.js           Canvas-Renderer (Rückfall ohne beschleunigtes WebGL 2) und gemeinsame Basis
     map/labels.js             Namen eingesetzter Items (gebogen nach der Form, keine Überschneidungen)
     map/labels-core.js        Kandidaten je Item (Maske, Mittellinie, Größe) – ohne DOM, auch im Worker
     map/labels-worker.js      Worker für labels-core.js (OffscreenCanvas, eigene Schrift-Instanz)

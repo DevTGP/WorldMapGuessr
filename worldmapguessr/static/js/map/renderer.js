@@ -35,20 +35,26 @@ const SHELF_STEP_PX = 2.5;
 const SEAM_PX = 1.2;
 /** Grenzen je Ebene (px): deutlich abgestuft, damit übergeordnete Grenzen zwischen eingesetzten
  *  Unterteilungen sichtbar bleiben. Küste: COAST_PX in der Küstenfarbe. */
-const BORDER_PX = { continent: 2.2, country: 0.8, state: 0.45 };
-const COAST_PX = 0.7;
+export const BORDER_PX = { continent: 2.2, country: 0.8, state: 0.45 };
+export const COAST_PX = 0.7;
+/** Breite des hellen Schelf-Saums entlang der Küste (px) */
+export const SHELF_PX = 5;
+/** Strichelung der Bundesland-Grenzen [Strich, Lücke] (px) */
+export const STATE_DASH = [3, 2.5];
 /** Kosmos: Schein um die Erde als breite, schwache Striche [Breite px, Deckkraft] */
-const GLOW = [[26, 0.035], [14, 0.06], [6, 0.1], [2, 0.18]];
+export const GLOW = [[26, 0.035], [14, 0.06], [6, 0.1], [2, 0.18]];
+export const GLOW_RGB = [110, 170, 255];
 
-export class Renderer {
+/**
+ * Gemeinsamer Teil beider Renderer (Canvas 2D hier, WebGL in gl-renderer.js): Farben, Spielstand,
+ * Aufhell-Animation, Namen, Ringe um Kleinststaaten.
+ */
+export class RendererBase {
   /**
-   * @param {HTMLCanvasElement} canvas
    * @param {{cells: [string, string|null][]}} index
    * @param {(key: string) => object|undefined} itemOf  Item-Metadaten (geom.anchor, geom.area)
    */
-  constructor(canvas, index, itemOf) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext("2d");
+  constructor(index, itemOf) {
     this.dpr = 1;
     this.colors = {};
     this.placed = new Map(); // Item-Key → Startzeit der Aufhell-Animation
@@ -80,14 +86,6 @@ export class Renderer {
     this.scheme = s;
     this.cellStops = this.cells.map((c) => stopsFor(s, c.continent));
     this.onColorsChanged?.();
-  }
-
-  resize(w, h) {
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.canvas.width = Math.round(w * this.dpr);
-    this.canvas.height = Math.round(h * this.dpr);
-    this.w = w;
-    this.h = h;
   }
 
   setPlaced(key, placed, animate = true) {
@@ -123,6 +121,79 @@ export class Renderer {
   }
 
   /**
+   * Wie _cellColors, aber als Zahlen: RGBA je Zelle in out (Uint8Array, 4 Byte je Zelle) – für WebGL
+   */
+  _cellRgba(now, out) {
+    this.cells.forEach((c, i) => {
+      const stops = this.cellStops[i];
+      const k = this._fraction(c.continent, now) + (c.item ? this._fraction(c.item, now) : 0) +
+        (c.state ? this._fraction(c.state, now) : 0);
+      let r, g, b;
+      if (k <= 0) ({ r, g, b } = stops[0]);
+      else {
+        const j = Math.min(stops.length - 2, Math.floor(k)), f = Math.min(1, k - j), a = stops[j], z = stops[j + 1];
+        r = a.r + (z.r - a.r) * f; g = a.g + (z.g - a.g) * f; b = a.b + (z.b - a.b) * f;
+      }
+      out[4 * i] = Math.round(r); out[4 * i + 1] = Math.round(g); out[4 * i + 2] = Math.round(b); out[4 * i + 3] = 255;
+    });
+    return out;
+  }
+
+  /** Ringe für eingesetzte Items, die in der aktuellen Ansicht kaum sichtbar wären */
+  _drawTinyMarkers(ctx, projection, now) {
+    const c = this.colors;
+    const scale = projection.scale();
+    ctx.lineWidth = 1;
+    for (const key of this.placed.keys()) {
+      const item = this.itemOf(key);
+      if (!item || Math.sqrt(item.geom.area) * scale >= TINY_PX) continue;
+      const p = projection(item.geom.anchor);
+      if (!p || p[0] < -10 || p[1] < -10 || p[0] > this.w + 10 || p[1] > this.h + 10) continue;
+      const cont = key.startsWith("continent:") ? key : `continent:${item.properties?.region}`;
+      const country = key.startsWith("state:") ? `country:${item.properties.country}` : null;
+      const k = this._fraction(key, now) + (cont === key ? 0 : this._fraction(cont, now)) +
+        (country ? this._fraction(country, now) : 0);
+      ctx.beginPath();
+      ctx.arc(p[0], p[1], TINY_RING_R, 0, 2 * Math.PI);
+      ctx.fillStyle = stageColor(stopsFor(this.scheme, cont), k);
+      ctx.fill();
+      ctx.strokeStyle = c.coast;
+      ctx.stroke();
+    }
+  }
+
+  /** Ringe und Namen obenauf */
+  _drawOverlay(ctx, projection, now, moving) {
+    this._drawTinyMarkers(ctx, projection, now);
+    if (this.showLabels) {
+      this.labels.draw(ctx, projection, { w: this.w, h: this.h }, this.placed.keys(),
+        (key) => this._stage(key), this.scheme, moving);
+    }
+  }
+}
+
+/** Renderer mit Canvas 2D – Rückfall, wenn WebGL 2 fehlt (gl-renderer.js) */
+export class Renderer extends RendererBase {
+  /**
+   * @param {HTMLCanvasElement} canvas
+   * @param {{cells: [string, string|null][]}} index
+   * @param {(key: string) => object|undefined} itemOf
+   */
+  constructor(canvas, index, itemOf) {
+    super(index, itemOf);
+    this.canvas = canvas;
+    this.ctx = canvas.getContext("2d");
+  }
+
+  resize(w, h) {
+    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.canvas.width = Math.round(w * this.dpr);
+    this.canvas.height = Math.round(h * this.dpr);
+    this.w = w;
+    this.h = h;
+  }
+
+  /**
    * @param {d3.GeoProjection} projection  vollständige d3-Projektion der aktuellen Ansicht
    * @param {object[]} tiles  zu zeichnende Kacheln (TileStore.select)
    * @param {boolean} moving  während Interaktion: ohne Schelf-Saum
@@ -143,7 +214,7 @@ export class Renderer {
       plain({ type: "Sphere" });
       for (const [width, alpha] of GLOW) {
         ctx.lineWidth = width;
-        ctx.strokeStyle = `rgba(110, 170, 255, ${alpha})`;
+        ctx.strokeStyle = `rgba(${GLOW_RGB.join(", ")}, ${alpha})`;
         ctx.stroke();
       }
     } else {
@@ -211,7 +282,7 @@ export class Renderer {
     // Heller Saum entlang der Küste (Schelf); beim Bewegen weggelassen
     if (!moving) {
       ctx.strokeStyle = c["sea-shelf"];
-      ctx.lineWidth = 5;
+      ctx.lineWidth = SHELF_PX;
       ctx.stroke(shelf);
     }
     for (const [color, p] of fills) {
@@ -230,7 +301,7 @@ export class Renderer {
     if (extras.water?.length) this._drawWater(extras.water, v);
     ctx.strokeStyle = c.border;
     ctx.lineWidth = BORDER_PX.state;
-    ctx.setLineDash([3, 2.5]);
+    ctx.setLineDash(STATE_DASH);
     ctx.stroke(stateBorders);
     ctx.setLineDash([]);
     ctx.lineWidth = BORDER_PX.country;
@@ -243,11 +314,7 @@ export class Renderer {
     ctx.lineWidth = COAST_PX;
     ctx.stroke(coast);
 
-    this._drawTinyMarkers(projection, now);
-    if (this.showLabels) {
-      this.labels.draw(ctx, projection, { w: this.w, h: this.h }, this.placed.keys(),
-        (key) => this._stage(key), this.scheme, moving);
-    }
+    this._drawOverlay(ctx, projection, now, moving);
   }
 
   /** Seen füllen, Flüsse als Linien (Breite nach Bedeutung und Zoom) – in der Wasserfarbe des Schemas */
@@ -279,29 +346,6 @@ export class Renderer {
       ctx.stroke(p);
     }
     ctx.lineCap = "butt";
-  }
-
-  /** Ringe für eingesetzte Items, die in der aktuellen Ansicht kaum sichtbar wären */
-  _drawTinyMarkers(projection, now) {
-    const { ctx, colors: c } = this;
-    const scale = projection.scale();
-    ctx.lineWidth = 1;
-    for (const key of this.placed.keys()) {
-      const item = this.itemOf(key);
-      if (!item || Math.sqrt(item.geom.area) * scale >= TINY_PX) continue;
-      const p = projection(item.geom.anchor);
-      if (!p || p[0] < -10 || p[1] < -10 || p[0] > this.w + 10 || p[1] > this.h + 10) continue;
-      const cont = key.startsWith("continent:") ? key : `continent:${item.properties?.region}`;
-      const country = key.startsWith("state:") ? `country:${item.properties.country}` : null;
-      const k = this._fraction(key, now) + (cont === key ? 0 : this._fraction(cont, now)) +
-        (country ? this._fraction(country, now) : 0);
-      ctx.beginPath();
-      ctx.arc(p[0], p[1], TINY_RING_R, 0, 2 * Math.PI);
-      ctx.fillStyle = stageColor(stopsFor(this.scheme, cont), k);
-      ctx.fill();
-      ctx.strokeStyle = c.coast;
-      ctx.stroke();
-    }
   }
 }
 

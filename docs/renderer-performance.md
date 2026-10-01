@@ -1,6 +1,34 @@
 # Renderer: Messungen und Optimierungsmöglichkeiten
 
-Stand der Überlegungen – nichts davon ist umgesetzt. Code: `static/js/map/renderer.js` (Flächen, Linien),
+## Stand: WebGL-Renderer (umgesetzt)
+
+`static/js/map/gl-renderer.js` zeichnet die Karte mit WebGL 2, wenn der Browser es mit Hardware-Beschleunigung
+anbietet (`failIfMajorPerformanceCaveat`); sonst zeichnet der Canvas-Renderer unten (`renderer.js`). Zum
+Vergleichen: `?canvas` bzw. `?webgl` (WebGL auch ohne Beschleunigung).
+
+- Kacheln liegen einmal als (λ, φ) im Grafikspeicher, Flächen fertig trianguliert (`build/5-binary.mjs`). Der
+  Vertex-Shader projiziert (Natural Earth / Equal Earth sind geschlossene Formeln): Drehen, Zoomen, Verschieben
+  ändern nur Uniforms – kein Neuaufbau von Pfaden.
+- Kacheln an der Schnittlinie werden zweimal gezeichnet (um 2π versetzt); ein Stencil mit der Erdform schneidet ab.
+- Landfarben je Zelle aus einer Textur (Aufhell-Animation = Textur-Update), Grenzklassen (Kontinent, Staat,
+  Bundesland, Küste) entscheidet der Shader aus einer zweiten Textur mit dem Einsetz-Stand.
+- Linien sind Kapseln je Strecke. Die Deckung kommt per MAX in eine Textur (eine Linienart je Farbkanal) und
+  wird einmal überblendet – wie ein Canvas-Strich über den ganzen Pfad (sonst addieren sich bei kleinem Zoom
+  die Kanten vieler kurzer Strecken).
+- Relief: Das Bild bis zu den Landflächen wird in eine Textur übernommen; jede Rasterkachel liegt als Gitter auf
+  der Erde und mischt ihren Grauwert mit den Formeln von „hard-light“/„soft-light“ (W3C Compositing).
+- Namen und Ringe um Kleinststaaten: 2D-Fläche darüber (`.map-overlay`).
+- Pixelvergleich mit dem Canvas-Renderer (5 Ansichten, mit/ohne eingesetzte Items, Kosmos, DPR 1/2): mittlere
+  Abweichung ≈ 1/255; WebGL zeichnet Küsten etwas detailreicher (keine übersprungenen Punkte).
+- Messung nur mit Software-GPU (SwiftShader) möglich: Dort ist WebGL ≈ 10× langsamer als Canvas – deshalb der
+  Rückfall ohne Beschleunigung. Auf echter GPU ist der JS-Anteil je Bild < 1 ms; Werte auf Zielgeräten fehlen.
+
+Canvas-Renderer: Die Relief-Zwischenfläche wird wiederverwendet, solange Ansicht und geladene Rasterkacheln gleich
+sind (Aufhell-Animation, nachkommende Kacheln: ≈ −11 % je Bild bei DPR 2).
+
+## Frühere Überlegungen (Canvas)
+
+Stand vor dem WebGL-Renderer. Code: `static/js/map/renderer.js` (Flächen, Linien),
 `relief.js` (Schummerung), `water.js`, `map.js` (Bildaufbau).
 
 ## Wie ein Bild entsteht

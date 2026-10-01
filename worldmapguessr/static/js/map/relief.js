@@ -51,29 +51,24 @@ export class ReliefLayer {
   draw(ctx, projection, { w, h }, passes, moving) {
     if (!passes?.length) return;
     const c = this.canvas;
-    if (c.width !== Math.ceil(w) || c.height !== Math.ceil(h)) {
-      c.width = Math.ceil(w);
-      c.height = Math.ceil(h);
-    }
-    const o = this.ctx;
-    o.globalCompositeOperation = "source-over";
-    o.fillStyle = "rgb(128,128,128)";
-    o.fillRect(0, 0, c.width, c.height);
-    o.imageSmoothingEnabled = true;
-
     const v = viewOf(projection);
-    const r = this.levelFor(v.s);
-    const lvl = this.levels[r];
-    const size = 360 / lvl.cols; // Grad je Kachel
-    const inView = boxTest(projection, [[0, 0], [w, h]]);
     const strip = moving ? STRIP_MOVING_PX : STRIP_PX;
-    for (let x = 0; x < lvl.cols; x++) {
-      for (let y = 0; y < lvl.rows; y++) {
-        const lon0 = -180 + x * size, lat0 = -90 + y * size;
-        if (!inView(lon0 * RAD, (lon0 + size) * RAD, lat0 * RAD, (lat0 + size) * RAD)) continue;
-        const src = this._source(r, x, y);
-        if (src) this._drawTile(o, v, src, lon0, lat0, size, strip);
+    const tiles = this.visible(projection, { w, h });
+    // Zwischenfläche wiederverwenden, solange Ansicht und Bilder gleich sind (z. B. während der Aufhell-
+    // Animation nach dem Einsetzen oder wenn Kacheln der Karte nachkommen)
+    const key = [v.s, v.tx, v.ty, v.rot, w, h, strip, ...tiles.map((t) => t.src.img.src + t.src.sx + t.src.sy)].join("|");
+    if (key !== this._key) {
+      this._key = key;
+      if (c.width !== Math.ceil(w) || c.height !== Math.ceil(h)) {
+        c.width = Math.ceil(w);
+        c.height = Math.ceil(h);
       }
+      const o = this.ctx;
+      o.globalCompositeOperation = "source-over";
+      o.fillStyle = "rgb(128,128,128)";
+      o.fillRect(0, 0, c.width, c.height);
+      o.imageSmoothingEnabled = true;
+      for (const t of tiles) this._drawTile(o, v, t.src, t.lon0, t.lat0, t.size, strip);
     }
     ctx.save();
     // nur auf der Erde überblenden – außerhalb kann die Fläche durchsichtig sein (Kosmos)
@@ -86,6 +81,29 @@ export class ReliefLayer {
       ctx.drawImage(c, 0, 0, w, h);
     }
     ctx.restore();
+  }
+
+  /**
+   * Sichtbare Kacheln der passenden Stufe mit ihrem Bild (geladen oder Ausschnitt einer gröberen Stufe);
+   * fehlende werden angefordert. Auch für den WebGL-Renderer.
+   * @returns {{src: {img: HTMLImageElement, sx: number, sy: number, sw: number}, lon0: number, lat0: number,
+   *            size: number}[]}  lon0/lat0/size in Grad
+   */
+  visible(projection, { w, h }) {
+    const r = this.levelFor(projection.scale());
+    const lvl = this.levels[r];
+    const size = 360 / lvl.cols; // Grad je Kachel
+    const inView = boxTest(projection, [[0, 0], [w, h]]);
+    const out = [];
+    for (let x = 0; x < lvl.cols; x++) {
+      for (let y = 0; y < lvl.rows; y++) {
+        const lon0 = -180 + x * size, lat0 = -90 + y * size;
+        if (!inView(lon0 * RAD, (lon0 + size) * RAD, lat0 * RAD, (lat0 + size) * RAD)) continue;
+        const src = this._source(r, x, y);
+        if (src) out.push({ src, lon0, lat0, size });
+      }
+    }
+    return out;
   }
 
   /**

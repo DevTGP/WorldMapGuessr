@@ -3,6 +3,7 @@
 
 import { LABEL_FONT } from "./labels.js";
 import { Renderer } from "./renderer.js";
+import { createGLRenderer } from "./gl-renderer.js";
 import { Gestures } from "./gestures.js";
 import { yielder } from "../ui/loading-screen.js";
 import { TileStore } from "./tiles.js";
@@ -113,7 +114,9 @@ export class WorldMap {
     this.projection = makeProjection().precision(0.5);
     this.view = { lambda: 0, k: 1, ty: 0 }; // lambda: Drehung in Grad (positiv = Karte nach rechts)
     this.size = { w: 0, h: 0 };
-    this.renderer = new Renderer(canvas, index, (key) => this.byKey.get(key));
+    // WebGL 2, sonst Canvas 2D (gl-renderer.js / renderer.js)
+    const itemOf = (key) => this.byKey.get(key);
+    this.renderer = createGLRenderer(canvas, index, itemOf) ?? new Renderer(canvas, index, itemOf);
     this.renderer.onColorsChanged = () => this.requestRender();
     this.renderer.labels.items = () => this.features;
     this.renderer.labels.onChange = () => this.requestRender(); // Namen aus dem Worker angekommen
@@ -367,10 +370,11 @@ export class WorldMap {
     this.quality = q;
   }
 
-  /** Kachelstufe für die aktuelle Ansicht (in Bewegung ggf. gröber, siehe map/quality.js) */
+  /** Kachelstufe für die aktuelle Ansicht (in Bewegung ggf. gröber, siehe map/quality.js – nur Canvas: mit WebGL
+   *  kostet ein Bild kaum mehr, wenn es mehr Punkte hat) */
   tileLevel(moving = this._moving) {
     const q = this.quality;
-    const s = this.projection.scale() * (moving ? q.moveDetail / q.detail : 1);
+    const s = this.projection.scale() * (moving && !this.renderer.webgl ? q.moveDetail / q.detail : 1);
     return this.tiles.levelFor(s);
   }
 
