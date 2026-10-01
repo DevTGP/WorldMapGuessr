@@ -533,6 +533,7 @@ export class GLRenderer extends RendererBase {
 
   _uploadCells(now) {
     const { gl } = this;
+    gl.activeTexture(UPLOAD_UNIT(gl));
     this._cellRgba(now, this._cellBytes);
     gl.bindTexture(gl.TEXTURE_2D, this.cellColorTex);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.cells.length, 1, gl.RGBA, gl.UNSIGNED_BYTE, this._cellBytes);
@@ -642,6 +643,7 @@ export class GLRenderer extends RendererBase {
     if (!tex) {
       const { gl } = this;
       tex = gl.createTexture();
+      gl.activeTexture(UPLOAD_UNIT(gl));
       gl.bindTexture(gl.TEXTURE_2D, tex);
       gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, gl.RED, gl.UNSIGNED_BYTE, img);
@@ -657,6 +659,12 @@ export class GLRenderer extends RendererBase {
 }
 
 // ---------- Hilfen ----------
+
+/**
+ * Einheit nur zum Anlegen und Hochladen von Texturen. bindTexture wirkt auf die aktive Einheit; ohne eigene Einheit
+ * ersetzte eine neu geladene Relief-Kachel (R8) das schon gebundene Basisbild (Einheit 2) – rote Fläche beim Zoomen.
+ */
+const UPLOAD_UNIT = (gl) => gl.TEXTURE7;
 
 /** Farbe (CSS) → vormultipliziertes RGBA 0…1 */
 const colorCache = new Map();
@@ -700,6 +708,7 @@ function program(gl, vs, fs) {
 
 function texture(gl, internal, w, h, format, type, filter) {
   const t = gl.createTexture();
+  gl.activeTexture(UPLOAD_UNIT(gl));
   gl.bindTexture(gl.TEXTURE_2D, t);
   gl.texImage2D(gl.TEXTURE_2D, 0, internal, w, h, 0, format, type, null);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
