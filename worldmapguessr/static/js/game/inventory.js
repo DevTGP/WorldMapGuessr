@@ -48,7 +48,7 @@ export class Inventory {
       btn.dataset.id = p.id;
       btn.dataset.state = "ready";
       btn.setAttribute("aria-label", t("inv.pick"));
-      btn.innerHTML = '<svg aria-hidden="true" preserveAspectRatio="xMidYMid meet"><path class="shape"/></svg>';
+      btn.innerHTML = '<svg aria-hidden="true" preserveAspectRatio="xMidYMid meet"><path class="halo"/><path class="shape"/></svg>';
       btn.addEventListener("click", () => this.onSlotClick(p.id));
       this.container.append(btn);
       this._drawIcon(p);
@@ -91,7 +91,8 @@ export class Inventory {
   _drawIcon(p) {
     const svg = this.iconSvg(p.id);
     svg.setAttribute("viewBox", `0 0 ${ICON_W} ${ICON_H}`);
-    svg.querySelector("path").setAttribute("d", iconPath(p.feature, ICON_W, ICON_H, 3, p.rotation ?? 0));
+    const d = iconPath(p.feature, ICON_W, ICON_H, 3, p.rotation ?? 0);
+    for (const path of svg.querySelectorAll("path")) path.setAttribute("d", d);
   }
 
   slot(id) { return this.container.querySelector(`.slot[data-id="${id}"]`); }

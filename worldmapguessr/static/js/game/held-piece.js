@@ -3,7 +3,12 @@
 // Mit „Items gedreht“ ist es zusätzlich um piece.rotation (Grad, im Uhrzeigersinn) um seinen Anker gedreht;
 // beim Einsetzen dreht es sich in die richtige Lage.
 //
-// Aufbau: <g> (Verschiebung/Flug) › <g class="rot"> (Drehung um den Anker) › Umriss + Ring
+// Aufbau: <g> (Verschiebung/Flug) › <g class="rot"> (Drehung um den Anker) › Halo + Umriss + Ring
+// Der Halo ist ein breiter, halbtransparenter Strich unter dem Umriss statt eines CSS-drop-shadow: Ein
+// Filter muss bei jeder Bewegung die ganze Fläche des Teils neu weichzeichnen (Russland: 11 statt 58 Bilder/s).
+// Dem Mauszeiger folgt die ganze Ebene per CSS-Transform (eigene Compositing-Ebene): Mausbewegungen zeichnen
+// das Teil nicht neu, nur Änderungen der Kartenansicht. Für Flüge (Einrasten, Zurück, Senden) wandert die
+// Verschiebung zurück in das transform-Attribut der Gruppe.
 
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const dur = (ms) => (reduceMotion ? 0 : ms);
@@ -29,6 +34,7 @@ const EARTH_R_KM = 6371.0088;
 export class HeldPiece {
   constructor(map, layerEl) {
     this.map = map;
+    this.layerEl = layerEl;
     this.layer = d3.select(layerEl);
     this.piece = null;
     this.g = null;
@@ -46,7 +52,8 @@ export class HeldPiece {
     this.pointer = pointer;
     this.g = this.layer.append("g").attr("data-piece", piece.id);
     this.rotEl = this.g.append("g").attr("class", "rot");
-    this.pathEl = this.rotEl.append("path");
+    this.haloEl = this.rotEl.append("path").attr("class", "halo");
+    this.pathEl = this.rotEl.append("path").attr("class", "shape");
     this.ringEl = this.rotEl.append("circle").attr("class", "tiny-ring").attr("r", TINY_RING_R);
     this._redraw();
   }
@@ -176,6 +183,7 @@ export class HeldPiece {
 
   cancel() {
     if (this.g) this.g.interrupt().remove();
+    this.layerEl.style.transform = "";
     this.g = null;
     this.piece = null;
     this._angle = 0;
@@ -193,8 +201,10 @@ export class HeldPiece {
     const r = this.map.canvas.getBoundingClientRect();
     const [ax, ay] = this.map.toScreen(this.piece.geom.anchor);
     const px = ax - r.left, py = ay - r.top, m = 20; // Anker in Kartenkoordinaten
-    this.pathEl.attr("d", this.map.svgPath(this.piece.feature,
-      [[px - r.width - m, py - r.height - m], [px + r.width + m, py + r.height + m]]));
+    const d = this.map.svgPath(this.piece.feature,
+      [[px - r.width - m, py - r.height - m], [px + r.width + m, py + r.height + m]]);
+    this.pathEl.attr("d", d);
+    this.haloEl.attr("d", d);
     // Ring um winzige Items: zeigt, wo das Item liegt, und bei Kleinststaaten den Trefferbereich
     this.ringEl
       .attr("cx", ax - r.left)
@@ -205,18 +215,25 @@ export class HeldPiece {
     this._follow();
   }
 
+  /** Verschiebung, bei der der Anker unter dem Mauszeiger liegt */
+  _offset() {
+    const [ax, ay] = this.map.toScreen(this.piece.geom.anchor);
+    const r = this.map.canvas.getBoundingClientRect();
+    return [this.pointer[0] - ax + r.left, this.pointer[1] - ay + r.top];
+  }
+
   /** Verschieben, sodass der Anker unter dem Mauszeiger liegt */
   _follow() {
     if (!this.g || this._flying) return;
-    const [ax, ay] = this.map.toScreen(this.piece.geom.anchor);
-    const r = this.map.canvas.getBoundingClientRect();
-    const dx = this.pointer[0] - ax + r.left;
-    const dy = this.pointer[1] - ay + r.top;
-    this.g.attr("transform", `translate(${dx},${dy}) scale(1)`);
+    const [dx, dy] = this._offset();
+    this.layerEl.style.transform = `translate3d(${dx}px,${dy}px,0)`;
   }
 
   _flyTo(transform, ms) {
     const g = this.g;
+    const [dx, dy] = this._offset();
+    this.layerEl.style.transform = "";
+    g.attr("transform", `translate(${dx},${dy}) scale(1)`);
     this._flying = true;
     return g.transition().duration(dur(ms)).ease(d3.easeCubicInOut)
       .attr("transform", transform)
