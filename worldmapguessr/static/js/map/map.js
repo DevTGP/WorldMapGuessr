@@ -116,6 +116,7 @@ export class WorldMap {
     this.renderer = new Renderer(canvas, index, (key) => this.byKey.get(key));
     this.renderer.onColorsChanged = () => this.requestRender();
     this.renderer.labels.items = () => this.features;
+    this.renderer.labels.onChange = () => this.requestRender(); // Namen aus dem Worker angekommen
     tiles.onLoad = () => this.requestRender();
     items.onUpgrade = () => this.requestRender();
     // Die Schrift der Namen (Google Fonts) kommt evtl. erst nach dem ersten Bild: dann neu auslegen

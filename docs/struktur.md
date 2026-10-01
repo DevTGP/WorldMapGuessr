@@ -56,11 +56,14 @@ worldmapguessr/
     map/map.js                Startdaten laden, Ansicht (Drehung, Zoom, Verschieben), Projektionswechsel
     map/renderer.js           Canvas-Zeichnung aus Kacheln (Zellfarben, Küsten, Grenzen, Wasser, Kleinststaat-Ringe)
     map/labels.js             Namen eingesetzter Items (gebogen nach der Form, keine Überschneidungen)
+    map/labels-core.js        Kandidaten je Item (Maske, Mittellinie, Größe) – ohne DOM, auch im Worker
+    map/labels-worker.js      Worker für labels-core.js (OffscreenCanvas, eigene Schrift-Instanz)
     map/tiles.js              Kacheln: Detailstufe je Zoom, Laden, Ersatz aus gröberer Stufe, Speichergrenze
     map/tile-format.js        Binäre Kacheln lesen (Punkte, Dreiecke, Linien; build/5-binary.mjs)
     map/items.js              Item-Umrisse: Startstufe für alle, feinere Stufe je Item bei Bedarf
     map/project.js            Schnelle Projektion, Sichtbarkeitstest
-    map/projections.js        Natural Earth / Equal Earth
+    map/projections.js        Natural Earth / Equal Earth (Einstellung, Bezeichnungen)
+    map/projection-defs.js    Formeln und d3-Fabriken der Projektionen (ohne Einstellungen, für Worker)
     map/relief.js             Geländeschummerung
     map/water.js              Flüsse und Seen
     map/schemes.js            Farbschemata A/B/C

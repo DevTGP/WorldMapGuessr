@@ -26,6 +26,7 @@
     apiBase: "{{ request.script_root }}/api",
     lobbyCode: {{ (lobby_code or none) | tojson }},
     serviceWorker: {{ service_worker | tojson }},  // nur mit Bündel (static/sw.js)
+    workers: {{ page.workers | tojson }},          // Worker-URLs (map/labels-worker.js)
     i18n: {{ i18n_client | tojson }},     // Sprache und Wörterbuch (static/js/i18n/index.js)
   };
 </script>

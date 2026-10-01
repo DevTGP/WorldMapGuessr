@@ -22,6 +22,7 @@
 - eine JS-Datei je Seite (ES-Modul, minifiziert) plus geteilte Teile; die Lobby-Teile (`static/js/lobby/index.js`) lädt `main.js` per `import()` erst bei Bedarf bzw. im Leerlauf nach dem Start,
 - eine CSS-Datei je Seite, Schriften mitkopiert,
 - d3 nur mit den genutzten Funktionen (`web/d3.js`; neue d3-Funktionen dort ergänzen),
+- Worker (`pages.json` → `workers`, z. B. `map/labels-worker.js`) als eigene Einstiege; die Seite bekommt ihre URLs in `WMG.workers`. Ohne Bündel lädt der Worker dasselbe d3-Skript wie die Seite.
 - Dateinamen mit Inhalts-Hash, dazu `manifest.json` (Quelle → Datei, Teile zum Vorladen, Build-Kennung).
 
 `worldmapguessr/assets.py` wählt je Seite: **Bündel**, wenn `dist/manifest.json` existiert und nicht älter ist als die Quellen in `static/js|css|fonts`; sonst die **Quelldateien einzeln** und d3 vom CDN (wie ohne Build). `WMG_BUNDLE=1` erzwingt das Bündel (Docker), `WMG_BUNDLE=0` die Quelldateien.

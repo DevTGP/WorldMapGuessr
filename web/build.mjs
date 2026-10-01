@@ -59,7 +59,13 @@ const common = {
 };
 const js = await esbuild.build({
   ...common,
-  entryPoints: Object.fromEntries(Object.entries(pages).map(([name, p]) => [name, join(staticDir, p.js)])),
+  entryPoints: {
+    ...Object.fromEntries(Object.entries(pages).map(([name, p]) => [name, join(staticDir, p.js)])),
+    // Worker (Modul-Worker): eigene Einstiege, teilen sich Teile mit den Seiten
+    ...Object.fromEntries(Object.values(pages).flatMap((p) => Object.values(p.workers ?? {}))
+      .map((w) => [w.split("/").pop().replace(/\.js$/, ""), join(staticDir, w)])),
+  },
+  define: { __BUNDLED__: "true" },
   format: "esm",
   splitting: true,
   entryNames: "[name]-[hash]",
@@ -82,7 +88,14 @@ for (const [out, info] of Object.entries(outputs)) {
   if (out.endsWith(".map")) continue;
   if (info.entryPoint) {
     const entry = resolve(here, info.entryPoint);
+    // Worker-Einstieg: in allen Seiten, die ihn nennen, unter seinem Namen
+    for (const page of Object.keys(pages)) {
+      for (const [wname, w] of Object.entries(pages[page].workers ?? {})) {
+        if (entry === join(staticDir, w)) ((manifest.pages[page] ??= { modulepreload: [] }).workers ??= {})[wname] = rel(out);
+      }
+    }
     const name = Object.keys(pages).find((n) => entry === join(staticDir, pages[n].js) || entry === cssEntries[n]);
+    if (!name) continue;
     const page = (manifest.pages[name] ??= { modulepreload: [] });
     if (out.endsWith(".js")) {
       page.js = rel(out);

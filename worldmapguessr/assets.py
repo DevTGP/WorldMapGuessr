@@ -67,7 +67,8 @@ class Assets:
         return m["build"] if m else None
 
     def page(self, name: str) -> dict:
-        """URLs für eine Seite: css (Liste), js, modulepreload (Liste), fonts (Vorladen), d3 (CDN-URL oder None)."""
+        """URLs für eine Seite: css (Liste), js, modulepreload (Liste), fonts (Vorladen), d3 (CDN-URL oder None),
+        workers ({Name: URL})."""
         page = self.pages[name]
         m = self.manifest()
         static = lambda path: url_for("static", filename=path)  # noqa: E731
@@ -79,6 +80,7 @@ class Assets:
                 "modulepreload": [static(p) for p in built["modulepreload"]],
                 "fonts": [static(m["files"].get(f, f)) for f in page.get("preloadFonts", [])],
                 "d3": None,
+                "workers": {k: static(v) for k, v in built.get("workers", {}).items()},
             }
         return {
             "css": [static(p) for p in page["css"]],
@@ -86,6 +88,7 @@ class Assets:
             "modulepreload": [],
             "fonts": [static(f) for f in page.get("preloadFonts", [])],
             "d3": D3_CDN if name == "game" else None,
+            "workers": {k: static(v) for k, v in page.get("workers", {}).items()},
         }
 
 
