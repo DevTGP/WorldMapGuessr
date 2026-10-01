@@ -180,7 +180,8 @@ export class RemoteRound {
       case "placed":
         return msg("good", mine ? "feed.placedMe" : "feed.placed", { who: who(ev.player), item: item(ev.key) }, pts);
       case "miss":
-        return msg("bad", mine ? "feed.missMe" : "feed.miss", { who: who(ev.player), item: item(ev.key) }, [
+        // ohne Itemnamen: ein Fehlwurf verrät nicht, welches Item es war
+        return msg("bad", mine ? "feed.missMe" : "feed.miss", { who: who(ev.player) }, [
           ev.lost ? t("feed.missLost") : "",
           round.lives > 0 ? t("feed.livesLeft", { n: round.lives }) : "",
           ...pts,

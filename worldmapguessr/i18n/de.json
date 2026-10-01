@@ -100,9 +100,9 @@
   "one": " · noch {n} Leben",
   "other": " · noch {n} Leben"
  },
- "feed.miss": "{who} lag daneben – {item}",
- "feed.missLost": " geht zurück in den Vorrat",
- "feed.missMe": "Daneben – {item}",
+ "feed.miss": "{who} lag daneben",
+ "feed.missLost": " · das Item geht zurück in den Vorrat",
+ "feed.missMe": "Daneben",
  "feed.placed": "{who} hat {item} eingesetzt",
  "feed.placedMe": "{item} sitzt",
  "feed.plusLives": {

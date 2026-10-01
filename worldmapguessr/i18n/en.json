@@ -100,9 +100,9 @@
   "one": " · {n} life left",
   "other": " · {n} lives left"
  },
- "feed.miss": "{who} missed – {item}",
- "feed.missLost": " goes back to the pool",
- "feed.missMe": "Missed – {item}",
+ "feed.miss": "{who} missed",
+ "feed.missLost": " · the item goes back to the pool",
+ "feed.missMe": "Missed",
  "feed.placed": "{who} placed {item}",
  "feed.placedMe": "{item} is in place",
  "feed.plusLives": {
