@@ -226,7 +226,7 @@ class LobbyHub:
             "settings": {
                 "config": s["config"], "maxPlayers": s["maxPlayers"], "private": bool(s["passwordHash"]),
                 "allowSend": s.get("allowSend", DEFAULT_ALLOW_SEND),
-                "sendEvery": self.store.send_every(lobby),
+                "sendEvery": self.store.send_every(lobby), "handCap": self.store.hand_cap(lobby),
                 "solo": bool(s.get("solo")), "ttl": self.store.ttl_of(lobby),
             },
             "round": rounds.public_view(lobby["round"], now=self.store.clock()),

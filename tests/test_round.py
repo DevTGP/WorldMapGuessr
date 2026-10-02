@@ -141,6 +141,30 @@ def test_give_moves_item_between_hands():
         assert e.value.code == code
 
 
+# ---------- Inventar-Obergrenze ----------
+def test_hand_cap_limits_start_refill_join_and_gifts():
+    rnd = rounds.new_round(1, {**CONFIG, "startItems": 9}, CATALOG, ["a", "b"], seed=7, now=0, hand_cap=3)
+    assert [len(rnd["hands"][p]) for p in "ab"] == [3, 3] and len(rnd["pool"]) == 8  # Rest bleibt im Vorrat
+    assert_unique(rnd)
+    rounds.place(rnd, "a", rnd["hands"]["a"][0], True, ["a", "b"])
+    res = rounds.place(rnd, "a", rnd["hands"]["a"][0], True, ["a", "b"])  # Nachschub 4, aber nur a hat Platz
+    assert res["refill"] == 2 and rnd["last"]["to"] == {"a": 2}
+    assert [len(rnd["hands"][p]) for p in "ab"] == [3, 3]
+    with pytest.raises(rounds.RoundError) as e:
+        rounds.give(rnd, "a", "b", rnd["hands"]["a"][0])
+    assert e.value.code == "hand_full"
+    rnd["handCap"] = 4  # Lobbyeinstellung geändert: gilt sofort
+    rounds.give(rnd, "a", "b", rnd["hands"]["a"][0])
+    assert rounds.join(rnd, "c") and len(rnd["hands"]["c"]) == 2
+    assert rounds.public_view(rnd)["handCap"] == 4
+    assert_unique(rnd)
+
+
+def test_hand_cap_zero_means_unlimited():
+    rnd = rounds.new_round(1, {**CONFIG, "startItems": 9}, CATALOG, ["a", "b"], seed=7, now=0, hand_cap=0)
+    assert [len(rnd["hands"][p]) for p in "ab"] == [6, 5]
+
+
 # ---------- Timer: fester Takt ab Start, Wegnahme reihum ----------
 def test_timer_waits_for_grace_then_takes_round_robin_oldest_first():
     rnd = new(timer=30, grace=60, timerTake=3)  # a, b je 2 Items

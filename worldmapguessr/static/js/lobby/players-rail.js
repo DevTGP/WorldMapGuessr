@@ -68,6 +68,10 @@ export class PlayersRail {
     if (q && q.left === 0) {
       return g.toast(t("err.send_limit", { n: q.next }), "hint");
     }
+    const round = this.client.state?.round;
+    if (round?.handCap && (round.handCounts?.[player.id] ?? 0) >= round.handCap) {
+      return g.toast(t("err.hand_full"), "hint");
+    }
     g.giveHeld(player.id, player.name, btn.querySelector(".avatar"));
   }
 }

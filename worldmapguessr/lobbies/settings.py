@@ -32,6 +32,8 @@ TTL_STEPS = (3600, 3 * 3600, 6 * 3600, 12 * 3600, 86400, 2 * 86400, 3 * 86400, 7
 DEFAULT_TTL = 86400
 SEND_EVERY = (0, 20)       # Sendelimit: 1 Senden je N vom Server erhaltene Items (0 = ohne Limit)
 DEFAULT_SEND_EVERY = 5
+HAND_CAP = (0, 60)         # Inventar-Obergrenze je Spieler (0 = ohne Grenze)
+DEFAULT_HAND_CAP = 20
 
 # Standard = Casual, Normal
 DEFAULT_CONFIG = {
@@ -97,6 +99,10 @@ def clean_ttl(value, default=DEFAULT_TTL) -> int:
 
 def clean_send_every(value, default=DEFAULT_SEND_EVERY) -> int:
     return _int(value, *SEND_EVERY, default)
+
+
+def clean_hand_cap(value, default=DEFAULT_HAND_CAP) -> int:
+    return _int(value, *HAND_CAP, default)
 
 
 def clean_max_players(value) -> int:

@@ -37,9 +37,14 @@ const SHIFTS = [0, 0.18, -0.18, 0.34, -0.34];
 const TURNS = [-40, -20, 20, 40];
 const TURN_GAIN = 1.05;
 /** Kandidaten je Item höchstens */
-const MAX_CANDS = 10;
-/** Kleinere Größen, die probiert werden (Faktor je Schritt, Schritte) */
-const SHRINK = 0.86, SHRINK_STEPS = 7;
+const MAX_CANDS = 16;
+/**
+ * Kleinere Größen, die probiert werden (Faktor je Schritt, Schritte): bis ≈ 1/5 – stößt ein Name an den eines
+ * Nachbarn, steht eine kleinere Fassung (sichtbar erst weiter drinnen) statt gar keiner
+ */
+const SHRINK = 0.86, SHRINK_STEPS = 12;
+/** Ersatz, wenn kein Name die Toleranz erfüllt (sehr kleine oder zerklüftete Items): so viel länger als die Form */
+const FALLBACK_OVERRUN = 1.25;
 /** Toleranz: so viel der Buchstabenfläche muss insgesamt in der Hülle des Items liegen, … */
 const MIN_INSIDE = 0.6;
 /** … so viel auf echtem Land, höchstens so viel auf Land anderer Staaten … */
@@ -93,6 +98,9 @@ export function candidates(f, neighbours, projection, env) {
   const out = [];
   const overrun = mix(OVERRUN);
   for (const shape of shapes) out.push(...sized(f, text, adv100, shape, mask, proj, scale, shape === main, overrun));
+  // Nichts passt (Liechtenstein, Andorra, Staaten zwischen großen Nachbarn): waagerecht in die Mitte, darf
+  // über die Form hinaus laufen – lieber ein Name über der Grenze als keiner
+  if (!out.length) out.push(...fallback(f, text, adv100, main, mask, proj, scale));
   // größte zuerst
   out.sort((a, b) => b.rank - a.rank);
   return out.slice(0, MAX_CANDS);
@@ -113,21 +121,52 @@ function sized(f, text, adv100, shape, mask, proj, scale, isMain, overrun) {
     for (const shift of SHIFTS) {
       const glyphs = placeOnCurve(shape.curve(shift, Math.max(1, overrun)), advances, track * px);
       if (!glyphs || !fits(glyphs, text, advances, (CAP * px) / 2, mask)) continue;
-      const geo = [];
-      for (let i = 0; i < glyphs.length; i++) {
-        if (text[i] === " ") continue;
-        const g = glyphs[i];
-        const ll = proj.invert([g.x, g.y]);
-        const dir = proj.invert([g.x + Math.cos(g.ang) * px * 0.25, g.y + Math.sin(g.ang) * px * 0.25]);
-        if (!ll || !dir || !Number.isFinite(ll[0]) || !Number.isFinite(dir[0])) { geo.length = 0; break; }
-        geo.push({ ch: text[i], ll, dir, hw: advances[i] / 2 / scale });
-      }
+      const geo = toGeo(glyphs, text, advances, px, proj, scale);
       // Rang fürs Sortieren: schräge Richtungen nur, wenn sie spürbar größer sind als die Hauptachse
       if (geo.length) out.push({ glyphs: geo, em: px / scale, rank: (px / scale) / (isMain ? 1 : TURN_GAIN) });
       break; // je Größe die erste passende Linie
     }
   }
   return out;
+}
+
+/** Ersatz-Kandidaten: waagerecht, gerade, um den innersten Punkt der Hülle, ohne Toleranztest */
+function fallback(f, text, adv100, shape, mask, proj, scale) {
+  const { m, cw, ch, x0, y0, cell } = mask;
+  const outside = new Uint8Array(m.length);
+  for (let i = 0; i < m.length; i++) outside[i] = m[i] ? 0 : 1;
+  const depth = distanceField(outside, cw, ch);
+  let best = -1;
+  for (let i = 0; i < m.length; i++) if (best < 0 || depth[i] > depth[best]) best = i;
+  if (best < 0 || !(depth[best] > 0)) return [];
+  const cx = x0 + ((best % cw) + 0.5) * cell, cy = y0 + (Math.floor(best / cw) + 0.5) * cell;
+  const [minTr] = TRACK[f.kind];
+  const w100 = adv100.reduce((a, b) => a + b, 0), gaps = text.length - 1;
+  const span = Math.max(shape.length, 2 * depth[best] * cell) * FALLBACK_OVERRUN;
+  let px = span / (w100 / 100 + gaps * minTr);
+  const out = [];
+  for (let step = 0; step < SHRINK_STEPS; step++, px *= SHRINK) {
+    const advances = adv100.map((a) => (a * px) / 100);
+    const len = advances.reduce((a, b) => a + b, 0) + gaps * minTr * px;
+    const glyphs = placeOnCurve([[cx - len / 2 - 1, cy], [cx + len / 2 + 1, cy]], advances, minTr * px);
+    const geo = glyphs && toGeo(glyphs, text, advances, px, proj, scale);
+    if (geo?.length) out.push({ glyphs: geo, em: px / scale, rank: px / scale });
+  }
+  return out;
+}
+
+/** Buchstaben der Bezugsansicht in Länge/Breite (Mitte, Richtungspunkt, halbe Breite); [] bei Lücken */
+function toGeo(glyphs, text, advances, px, proj, scale) {
+  const geo = [];
+  for (let i = 0; i < glyphs.length; i++) {
+    if (text[i] === " ") continue;
+    const g = glyphs[i];
+    const ll = proj.invert([g.x, g.y]);
+    const dir = proj.invert([g.x + Math.cos(g.ang) * px * 0.25, g.y + Math.sin(g.ang) * px * 0.25]);
+    if (!ll || !dir || !Number.isFinite(ll[0]) || !Number.isFinite(dir[0])) return [];
+    geo.push({ ch: text[i], ll, dir, hw: advances[i] / 2 / scale });
+  }
+  return geo;
 }
 
 /**

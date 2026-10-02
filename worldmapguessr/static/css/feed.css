@@ -1,6 +1,7 @@
 /* WorldMapGuessr – Nachrichtenleiste unten rechts: Meldungen aller Spieler, Timer, Chat */
 
 :root { --feed-w: 320px; --inv-h: 112px; }
+:root.inv-two-rows { --inv-h: 212px; } /* Inventar mit zweiter Zeile (game/inventory.js) */
 
 .hud-feed {
   right: 16px;
@@ -141,6 +142,7 @@
 /* Schmal: Leiste über dem Inventar, volle Breite, Inventar über die ganze Breite */
 @media (max-width: 640px) {
   :root { --inv-h: 94px; }
+  :root.inv-two-rows { --inv-h: 178px; }
   .hud-feed {
     left: 16px;
     right: 16px;

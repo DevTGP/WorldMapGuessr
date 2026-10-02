@@ -395,6 +395,20 @@ def test_send_limit_setting_and_quota_in_state(store):
     assert [m for m in h.ws.sent if m["type"] == "state"][-1]["sends"]["left"] == 0
 
 
+def test_hand_cap_setting_in_state_and_round(store):
+    hub, code, h, g = two_players(store)
+    last = [m for m in h.ws.sent if m["type"] == "state"][-1]
+    assert last["lobby"]["settings"]["handCap"] == 20 and round_of(h)["handCap"] == 20
+    hub.handle(code, h, {"type": "settings", "settings": {"handCap": 999}})
+    assert round_of(h)["handCap"] == 60
+    hub.handle(code, h, {"type": "settings", "settings": {"handCap": 3}})
+    assert round_of(g)["handCap"] == 3
+    hub.handle(code, h, {"type": "settings", "settings": {"sendEvery": 0}})
+    with pytest.raises(LobbyError) as e:
+        hub.handle(code, h, {"type": "give", "key": hand_of(h)[0], "to": g.player_id})
+    assert e.value.code == "hand_full"
+
+
 def test_chat_is_broadcast_trimmed_and_kept(store):
     hub = LobbyHub(store, clock=Clock())
     lobby, host = store.create(player_name="Host")

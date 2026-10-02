@@ -2,7 +2,8 @@
 // (Victoria 3): Versalien einer Antiqua, gesperrt, entlang der Form des Items gebogen, so groß, wie das Item
 // es hergibt – und fest auf der Erde: Ein Name wird einmal ausgelegt und wächst beim Zoomen mit der Karte,
 // er springt nicht und wird nicht kleiner. Zu klein zum Lesen wird er ausgeblendet (kleine Länder zeigen ihren
-// Namen erst beim Hineinzoomen), sehr groß blendet er aus (ganz nah sieht man die Landschaft).
+// Namen erst beim Hineinzoomen). Ganz nah bleibt er stehen: Die Buchstaben wachsen ab einer Höchstgröße nicht
+// weiter (sie bleiben an ihrem Ort, rücken also auseinander), Kontinentnamen treten dabei zurück.
 //
 // Auslegen je Item in einer eigenen Bezugsansicht (Projektion auf das Item gedreht, Item ≈ REF_PX groß):
 // Hauptteil und nahe Inseln werden in eine Maske gerastert; die Hauptachse der Fläche gibt die Richtung, die
@@ -15,7 +16,8 @@
 // Die Kandidaten (Größen, quer verschobene Linien) je Item werden zwischengespeichert; welche Namen stehen,
 // entscheidet ein Überschneidungstest in einer gemeinsamen Weltansicht – nur, wenn sich die eingesetzten
 // Items ändern, nicht beim Bewegen. Vorrang: Staaten (größere zuerst), Bundesländer untereinander,
-// Kontinente nur, wo sie keinen Staatsnamen berühren.
+// Kontinente nur, wo sie keinen Staatsnamen berühren. Stößt ein Name an einen anderen, steht eine kleinere
+// Fassung (bis ≈ 1/5); passt bei sehr kleinen Items gar keine, steht der Name waagerecht in der Mitte.
 
 //
 // Die Kandidaten je Item rechnet labels-core.js – im Worker (labels-worker.js), damit das Auslegen vieler
@@ -28,9 +30,14 @@ import { CAP, LABEL_FONT, candidates, fontFor, geoBox } from "./labels-core.js";
 
 export { LABEL_FONT };
 
-/** Sichtbar ab / bis zu dieser Schriftgröße auf dem Bildschirm (px), dazwischen weich ein- und ausgeblendet */
+/**
+ * Sichtbar ab dieser Schriftgröße auf dem Bildschirm (px, darüber weich eingeblendet); ab der zweiten wachsen die
+ * Buchstaben nicht weiter
+ */
 const VISIBLE_PX = { continent: [10, 90], country: [7.5, 170], state: [7, 140] };
-const FADE = 0.3; // Anteil der Grenze, über den ein- bzw. ausgeblendet wird
+const FADE = 0.3; // Anteil der Grenze, über den eingeblendet wird
+/** Kontinentnamen über ihrer Höchstgröße: so viel Deckkraft bleibt ganz nah */
+const CONTINENT_NEAR = 0.4;
 /** Gemeinsame Weltansicht für den Überschneidungstest: Maßstab und Abstand (Anteil der Schriftgröße) */
 const WORLD_SCALE = 1000, GAP = 0.25;
 
@@ -96,8 +103,8 @@ export class LabelLayer {
     const base = ctx.getTransform();
     const dpr = Math.hypot(base.a, base.b) || 1;
     for (const l of this.layout) {
-      const px = l.em * scale;
-      let alpha = visibility(l.item.kind, px);
+      const full = l.em * scale, px = Math.min(full, VISIBLE_PX[l.item.kind][1]);
+      let alpha = visibility(l.item.kind, full);
       if (alpha <= 0.02) continue;
       if (l.item.kind === "country" && statesShown.has(l.item.id)) alpha *= 0.3;
       // große Namen liegen wie gedruckt auf der Karte, kleine bleiben kräftig
@@ -134,18 +141,33 @@ export class LabelLayer {
     const items = keys.map((k) => this.itemOf(k)).filter((f) => f && RANK[f.kind] !== undefined)
       .sort((a, b) => RANK[a.kind] - RANK[b.kind] || b.geom.area - a.geom.area);
     const world = makeProjection().rotate([0, 0]).translate([0, 0]).scale(WORLD_SCALE);
-    const taken = { country: [], state: [], continent: [] };
     // gegen welche Namen eine Ebene geprüft wird
     const against = { country: ["country"], state: ["state"], continent: ["country", "continent"] };
-    const out = [];
+    /** gesetzte Namen: {f, cands, i} – i: gewählter Kandidat */
+    const set = [];
+    const prep = (c) => { c.boxes ??= worldBoxes(c, world); c.box ??= unionBox(c.boxes); return c; };
+    const hits = (f, c, skip) => set.filter((e) => e !== skip && against[f.kind].includes(e.f.kind) && collide(c, e.cands[e.i]));
     for (const f of items) {
-      const cands = this.cands.get(f.key) ?? [];
-      const pick = cands.find((c) => {
-        c.boxes ??= worldBoxes(c, world);
-        return !against[f.kind].some((k) => taken[k].some((b) => c.boxes.some((x) => overlaps(b, x))));
-      });
-      if (!pick) continue;
-      taken[f.kind].push(...pick.boxes);
+      const cands = (this.cands.get(f.key) ?? []).map(prep);
+      let i = cands.findIndex((c) => !hits(f, c).length);
+      // Kein Platz: Ein Name derselben Ebene, der im Weg steht (meist ein größerer Nachbar mit langem Namen),
+      // weicht auf eine kleinere Fassung aus, wenn sie dann frei liegt – sonst fehlte der kleine Name ganz
+      for (let j = 0; i < 0 && j < cands.length; j++) {
+        const c = cands[j], blocking = hits(f, c);
+        if (blocking.length > 2 || blocking.some((e) => e.f.kind !== f.kind)) continue;
+        const before = blocking.map((e) => e.i);
+        const moved = blocking.every((e) => {
+          e.i = e.cands.findIndex((alt, k) => k > e.i && !collide(alt, c) && !hits(e.f, alt, e).length);
+          return e.i >= 0;
+        });
+        if (moved) i = j;
+        else blocking.forEach((e, n) => { e.i = before[n]; });
+      }
+      if (i >= 0) set.push({ f, cands, i });
+    }
+    const out = [];
+    for (const { f, cands, i } of set) {
+      const pick = cands[i];
       labelPointOf(f);
       const bg = d3.rgb(stageColor(stopsFor(scheme, f.kind === "continent" ? f.key : `continent:${f.properties.region}`),
         stageOf(f.key) + (f.kind === "continent" && this._placedUnder(f, keys) ? 1 : 0)));
@@ -352,12 +374,13 @@ function displayName(f) {
   return f.properties.name.toLocaleUpperCase();
 }
 
-/** 0 … 1: Sichtbarkeit eines Namens dieser Ebene bei dieser Schriftgröße */
+/** 0 … 1: Sichtbarkeit eines Namens dieser Ebene bei dieser (ungekappten) Schriftgröße */
 function visibility(kind, px) {
   const [lo, hi] = VISIBLE_PX[kind];
   const a = Math.min(1, Math.max(0, (px - lo) / (lo * FADE)));
-  const b = Math.min(1, Math.max(0, (hi * (1 + FADE) - px) / (hi * FADE)));
-  return a * b;
+  if (kind !== "continent") return a;
+  const near = Math.min(1, Math.max(0, (px - hi) / (hi * FADE)));
+  return a * (1 - near * (1 - CONTINENT_NEAR));
 }
 
 /** Buchstabenrahmen in der gemeinsamen Weltansicht (für den Überschneidungstest) */
@@ -374,6 +397,17 @@ function worldBoxes(c, world) {
     boxes.push([p[0] - ex, p[1] - ey, p[0] + ex, p[1] + ey]);
   }
   return boxes;
+}
+
+function unionBox(boxes) {
+  const u = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const b of boxes) { u[0] = Math.min(u[0], b[0]); u[1] = Math.min(u[1], b[1]); u[2] = Math.max(u[2], b[2]); u[3] = Math.max(u[3], b[3]); }
+  return u;
+}
+
+/** Überschneiden sich zwei Kandidaten (Buchstabenrahmen)? */
+function collide(a, b) {
+  return overlaps(a.box, b.box) && a.boxes.some((x) => b.boxes.some((y) => overlaps(x, y)));
 }
 
 function overlaps(a, b) {

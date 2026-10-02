@@ -1,7 +1,7 @@
 // Menü einer Server-Runde. Zwei Modi:
 // - Einzelspiel (Solo-Lobby): wie ein normales Einzelspiel-Menü, dazu „Aufbewahren“ und
 //   „Mitspieler einladen“ (macht daraus eine Lobby, die Runde läuft weiter).
-// - Lobby: Einladungslink, Spielerliste, Lobbyeinstellungen (max. Spieler, Passwort, Senden) und die
+// - Lobby: Einladungslink, Spielerliste, Lobbyeinstellungen (max. Spieler, Inventar-Grenze, Passwort, Senden) und die
 //   Spielkonfiguration. Nur der Host darf ändern; Änderungen gehen sofort an den Server und kommen als
 //   Lobby-Zustand bei allen an.
 
@@ -63,6 +63,13 @@ export class LobbyMenu {
     });
     this.sendEvery.el.classList.add("host-only");
     this.allowSend.closest(".field").after(this.sendEvery.el);
+    this.handCap = createStepper({
+      id: "lobby-hand-cap", label: t("lobby.handCap"), hint: t("lobby.handCapHint"),
+      value: 20, min: 0, max: 60,
+      onChange: (v) => client.sendSettings({ handCap: v }),
+    });
+    this.handCap.el.classList.add("host-only");
+    this.maxPlayers.el.after(this.handCap.el);
 
     // Verlassen (alle) und Beenden (nur Host)
     document.getElementById("lobby-leave").addEventListener("click", () => this._leave());
@@ -135,10 +142,11 @@ export class LobbyMenu {
     this.maxPlayers.value = state.settings.maxPlayers;
     this.section.classList.toggle("readonly", !host);
     this.section.querySelectorAll(".host-only input, .host-only button").forEach((el) => { el.disabled = !host; });
-    for (const st of [this.maxPlayers, this.sendEvery]) {
+    for (const st of [this.maxPlayers, this.sendEvery, this.handCap]) {
       st.el.querySelectorAll("input, button").forEach((el) => { if (!host) el.disabled = true; });
     }
     this.sendEvery.value = state.settings.sendEvery ?? 0;
+    this.handCap.value = state.settings.handCap ?? 0;
     this.sendEvery.el.classList.toggle("muted", state.settings.allowSend === false);
     if (host) this.maxPlayers.value = state.settings.maxPlayers; // Grenzen neu anwenden
 

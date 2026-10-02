@@ -52,7 +52,7 @@ Phasen: Kartendaten herunterladen (in MB, der Server gibt die Größe des Startp
 - Zurücklegen ohne Strafe: Klick auf den Slot, `Esc` oder Rechtsklick (außer bei „Kein Zurücklegen“).
 - **Items gedreht** (Regel, siehe [spielmodi.md](spielmodi.md)): Items liegen in 30°-Schritten gedreht im Inventar (nie 0°; fest je Runde, Spieler und Item). Das gehaltene Item dreht man mit `Q` (gegen den Uhrzeigersinn) / `E` (im Uhrzeigersinn) oder `Shift` + Mausrad um je 30°; zurückgelegt bleibt die neue Lage. Die Drehung ist nur eine Erschwernis: Eingesetzt wird unabhängig von ihr, beim Einrasten dreht sich das Item in die richtige Lage.
 - Helligkeitsstufen: Das Land startet dunkel bzw. neutral. Jedes eingesetzte Item hellt seine Fläche um eine Stufe auf (additiv). Staats- und Kontinentgrenzen sind unsichtbar, sichtbar sind nur Küsten; eine Kontinentgrenze (Ural, Sinai, Panama …) erscheint, sobald einer der angrenzenden Kontinente eingesetzt ist.
-- Inventar: scrollt horizontal, wenn es voll wird; die Beschriftung zeigt die Anzahl. Über dem Inventar: Nachschub-Anzeige („Noch n Treffer bis +k Items“) und – mit Timer – der Countdown.
+- Inventar: Passen die Items nicht mehr in eine Zeile, kommt eine zweite dazu (spaltenweise gefüllt); darüber hinaus scrollt es horizontal (auch mit dem Mausrad). Neue Items kommen hinten dazu, die Scrollposition bleibt stehen. Die Beschriftung zeigt die Anzahl. Über dem Inventar: Nachschub-Anzeige („Noch n Treffer bis +k Items“) und – mit Timer – der Countdown.
 
 ## Statusleiste und Nachrichtenleiste
 

@@ -7,7 +7,7 @@ import { fromWire } from "../menu/config.js";
 import { parts, serverError, t } from "../i18n/index.js";
 
 /** Fehler, nach denen der eigene (optimistische) Stand verworfen wird */
-const RESYNC_ERRORS = new Set(["not_in_hand", "round_over", "no_round", "bad_target", "send_disabled", "send_limit"]);
+const RESYNC_ERRORS = new Set(["not_in_hand", "round_over", "no_round", "bad_target", "send_disabled", "send_limit", "hand_full"]);
 /** So viele ältere Chat-Nachrichten zeigt die Leiste beim Beitreten */
 const CHAT_HISTORY = 10;
 const PAUSE_CHECK_MS = 300;
@@ -35,7 +35,7 @@ export class RemoteRound {
     client.addEventListener("welcome", () => { this.paused = null; });
 
     client.addEventListener("error", ({ detail: err }) => {
-      if (err.code === "send_limit" || err.code === "send_disabled") game.toast(serverError(err), "hint");
+      if (["send_limit", "send_disabled", "hand_full"].includes(err.code)) game.toast(serverError(err), "hint");
       if (!RESYNC_ERRORS.has(err.code)) return;
       this.sent.clear();
       this.gifting.clear();

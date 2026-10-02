@@ -18,6 +18,9 @@
   Item – bis Rundenende. So wird das Inventar am Schluss nur durch Treffer leer.
 - Verlässt ein Spieler die Lobby, gehen seine Teile zurück in den Vorrat. Sind danach alle Inventare leer,
   wird sofort nachgelegt (das ist kein Fehler der anderen).
+- Inventar-Obergrenze (Lobbyeinstellung `handCap`, 0 = ohne; rnd["handCap"], gilt sofort auch in der laufenden
+  Runde): Wer so viele Items hat, wird beim Verteilen (Start, Nachschub, Beitritt) übersprungen – was keiner mehr
+  nehmen kann, bleibt im Vorrat. Senden an einen vollen Spieler geht nicht.
 - Teile können an Mitspieler gesendet werden (give) – sie wechseln nur das Inventar. Sendelimit
   (Lobbyeinstellung `sendEvery` = N): je N vom Server erhaltene Items darf ein Spieler 1 Item senden;
   geschenkte Items zählen nicht mit.
@@ -91,7 +94,7 @@ def scaled(config: dict, players: int) -> dict:
 
 
 def new_round(number: int, config: dict, catalog, online: list[str], seed: int, now: float,
-              difficulty: dict[str, float] | None = None) -> dict:
+              difficulty: dict[str, float] | None = None, hand_cap: int = 0) -> dict:
     rng = random.Random(seed)
     pool = build_pool(catalog, config, rng, difficulty)
     start = scaled(config, len(online))
@@ -102,7 +105,7 @@ def new_round(number: int, config: dict, catalog, online: list[str], seed: int, 
         "placed": [], "placedBy": {}, "sinceRefill": 0, "events": 0, "log": [], "last": None,
         "timer": {"nextAt": now + config.get("grace", 0) + config["timer"], "graceUntil": now + config.get("grace", 0),
                   "pausedAt": None} if config.get("timer") else None,
-        "takeCursor": 0, "endspurt": False, "lostReason": None,
+        "takeCursor": 0, "endspurt": False, "lostReason": None, "handCap": hand_cap,
         # Item-Schwierigkeit zu Rundenbeginn (Punkte, scoring.py) – für alle Spieler gleich
         "diff": {k: round(float((difficulty or {}).get(k, scoring.DEFAULT_DIFFICULTY)), 1) for k in pool},
     }
@@ -141,11 +144,14 @@ def _deal(rnd: dict, online: list[str], count: int) -> dict[str, int]:
     if not order or not online.intersection(order):
         return to
     given = 0
-    while given < count and rnd["pool"]:
+    skipped = 0  # Spieler in Folge, die nichts nehmen können – nach einer vollen Runde ist Schluss
+    while given < count and rnd["pool"] and skipped < len(order):
         pid = order[rnd["cursor"] % len(order)]
         rnd["cursor"] = (rnd["cursor"] + 1) % len(order)
-        if pid not in online:
+        if pid not in online or _full(rnd, pid):
+            skipped += 1
             continue
+        skipped = 0
         key = rnd["pool"].pop(0)
         rnd["hands"].setdefault(pid, []).append(key)
         rnd["dealt"][pid] = rnd["dealt"].get(pid, 0) + 1
@@ -153,6 +159,12 @@ def _deal(rnd: dict, online: list[str], count: int) -> dict[str, int]:
         to[pid] = to.get(pid, 0) + 1
         given += 1
     return to
+
+
+def _full(rnd: dict, pid: str) -> bool:
+    """Hat der Spieler die Inventar-Obergrenze erreicht?"""
+    cap = rnd.get("handCap") or 0
+    return bool(cap) and len(rnd["hands"].get(pid, [])) >= cap
 
 
 def _count(rnd: dict, key: str, event: str, amount: int = 1) -> None:
@@ -202,7 +214,7 @@ def join(rnd: dict, pid: str, now: float | None = None) -> bool:
     scoring.start_pace(rnd, pid, time.time() if now is None else now)
     hand = rnd["hands"].setdefault(pid, [])
     count = 0
-    while count < PER_PLAYER and rnd["pool"]:
+    while count < PER_PLAYER and rnd["pool"] and not _full(rnd, pid):
         key = rnd["pool"].pop(0)
         hand.append(key)
         rnd["dealt"][pid] = rnd["dealt"].get(pid, 0) + 1
@@ -286,6 +298,8 @@ def give(rnd: dict, pid: str, to: str, key: str, every: int = 0) -> None:
     hand = rnd["hands"].get(pid, [])
     if key not in hand:
         raise RoundError("not_in_hand", "Dieses Item liegt nicht in deinem Inventar.")
+    if _full(rnd, to):
+        raise RoundError("hand_full", "Das Inventar dieses Spielers ist voll.")
     quota = send_quota(rnd, pid, every)
     if quota["left"] == 0:
         n = quota["next"]
@@ -456,7 +470,7 @@ def public_view(rnd: dict | None, now: float | None = None) -> dict | None:
         "number": rnd["number"], "config": rnd["config"], "status": rnd["status"],
         "lives": rnd["lives"], "livesMax": rnd["livesMax"], "total": rnd["total"],
         "placed": rnd["placed"], "placedBy": rnd["placedBy"], "poolCount": len(rnd["pool"]),
-        "sinceRefill": rnd["sinceRefill"],
+        "sinceRefill": rnd["sinceRefill"], "handCap": rnd.get("handCap") or 0,
         "handCounts": {pid: len(h) for pid, h in rnd["hands"].items()}, "last": rnd["last"],
         "log": rnd.get("log", []), "events": rnd.get("events", 0), "timer": timer_view(rnd, now),
         "endspurt": bool(rnd.get("endspurt")), "lostReason": rnd.get("lostReason"),

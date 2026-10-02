@@ -14,7 +14,7 @@ def _store():
 
 @bp.post("")
 def create_lobby():
-    """Body: {name, config, maxPlayers, password, solo, ttl, sendEvery} → {code, url, player: {id, token, name}}
+    """Body: {name, config, maxPlayers, password, solo, ttl, sendEvery, handCap} → {code, url, player: {id, token, name}}
     solo: Einzelspiel (niemand kann beitreten) · ttl: Verfall nach so vielen Sekunden Untätigkeit"""
     body = request.get_json(silent=True) or {}
     lobby, player = _store().create(
@@ -25,6 +25,7 @@ def create_lobby():
         solo=body.get("solo") is True,
         ttl=body.get("ttl"),
         send_every=body.get("sendEvery"),
+        hand_cap=body.get("handCap"),
     )
     code = lobby["code"]
     return jsonify(code=code, url=url_for("main.lobby", code=code), player=player), 201

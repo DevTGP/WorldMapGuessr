@@ -26,7 +26,7 @@ export class Inventory {
       e.preventDefault();
       container.scrollLeft += e.deltaY;
     }, { passive: false });
-    container.addEventListener("scroll", () => this._edges(), { passive: true });
+    container.addEventListener("scroll", () => this._fades(), { passive: true });
     addEventListener("resize", () => this._edges());
   }
 
@@ -39,7 +39,6 @@ export class Inventory {
   }
 
   add(pieces) {
-    const refill = this.container.children.length > 0;
     for (const p of pieces) {
       this.pieces.set(p.id, p);
       const btn = document.createElement("button");
@@ -54,9 +53,7 @@ export class Inventory {
       this._drawIcon(p);
       requestAnimationFrame(() => requestAnimationFrame(() => btn.classList.remove("entering")));
     }
-    this._changed();
-    // Nachschub sichtbar machen (neue Items kommen hinten dazu)
-    if (pieces.length && refill) requestAnimationFrame(() => this.container.scrollTo({ left: this.container.scrollWidth, behavior: "smooth" }));
+    this._changed(); // Scrollposition bleibt: neue Items kommen hinten dazu, ohne dass das Inventar wegspringt
   }
 
   /** Slot in den sichtbaren Bereich scrollen (z. B. bevor ein Item dorthin zurückfliegt) */
@@ -75,8 +72,18 @@ export class Inventory {
     this._edges();
   }
 
-  /** Ausblendung an den Rändern, wenn es dort weitergeht */
+  /** Zweite Zeile, sobald die Items nicht mehr in eine passen; Ausblendung an den Rändern, wenn es dort weitergeht */
   _edges() {
+    const c = this.container;
+    const two = c.classList.contains("two-rows");
+    c.classList.remove("two-rows");
+    const need = c.children.length > 1 && c.scrollWidth > c.clientWidth + 2;
+    c.classList.toggle("two-rows", need);
+    if (need !== two) document.documentElement.classList.toggle("inv-two-rows", need);
+    this._fades();
+  }
+
+  _fades() {
     const c = this.container;
     c.classList.toggle("more-left", c.scrollLeft > 2);
     c.classList.toggle("more-right", c.scrollLeft + c.clientWidth < c.scrollWidth - 2);

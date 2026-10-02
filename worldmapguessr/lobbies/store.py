@@ -20,8 +20,9 @@ from . import round as rounds
 from . import scoring
 from .codes import new_code, normalize
 from .persistence import JsonLobbyPersistence
-from .settings import (DEFAULT_ALLOW_SEND, DEFAULT_CONFIG, DEFAULT_SEND_EVERY, DEFAULT_TTL, clean_bool,
-                       clean_config, clean_max_players, clean_name, clean_send_every, clean_ttl)
+from .settings import (DEFAULT_ALLOW_SEND, DEFAULT_CONFIG, DEFAULT_HAND_CAP, DEFAULT_SEND_EVERY, DEFAULT_TTL,
+                       clean_bool, clean_config, clean_hand_cap, clean_max_players, clean_name, clean_send_every,
+                       clean_ttl)
 
 LOBBY_TTL = DEFAULT_TTL  # Sekunden ohne Aktivität für Lobbys ohne eigene Einstellung (ältere)
 INACTIVE_AFTER = 600     # Sekunden ohne Aktivität (und ohne Verbindung), bis eine Lobby den Speicher verlässt
@@ -141,7 +142,7 @@ class LobbyStore:
 
     # ---------- Anlegen / Beitreten ----------
     def create(self, *, player_name, config=None, max_players=None, password="", solo=False,
-               ttl=None, send_every=None) -> tuple[dict, dict]:
+               ttl=None, send_every=None, hand_cap=None) -> tuple[dict, dict]:
         """Neue Lobby; der Ersteller wird Host. solo: Einzelspiel (niemand kann beitreten).
         Gibt (lobby, player_with_token) zurück."""
         with self.lock:
@@ -159,6 +160,7 @@ class LobbyStore:
                     "passwordHash": generate_password_hash(password) if password else "",
                     "allowSend": DEFAULT_ALLOW_SEND,
                     "sendEvery": clean_send_every(send_every) if send_every is not None else DEFAULT_SEND_EVERY,
+                    "handCap": clean_hand_cap(hand_cap),
                     "solo": bool(solo),
                     "ttl": clean_ttl(ttl),
                 },
@@ -217,6 +219,10 @@ class LobbyStore:
                 s["solo"] = False
             if "sendEvery" in settings:
                 s["sendEvery"] = clean_send_every(settings["sendEvery"], s.get("sendEvery", DEFAULT_SEND_EVERY))
+            if "handCap" in settings:
+                s["handCap"] = clean_hand_cap(settings["handCap"], self.hand_cap(lobby))
+                if lobby["round"]:
+                    lobby["round"]["handCap"] = s["handCap"]  # gilt sofort, auch in der laufenden Runde
             if "password" in settings:  # "" entfernt das Passwort
                 pw = str(settings["password"] or "")[:64]
                 s["passwordHash"] = generate_password_hash(pw) if pw else ""
@@ -240,7 +246,7 @@ class LobbyStore:
             lobby["round"] = rounds.new_round(
                 number, lobby["settings"]["config"], self.catalog, players,
                 seed=secrets.randbits(31), now=self.clock(),
-                difficulty=self.difficulty() if self.difficulty else None,
+                difficulty=self.difficulty() if self.difficulty else None, hand_cap=self.hand_cap(lobby),
             )
             self.touch(code)
             return lobby
@@ -291,6 +297,11 @@ class LobbyStore:
     def send_every(lobby) -> int:
         """Sendelimit der Lobby (1 Senden je N erhaltene Items, 0 = ohne); ältere Lobbys: Standard."""
         return lobby["settings"].get("sendEvery", DEFAULT_SEND_EVERY)
+
+    @staticmethod
+    def hand_cap(lobby) -> int:
+        """Inventar-Obergrenze je Spieler (0 = ohne); ältere Lobbys: Standard."""
+        return lobby["settings"].get("handCap", DEFAULT_HAND_CAP)
 
     def pause_timer(self, code, paused: bool) -> bool:
         """Rundentimer anhalten/weiterlaufen lassen (niemand da; Einzelspieler im Menü)."""
